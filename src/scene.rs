@@ -68,7 +68,9 @@ pub(crate) struct MaterialState {
 }
 
 #[derive(Component)]
-pub(crate) struct PolyhedronEntity;
+pub(crate) struct PolyhedronEntity {
+    pub(crate) node_index: usize,
+}
 
 pub(crate) fn setup_scene(
     mut commands: Commands,
@@ -90,6 +92,7 @@ pub(crate) fn setup_scene(
         &root,
         &app_config.materials,
         initial_opacity,
+        0,
     );
 
     let camera_translation = camera_rig.orientation * Vec3::new(0.0, 0.0, camera_rig.distance);
@@ -190,13 +193,14 @@ pub(crate) fn spawn_polyhedron_entity(
     node: &PolyhedronNode,
     material_config: &MaterialConfig,
     opacity: f32,
+    node_index: usize,
 ) {
     let material = materials.add(polyhedron_material(node, material_config, opacity));
 
     commands.spawn((
         Mesh3d(mesh.clone()),
         MeshMaterial3d(material),
-        PolyhedronEntity,
+        PolyhedronEntity { node_index },
         Transform {
             translation: node.center,
             rotation: node.rotation,
@@ -204,6 +208,21 @@ pub(crate) fn spawn_polyhedron_entity(
         },
         Visibility::Visible,
     ));
+}
+
+pub(crate) fn sync_polyhedron_transforms(
+    nodes: &[PolyhedronNode],
+    polyhedron_transforms: &mut Query<(&PolyhedronEntity, &mut Transform)>,
+) {
+    for (polyhedron_entity, mut transform) in polyhedron_transforms.iter_mut() {
+        let Some(node) = nodes.get(polyhedron_entity.node_index) else {
+            continue;
+        };
+
+        transform.translation = node.center;
+        transform.rotation = node.rotation;
+        transform.scale = Vec3::splat(node.scale);
+    }
 }
 
 fn polyhedron_material(
@@ -248,7 +267,7 @@ mod tests {
 
     use crate::config::GenerationConfig;
     use crate::generation::SpawnHoldState;
-    use crate::polyhedra::{PolyhedronKind, PolyhedronNode, ShapeCatalog};
+    use crate::polyhedra::{NodeOrigin, PolyhedronKind, PolyhedronNode, ShapeCatalog};
 
     use super::{
         GenerationState, alpha_mode_for_opacity, reset_generation_state, root_generation_node,
@@ -269,6 +288,10 @@ mod tests {
             scale: 0.4,
             radius: 0.7,
             occupied_vertices: vec![false; 4],
+            origin: NodeOrigin::Child {
+                parent_index: 0,
+                vertex_index: 0,
+            },
         };
 
         let mut generation_state = GenerationState {

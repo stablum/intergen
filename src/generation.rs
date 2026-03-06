@@ -1,10 +1,11 @@
 use bevy::prelude::*;
 
 use crate::config::AppConfig;
-use crate::polyhedra::{PolyhedronKind, next_spawn};
+use crate::polyhedra::{PolyhedronKind, next_spawn, recompute_spawn_tree};
 use crate::scene::{
     GenerationState, MaterialState, PolyhedronEntity, ShapeAssets, alpha_mode_for_opacity,
     opacity_status_message, reset_generation_state, spawn_polyhedron_entity,
+    sync_polyhedron_transforms,
 };
 
 const RADIANS_TO_DEGREES: f32 = 180.0 / std::f32::consts::PI;
@@ -68,6 +69,7 @@ pub(crate) fn generation_input_system(
     mut materials: ResMut<Assets<StandardMaterial>>,
     polyhedron_entities: Query<Entity, With<PolyhedronEntity>>,
     polyhedron_materials: Query<&MeshMaterial3d<StandardMaterial>, With<PolyhedronEntity>>,
+    mut polyhedron_transforms: Query<(&PolyhedronEntity, &mut Transform)>,
 ) {
     if keys.just_pressed(KeyCode::Digit1) {
         generation_state.selected_kind = PolyhedronKind::Cube;
@@ -139,6 +141,7 @@ pub(crate) fn generation_input_system(
     }
 
     let (min_twist, max_twist) = app_config.generation.twist_bounds();
+    let mut twist_changed = false;
     if twist_decrease_requested(&keys) {
         generation_state.twist_per_vertex_radians = adjust_clamped_value(
             generation_state.twist_per_vertex_radians,
@@ -146,6 +149,7 @@ pub(crate) fn generation_input_system(
             min_twist,
             max_twist,
         );
+        twist_changed = true;
         println!(
             "{}",
             twist_status_message(generation_state.twist_per_vertex_radians)
@@ -158,6 +162,7 @@ pub(crate) fn generation_input_system(
             min_twist,
             max_twist,
         );
+        twist_changed = true;
         println!(
             "{}",
             twist_status_message(generation_state.twist_per_vertex_radians)
@@ -167,10 +172,20 @@ pub(crate) fn generation_input_system(
         generation_state.twist_per_vertex_radians = app_config
             .generation
             .default_twist_per_vertex_radians_clamped();
+        twist_changed = true;
         println!(
             "Reset {}",
             twist_status_message(generation_state.twist_per_vertex_radians).to_lowercase()
         );
+    }
+    if twist_changed {
+        let twist_per_vertex_radians = generation_state.twist_per_vertex_radians;
+        recompute_spawn_tree(
+            &mut generation_state.nodes,
+            &shape_assets.catalog,
+            twist_per_vertex_radians,
+        );
+        sync_polyhedron_transforms(&generation_state.nodes, &mut polyhedron_transforms);
     }
 
     if keys.just_pressed(KeyCode::KeyR) {
@@ -190,6 +205,7 @@ pub(crate) fn generation_input_system(
             &root,
             &app_config.materials,
             material_state.opacity,
+            0,
         );
         println!("Reset scene to the root polyhedron.");
         return;
@@ -220,6 +236,7 @@ pub(crate) fn generation_input_system(
         eprintln!("No valid spawn position is currently available.");
         return;
     };
+    let node_index = generation_state.nodes.len() - 1;
 
     spawn_polyhedron_entity(
         &mut commands,
@@ -228,6 +245,7 @@ pub(crate) fn generation_input_system(
         &spawn.node,
         &app_config.materials,
         material_state.opacity,
+        node_index,
     );
     println!(
         "Spawned {:?} at level {} from parent level {}",
