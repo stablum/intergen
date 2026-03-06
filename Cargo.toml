@@ -3,8 +3,16 @@ name = "intergen"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+fast-compile = ["bevy/dynamic_linking"]
+
 [dependencies]
-bevy = "0.17.3"
+bevy = { version = "0.17.3", default-features = false, features = [
+    "bevy_pbr",
+    "bevy_winit",
+    "multi_threaded",
+    "png",
+] }
 
 [profile.dev]
 opt-level = 1
