@@ -160,9 +160,6 @@ struct SceneCamera;
 #[derive(Component)]
 struct HelpOverlay;
 
-#[derive(Component)]
-struct UiCamera;
-
 fn setup_scene(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -189,18 +186,15 @@ fn setup_scene(
         SceneCamera,
     ));
 
-    let ui_camera = commands
-        .spawn((
-            Camera2d,
-            Camera {
-                order: 1,
-                clear_color: ClearColorConfig::None,
-                ..default()
-            },
-            IsDefaultUiCamera,
-            UiCamera,
-        ))
-        .id();
+    commands.spawn((
+        Camera2d,
+        Camera {
+            order: 1,
+            clear_color: ClearColorConfig::None,
+            ..default()
+        },
+        IsDefaultUiCamera,
+    ));
 
     commands.spawn((
         DirectionalLight {
@@ -221,7 +215,7 @@ fn setup_scene(
         Transform::from_xyz(-8.0, 6.0, -7.0),
     ));
 
-    spawn_help_ui(&mut commands, &ui_theme, ui_camera);
+    spawn_help_ui(&mut commands, &ui_theme);
 
     commands.insert_resource(ui_theme.clone());
     commands.insert_resource(shape_assets);
@@ -421,7 +415,7 @@ fn carbon_plus_font_asset() -> Option<&'static str> {
         .find(|path| Path::new("assets").join(path).is_file())
 }
 
-fn spawn_help_ui(commands: &mut Commands, ui_theme: &UiTheme, camera: Entity) {
+fn spawn_help_ui(commands: &mut Commands, ui_theme: &UiTheme) {
     commands
         .spawn((
             Node {
@@ -431,7 +425,6 @@ fn spawn_help_ui(commands: &mut Commands, ui_theme: &UiTheme, camera: Entity) {
                 padding: UiRect::axes(px(12), px(8)),
                 ..default()
             },
-            UiTargetCamera(camera),
             BackgroundColor(Color::srgba(0.06, 0.08, 0.13, 0.86)),
             BorderRadius::MAX,
             GlobalZIndex(20),
@@ -455,7 +448,6 @@ fn spawn_help_ui(commands: &mut Commands, ui_theme: &UiTheme, camera: Entity) {
                 align_items: AlignItems::FlexEnd,
                 ..default()
             },
-            UiTargetCamera(camera),
             BackgroundColor(Color::srgba(0.01, 0.02, 0.04, 0.72)),
             GlobalZIndex(30),
             Visibility::Hidden,
