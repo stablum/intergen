@@ -243,13 +243,8 @@ fn setup_scene(
 fn camera_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    help_overlay: Res<HelpOverlayState>,
     mut camera_rig: ResMut<CameraRig>,
 ) {
-    if help_overlay.visible {
-        return;
-    }
-
     let dt = time.delta_secs();
     let torque_step = CAMERA_ROTATION_ACCEL * dt;
 
@@ -308,14 +303,9 @@ fn generation_input_system(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
     shape_assets: Res<ShapeAssets>,
-    help_overlay: Res<HelpOverlayState>,
     mut generation_state: ResMut<GenerationState>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
-    if help_overlay.visible {
-        return;
-    }
-
     if keys.just_pressed(KeyCode::Digit1) {
         generation_state.selected_kind = PolyhedronKind::Cube;
         println!("Selected child shape: {:?}", generation_state.selected_kind);
