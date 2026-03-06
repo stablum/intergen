@@ -9,6 +9,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - selectable child shape type
 - adjustable child scale ratio
 - toggleable in-app keybinding overlay
+- built-in screenshot capture for manual and scripted verification
 - containment rejection so obviously hidden fully-inside spawns are skipped
 
 ## Requirements
@@ -45,6 +46,14 @@ If you want to run without that mode:
 cargo run-plain
 ```
 
+To save a verification screenshot and exit automatically:
+
+```powershell
+cargo run -- --capture screenshots\check.png --capture-delay-frames 120
+```
+
+During a normal interactive run, press `F12` to save a screenshot under `screenshots/`.
+
 ## Test
 
 ```powershell
@@ -64,6 +73,7 @@ cargo test-plain
 - `Q` / `E`: roll camera
 - `W` / `S`: zoom in / out
 - `F1` or `H`: toggle the keybinding overlay
+- `F12`: save a screenshot to `screenshots/`
 - `Space`: spawn the next child polyhedron
 - `1`: select cube
 - `2`: select tetrahedron
@@ -92,3 +102,4 @@ Not implemented yet:
 - hardware ray tracing
 - more advanced visibility heuristics than simple containment rejection
 - export / save workflows
+
