@@ -53,7 +53,7 @@ If `config.toml` is missing, the app falls back to the same built-in defaults.
 Live twist controls use these `generation` settings:
 - `twist_per_vertex_radians`: startup default for the child twist angle
 - `twist_adjust_step`: per-keypress twist change
-- `min_twist_per_vertex_radians` / `max_twist_per_vertex_radians`: live clamp range
+- `min_twist_per_vertex_radians` / `max_twist_per_vertex_radians`: live clamp range, with `0.0` as the minimum allowed floor
 
 Live opacity controls use these `materials` settings:
 - `default_opacity`: startup default for all object materials
@@ -137,4 +137,5 @@ Not implemented yet:
 - hardware ray tracing
 - more advanced visibility heuristics than simple containment rejection
 - export / save workflows
+
 

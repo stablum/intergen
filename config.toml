@@ -34,7 +34,7 @@ spawn_repeat_interval_secs = 0.07
 containment_epsilon = 0.02
 twist_per_vertex_radians = 0.62831855
 twist_adjust_step = 0.17453292
-min_twist_per_vertex_radians = -3.1415927
+min_twist_per_vertex_radians = 0.0
 max_twist_per_vertex_radians = 3.1415927
 
 [lighting.directional]
@@ -99,4 +99,5 @@ title_text = [0.98, 0.99, 1.0]
 body_font_size = 16.0
 body_text = [0.89, 0.92, 0.96]
 body_max_width = 420.0
+
 

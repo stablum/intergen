@@ -213,10 +213,9 @@ impl GenerationConfig {
     }
 
     pub(crate) fn twist_bounds(&self) -> (f32, f32) {
-        ordered_pair(
-            self.min_twist_per_vertex_radians,
-            self.max_twist_per_vertex_radians,
-        )
+        let min = self.min_twist_per_vertex_radians.max(0.0);
+        let max = self.max_twist_per_vertex_radians.max(min);
+        (min, max)
     }
 
     pub(crate) fn default_twist_per_vertex_radians_clamped(&self) -> f32 {
@@ -252,7 +251,7 @@ impl Default for GenerationConfig {
             containment_epsilon: 0.02,
             twist_per_vertex_radians: std::f32::consts::PI / 5.0,
             twist_adjust_step: std::f32::consts::PI / 18.0,
-            min_twist_per_vertex_radians: -std::f32::consts::PI,
+            min_twist_per_vertex_radians: 0.0,
             max_twist_per_vertex_radians: std::f32::consts::PI,
         }
     }
@@ -532,7 +531,7 @@ mod tests {
             r#"
             [generation]
             twist_per_vertex_radians = 10.0
-            min_twist_per_vertex_radians = -0.5
+            min_twist_per_vertex_radians = 0.0
             max_twist_per_vertex_radians = 0.75
             "#,
         )
@@ -557,5 +556,19 @@ mod tests {
         .expect("material config should parse");
 
         assert_eq!(config.materials.default_opacity_clamped(), 0.8);
+    }
+
+    #[test]
+    fn twist_bounds_never_allow_negative_floor() {
+        let config = parse_config(
+            r#"
+            [generation]
+            min_twist_per_vertex_radians = -1.0
+            max_twist_per_vertex_radians = 0.75
+            "#,
+        )
+        .expect("twist config should parse");
+
+        assert_eq!(config.generation.twist_bounds(), (0.0, 0.75));
     }
 }
