@@ -2,14 +2,7 @@ use std::path::Path;
 
 use bevy::prelude::*;
 
-const CARBON_PLUS_FONT_CANDIDATES: &[&str] = &[
-    "fonts/CarbonPlus-Regular.ttf",
-    "fonts/CarbonPlus-Regular.otf",
-    "fonts/Carbon Plus Regular.ttf",
-    "fonts/Carbon Plus Regular.otf",
-    "fonts/CarbonPlus.ttf",
-    "fonts/Carbon Plus.ttf",
-];
+use crate::config::{UiConfig, srgb, srgba};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum UiFontSource {
@@ -63,8 +56,8 @@ pub(crate) fn toggle_help_overlay_system(
     };
 }
 
-pub(crate) fn load_ui_theme(asset_server: &AssetServer) -> UiTheme {
-    if let Some(font_asset) = carbon_plus_font_asset() {
+pub(crate) fn load_ui_theme(asset_server: &AssetServer, ui_config: &UiConfig) -> UiTheme {
+    if let Some(font_asset) = carbon_plus_font_asset(&ui_config.font_candidates) {
         return UiTheme {
             font: asset_server.load(font_asset),
             source: UiFontSource::CarbonPlus,
@@ -77,24 +70,29 @@ pub(crate) fn load_ui_theme(asset_server: &AssetServer) -> UiTheme {
     }
 }
 
-fn carbon_plus_font_asset() -> Option<&'static str> {
-    CARBON_PLUS_FONT_CANDIDATES
+fn carbon_plus_font_asset(font_candidates: &[String]) -> Option<String> {
+    font_candidates
         .iter()
-        .copied()
         .find(|path| Path::new("assets").join(path).is_file())
+        .cloned()
 }
 
-pub(crate) fn spawn_help_ui(commands: &mut Commands, ui_theme: &UiTheme, scene_camera: Entity) {
+pub(crate) fn spawn_help_ui(
+    commands: &mut Commands,
+    ui_theme: &UiTheme,
+    scene_camera: Entity,
+    ui_config: &UiConfig,
+) {
     commands
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                top: px(18),
-                left: px(18),
-                padding: UiRect::axes(px(12), px(8)),
+                top: px(ui_config.hint_top),
+                left: px(ui_config.hint_left),
+                padding: UiRect::axes(px(ui_config.hint_padding_x), px(ui_config.hint_padding_y)),
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.06, 0.08, 0.13, 0.86)),
+            BackgroundColor(srgba(ui_config.hint_background)),
             BorderRadius::MAX,
             GlobalZIndex(20),
             UiTargetCamera(scene_camera),
@@ -102,8 +100,8 @@ pub(crate) fn spawn_help_ui(commands: &mut Commands, ui_theme: &UiTheme, scene_c
         .with_children(|parent| {
             parent.spawn((
                 Text::new("F1 / H: controls"),
-                ui_theme.text_font(14.0),
-                TextColor(Color::srgb(0.93, 0.95, 0.99)),
+                ui_theme.text_font(ui_config.hint_font_size),
+                TextColor(srgb(ui_config.hint_text)),
             ));
         });
 
@@ -113,12 +111,12 @@ pub(crate) fn spawn_help_ui(commands: &mut Commands, ui_theme: &UiTheme, scene_c
                 width: percent(100),
                 height: percent(100),
                 position_type: PositionType::Absolute,
-                padding: UiRect::all(px(24)),
+                padding: UiRect::all(px(ui_config.overlay_padding)),
                 flex_direction: FlexDirection::Column,
                 align_items: AlignItems::FlexEnd,
                 ..default()
             },
-            BackgroundColor(Color::srgba(0.01, 0.02, 0.04, 0.72)),
+            BackgroundColor(srgba(ui_config.overlay_background)),
             GlobalZIndex(30),
             Visibility::Hidden,
             HelpOverlay,
@@ -129,28 +127,28 @@ pub(crate) fn spawn_help_ui(commands: &mut Commands, ui_theme: &UiTheme, scene_c
                 .spawn((
                     Node {
                         width: percent(100),
-                        max_width: px(460),
+                        max_width: px(ui_config.panel_max_width),
                         flex_direction: FlexDirection::Column,
-                        row_gap: px(12),
-                        padding: UiRect::all(px(20)),
+                        row_gap: px(ui_config.panel_row_gap),
+                        padding: UiRect::all(px(ui_config.panel_padding)),
                         ..default()
                     },
-                    BackgroundColor(Color::srgba(0.07, 0.1, 0.16, 0.95)),
-                    BorderRadius::all(px(20)),
+                    BackgroundColor(srgba(ui_config.panel_background)),
+                    BorderRadius::all(px(ui_config.panel_radius)),
                 ))
                 .with_children(|panel| {
                     panel.spawn((
                         Text::new("Keybindings"),
-                        ui_theme.text_font(28.0),
-                        TextColor(Color::srgb(0.98, 0.99, 1.0)),
+                        ui_theme.text_font(ui_config.title_font_size),
+                        TextColor(srgb(ui_config.title_text)),
                     ));
                     panel.spawn((
                         Text::new(controls_overlay_text(ui_theme.source)),
-                        ui_theme.text_font(16.0),
-                        TextColor(Color::srgb(0.89, 0.92, 0.96)),
+                        ui_theme.text_font(ui_config.body_font_size),
+                        TextColor(srgb(ui_config.body_text)),
                         TextLayout::new_with_justify(Justify::Left),
                         Node {
-                            max_width: px(420),
+                            max_width: px(ui_config.body_max_width),
                             ..default()
                         },
                     ));

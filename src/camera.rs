@@ -1,14 +1,6 @@
-use std::f32::consts::FRAC_PI_4;
-
 use bevy::prelude::*;
 
-const CAMERA_DISTANCE: f32 = 14.0;
-const CAMERA_ROTATION_ACCEL: f32 = 1.9;
-const CAMERA_ZOOM_ACCEL: f32 = 24.0;
-const ANGULAR_DAMPING: f32 = 2.2;
-const ZOOM_DAMPING: f32 = 4.0;
-const MIN_CAMERA_DISTANCE: f32 = 4.0;
-const MAX_CAMERA_DISTANCE: f32 = 48.0;
+use crate::config::{AppConfig, CameraConfig};
 
 #[derive(Resource)]
 pub(crate) struct CameraRig {
@@ -18,12 +10,12 @@ pub(crate) struct CameraRig {
     pub(crate) zoom_velocity: f32,
 }
 
-impl Default for CameraRig {
-    fn default() -> Self {
+impl CameraRig {
+    pub(crate) fn from_config(config: &CameraConfig) -> Self {
         Self {
-            orientation: Quat::from_euler(EulerRot::YXZ, -FRAC_PI_4, -0.45, 0.15),
+            orientation: config.initial_orientation(),
             angular_velocity: Vec3::ZERO,
-            distance: CAMERA_DISTANCE,
+            distance: config.initial_distance,
             zoom_velocity: 0.0,
         }
     }
@@ -35,10 +27,11 @@ pub(crate) struct SceneCamera;
 pub(crate) fn camera_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
+    app_config: Res<AppConfig>,
     mut camera_rig: ResMut<CameraRig>,
 ) {
     let dt = time.delta_secs();
-    let torque_step = CAMERA_ROTATION_ACCEL * dt;
+    let torque_step = app_config.camera.rotation_accel * dt;
 
     if keys.pressed(KeyCode::ArrowUp) {
         camera_rig.angular_velocity.x += torque_step;
@@ -59,15 +52,16 @@ pub(crate) fn camera_input_system(
         camera_rig.angular_velocity.z -= torque_step;
     }
     if keys.pressed(KeyCode::KeyW) {
-        camera_rig.zoom_velocity -= CAMERA_ZOOM_ACCEL * dt;
+        camera_rig.zoom_velocity -= app_config.camera.zoom_accel * dt;
     }
     if keys.pressed(KeyCode::KeyS) {
-        camera_rig.zoom_velocity += CAMERA_ZOOM_ACCEL * dt;
+        camera_rig.zoom_velocity += app_config.camera.zoom_accel * dt;
     }
 }
 
 pub(crate) fn camera_motion_system(
     time: Res<Time>,
+    app_config: Res<AppConfig>,
     mut camera_rig: ResMut<CameraRig>,
     mut query: Query<&mut Transform, With<SceneCamera>>,
 ) {
@@ -81,10 +75,11 @@ pub(crate) fn camera_motion_system(
         camera_rig.orientation = (delta * camera_rig.orientation).normalize();
     }
 
-    camera_rig.angular_velocity *= f32::exp(-ANGULAR_DAMPING * dt);
-    camera_rig.zoom_velocity *= f32::exp(-ZOOM_DAMPING * dt);
-    camera_rig.distance = (camera_rig.distance + camera_rig.zoom_velocity * dt)
-        .clamp(MIN_CAMERA_DISTANCE, MAX_CAMERA_DISTANCE);
+    camera_rig.angular_velocity *= f32::exp(-app_config.camera.angular_damping * dt);
+    camera_rig.zoom_velocity *= f32::exp(-app_config.camera.zoom_damping * dt);
+    let (min_distance, max_distance) = app_config.camera.distance_bounds();
+    camera_rig.distance =
+        (camera_rig.distance + camera_rig.zoom_velocity * dt).clamp(min_distance, max_distance);
 
     let translation = camera_rig.orientation * Vec3::new(0.0, 0.0, camera_rig.distance);
     *transform = Transform::from_translation(translation)

@@ -2,6 +2,8 @@
 
 Interactive 3D polyhedron generation tool built with Rust and Bevy.
 
+Runtime tuning lives in config.toml at the repository root.
+
 The current prototype focuses on a fast local development loop and a usable vertical slice:
 - inertial camera rotation on all 3 axes
 - keyboard zoom
@@ -32,6 +34,21 @@ Supported filenames:
 
 If none of those files are present, the app falls back to Bevy's default font.
 
+## Configuration
+
+The app loads `config.toml` from the repository root on startup.
+
+Current configuration sections:
+- `window`: title, resolution, and present mode
+- `rendering`: clear color and ambient light
+- `camera`: initial orbit and motion tuning
+- `generation`: root shape, default child shape, scale limits, spawn cadence, and spawn heuristics
+- `lighting`: directional and point light colors, positions, and intensities
+- `materials`: color progression and PBR material tuning
+- `capture`: screenshot output directory and default capture delay
+- `ui`: font candidates plus overlay sizing and colors
+
+If `config.toml` is missing, the app falls back to the same built-in defaults.
 ## Run
 
 ```powershell

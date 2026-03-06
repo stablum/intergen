@@ -1,0 +1,94 @@
+[window]
+title = "intergen"
+width = 1440
+height = 960
+present_mode = "auto_vsync"
+
+[rendering]
+clear_color = [0.035, 0.04, 0.06]
+ambient_light_color = [0.7, 0.74, 0.82]
+ambient_light_brightness = 12.0
+
+[camera]
+initial_yaw = -0.7853982
+initial_pitch = -0.45
+initial_roll = 0.15
+initial_distance = 14.0
+rotation_accel = 1.9
+zoom_accel = 24.0
+angular_damping = 2.2
+zoom_damping = 4.0
+min_distance = 4.0
+max_distance = 48.0
+
+[generation]
+root_kind = "cube"
+root_scale = 1.9
+default_child_kind = "dodecahedron"
+default_scale_ratio = 0.58
+scale_adjust_step = 0.05
+min_scale_ratio = 0.15
+max_scale_ratio = 1.0
+spawn_hold_delay_secs = 0.24
+spawn_repeat_interval_secs = 0.07
+containment_epsilon = 0.02
+twist_per_vertex_radians = 0.62831855
+
+[lighting.directional]
+color = [1.0, 0.97, 0.93]
+illuminance = 22000.0
+shadows_enabled = true
+translation = [12.0, 18.0, 9.0]
+look_at = [0.0, 0.0, 0.0]
+
+[lighting.point]
+color = [0.5, 0.6, 0.85]
+intensity = 1200000.0
+range = 60.0
+shadows_enabled = false
+translation = [-9.0, 5.0, -12.0]
+
+[materials]
+hue_step_per_level = 45.0
+saturation = 0.68
+lightness = 0.56
+metallic = 0.05
+perceptual_roughness = 0.86
+reflectance = 0.24
+cube_hue_bias = 35.0
+tetrahedron_hue_bias = 110.0
+octahedron_hue_bias = 205.0
+dodecahedron_hue_bias = 290.0
+
+[capture]
+output_dir = "screenshots"
+default_capture_delay_frames = 8
+
+[ui]
+font_candidates = [
+  "fonts/CarbonPlus-Regular.ttf",
+  "fonts/CarbonPlus-Regular.otf",
+  "fonts/Carbon Plus Regular.ttf",
+  "fonts/Carbon Plus Regular.otf",
+  "fonts/CarbonPlus.ttf",
+  "fonts/Carbon Plus.ttf",
+]
+hint_top = 18.0
+hint_left = 18.0
+hint_padding_x = 12.0
+hint_padding_y = 8.0
+hint_background = [0.06, 0.08, 0.13, 0.86]
+hint_text = [0.93, 0.95, 0.99]
+hint_font_size = 14.0
+overlay_background = [0.01, 0.02, 0.04, 0.72]
+overlay_padding = 24.0
+panel_max_width = 460.0
+panel_row_gap = 12.0
+panel_padding = 20.0
+panel_background = [0.07, 0.1, 0.16, 0.95]
+panel_radius = 20.0
+title_font_size = 28.0
+title_text = [0.98, 0.99, 1.0]
+body_font_size = 16.0
+body_text = [0.89, 0.92, 0.96]
+body_max_width = 420.0

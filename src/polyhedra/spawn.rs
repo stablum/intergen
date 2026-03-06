@@ -1,31 +1,25 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
+use serde::Deserialize;
 
 use super::shapes::{ShapeCatalog, ShapeGeometry};
 
-pub(crate) const MIN_SCALE_RATIO: f32 = 0.15;
-pub(crate) const MAX_SCALE_RATIO: f32 = 1.0;
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SpawnTuning {
+    pub(crate) min_scale_ratio: f32,
+    pub(crate) max_scale_ratio: f32,
+    pub(crate) containment_epsilon: f32,
+    pub(crate) twist_per_vertex_radians: f32,
+}
 
-const CONTAINMENT_EPSILON: f32 = 0.02;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
 pub(crate) enum PolyhedronKind {
     Cube,
     Tetrahedron,
     Octahedron,
     Dodecahedron,
-}
-
-impl PolyhedronKind {
-    pub(crate) fn hue_bias(self) -> f32 {
-        match self {
-            Self::Cube => 35.0,
-            Self::Tetrahedron => 110.0,
-            Self::Octahedron => 205.0,
-            Self::Dodecahedron => 290.0,
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -64,8 +58,9 @@ pub(crate) fn next_spawn(
     shapes: &ShapeCatalog,
     child_kind: PolyhedronKind,
     scale_ratio: f32,
+    tuning: SpawnTuning,
 ) -> Option<SpawnedNode> {
-    let scale_ratio = scale_ratio.clamp(MIN_SCALE_RATIO, MAX_SCALE_RATIO);
+    let scale_ratio = scale_ratio.clamp(tuning.min_scale_ratio, tuning.max_scale_ratio);
     let highest_level = nodes.iter().map(|node| node.level).max().unwrap_or(0);
 
     for level in 0..=highest_level {
@@ -92,11 +87,20 @@ pub(crate) fn next_spawn(
                     child_geometry,
                     vertex_index,
                     scale_ratio,
+                    tuning.twist_per_vertex_radians,
                 );
 
-                if is_fully_contained(candidate.center, candidate.radius, nodes)
-                    || contains_existing(candidate.center, candidate.radius, nodes)
-                {
+                if is_fully_contained(
+                    candidate.center,
+                    candidate.radius,
+                    nodes,
+                    tuning.containment_epsilon,
+                ) || contains_existing(
+                    candidate.center,
+                    candidate.radius,
+                    nodes,
+                    tuning.containment_epsilon,
+                ) {
                     continue;
                 }
 
@@ -122,6 +126,7 @@ fn spawn_candidate(
     child_geometry: &ShapeGeometry,
     vertex_index: usize,
     scale_ratio: f32,
+    twist_per_vertex_radians: f32,
 ) -> PolyhedronNode {
     let local_vertex = parent_geometry.vertices[vertex_index] * parent.scale;
     let world_vertex = parent.center + parent.rotation * local_vertex;
@@ -137,7 +142,12 @@ fn spawn_candidate(
     let center = world_vertex;
 
     let align = Quat::from_rotation_arc(Vec3::Y, outward);
-    let twist = Quat::from_axis_angle(outward, vertex_index as f32 * PI / 5.0);
+    let twist_step = if twist_per_vertex_radians.is_finite() {
+        twist_per_vertex_radians
+    } else {
+        PI / 5.0
+    };
+    let twist = Quat::from_axis_angle(outward, vertex_index as f32 * twist_step);
 
     PolyhedronNode {
         kind: child_kind,
@@ -150,23 +160,42 @@ fn spawn_candidate(
     }
 }
 
-fn is_fully_contained(center: Vec3, radius: f32, nodes: &[PolyhedronNode]) -> bool {
+fn is_fully_contained(
+    center: Vec3,
+    radius: f32,
+    nodes: &[PolyhedronNode],
+    containment_epsilon: f32,
+) -> bool {
     nodes.iter().any(|node| {
         let distance = center.distance(node.center);
-        distance + radius <= node.radius - CONTAINMENT_EPSILON
+        distance + radius <= node.radius - containment_epsilon
     })
 }
 
-fn contains_existing(center: Vec3, radius: f32, nodes: &[PolyhedronNode]) -> bool {
+fn contains_existing(
+    center: Vec3,
+    radius: f32,
+    nodes: &[PolyhedronNode],
+    containment_epsilon: f32,
+) -> bool {
     nodes.iter().any(|node| {
         let distance = center.distance(node.center);
-        distance + node.radius <= radius - CONTAINMENT_EPSILON
+        distance + node.radius <= radius - containment_epsilon
     })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_tuning() -> SpawnTuning {
+        SpawnTuning {
+            min_scale_ratio: 0.15,
+            max_scale_ratio: 1.0,
+            containment_epsilon: 0.02,
+            twist_per_vertex_radians: PI / 5.0,
+        }
+    }
 
     #[test]
     fn root_level_is_exhausted_before_level_one_is_used() {
@@ -175,8 +204,14 @@ mod tests {
 
         let mut parent_levels = Vec::new();
         for _ in 0..9 {
-            let spawn = next_spawn(&mut nodes, &shapes, PolyhedronKind::Cube, 0.35)
-                .expect("spawn should succeed");
+            let spawn = next_spawn(
+                &mut nodes,
+                &shapes,
+                PolyhedronKind::Cube,
+                0.35,
+                test_tuning(),
+            )
+            .expect("spawn should succeed");
             parent_levels.push(spawn.parent_level);
         }
 
@@ -196,8 +231,18 @@ mod tests {
             occupied_vertices: vec![false; 8],
         }];
 
-        assert!(is_fully_contained(Vec3::new(0.5, 0.0, 0.0), 1.0, &nodes));
-        assert!(!is_fully_contained(Vec3::new(5.0, 0.0, 0.0), 1.0, &nodes));
+        assert!(is_fully_contained(
+            Vec3::new(0.5, 0.0, 0.0),
+            1.0,
+            &nodes,
+            test_tuning().containment_epsilon,
+        ));
+        assert!(!is_fully_contained(
+            Vec3::new(5.0, 0.0, 0.0),
+            1.0,
+            &nodes,
+            test_tuning().containment_epsilon,
+        ));
     }
 
     #[test]
@@ -218,8 +263,14 @@ mod tests {
             occupied_vertices: vec![false; parent_geometry.vertices.len()],
         }];
 
-        let spawn = next_spawn(&mut nodes, &shapes, PolyhedronKind::Tetrahedron, 0.35)
-            .expect("spawn should succeed");
+        let spawn = next_spawn(
+            &mut nodes,
+            &shapes,
+            PolyhedronKind::Tetrahedron,
+            0.35,
+            test_tuning(),
+        )
+        .expect("spawn should succeed");
         let expected_center =
             parent_center + parent_rotation * (parent_geometry.vertices[0] * parent_scale);
 

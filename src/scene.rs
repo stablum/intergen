@@ -2,15 +2,12 @@ use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::prelude::*;
 
 use crate::camera::{CameraRig, SceneCamera};
+use crate::config::{AppConfig, GenerationConfig, MaterialConfig};
 use crate::generation::SpawnHoldState;
 use crate::polyhedra::{
     PolyhedronKind, PolyhedronNode, ShapeCatalog, ShapeGeometry, build_mesh, root_node,
 };
 use crate::ui::{UiFontSource, load_ui_theme, spawn_help_ui};
-
-const ROOT_KIND: PolyhedronKind = PolyhedronKind::Cube;
-const ROOT_SCALE: f32 = 1.9;
-const DEFAULT_SCALE_RATIO: f32 = 0.58;
 
 #[derive(Resource)]
 pub(crate) struct ShapeAssets {
@@ -70,19 +67,21 @@ pub(crate) struct PolyhedronEntity;
 pub(crate) fn setup_scene(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
+    app_config: Res<AppConfig>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     camera_rig: Res<CameraRig>,
 ) {
-    let ui_theme = load_ui_theme(&asset_server);
+    let ui_theme = load_ui_theme(&asset_server, &app_config.ui);
     let shape_assets = ShapeAssets::new(&mut meshes);
-    let root = root_generation_node(&shape_assets.catalog);
+    let root = root_generation_node(&shape_assets.catalog, &app_config.generation);
 
     spawn_polyhedron_entity(
         &mut commands,
         &mut materials,
         shape_assets.mesh(root.kind),
         &root,
+        &app_config.materials,
     );
 
     let camera_translation = camera_rig.orientation * Vec3::new(0.0, 0.0, camera_rig.distance);
@@ -99,33 +98,34 @@ pub(crate) fn setup_scene(
 
     commands.spawn((
         DirectionalLight {
-            color: Color::srgb(1.0, 0.97, 0.93),
-            illuminance: 22_000.0,
-            shadows_enabled: true,
+            color: app_config.lighting.directional.color(),
+            illuminance: app_config.lighting.directional.illuminance,
+            shadows_enabled: app_config.lighting.directional.shadows_enabled,
             ..default()
         },
-        Transform::from_xyz(12.0, 18.0, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_translation(app_config.lighting.directional.translation())
+            .looking_at(app_config.lighting.directional.look_at(), Vec3::Y),
     ));
 
     commands.spawn((
         PointLight {
-            color: Color::srgb(0.5, 0.6, 0.85),
-            intensity: 1_200_000.0,
-            range: 60.0,
-            shadows_enabled: false,
+            color: app_config.lighting.point.color(),
+            intensity: app_config.lighting.point.intensity,
+            range: app_config.lighting.point.range,
+            shadows_enabled: app_config.lighting.point.shadows_enabled,
             ..default()
         },
-        Transform::from_xyz(-9.0, 5.0, -12.0),
+        Transform::from_translation(app_config.lighting.point.translation()),
     ));
 
-    spawn_help_ui(&mut commands, &ui_theme, scene_camera);
+    spawn_help_ui(&mut commands, &ui_theme, scene_camera, &app_config.ui);
 
     commands.insert_resource(ui_theme.clone());
     commands.insert_resource(shape_assets);
     commands.insert_resource(GenerationState {
         nodes: vec![root],
-        selected_kind: PolyhedronKind::Dodecahedron,
-        scale_ratio: DEFAULT_SCALE_RATIO,
+        selected_kind: app_config.generation.default_child_kind,
+        scale_ratio: app_config.generation.default_scale_ratio_clamped(),
         spawn_hold: SpawnHoldState::default(),
     });
 
@@ -134,8 +134,8 @@ pub(crate) fn setup_scene(
     );
     println!(
         "Selected child shape: {:?}, ratio: {:.2}",
-        PolyhedronKind::Dodecahedron,
-        DEFAULT_SCALE_RATIO
+        app_config.generation.default_child_kind,
+        app_config.generation.default_scale_ratio_clamped()
     );
     if ui_theme.source == UiFontSource::Fallback {
         eprintln!(
@@ -144,15 +144,23 @@ pub(crate) fn setup_scene(
     }
 }
 
-pub(crate) fn root_generation_node(shape_catalog: &ShapeCatalog) -> PolyhedronNode {
-    root_node(ROOT_KIND, ROOT_SCALE, shape_catalog)
+pub(crate) fn root_generation_node(
+    shape_catalog: &ShapeCatalog,
+    generation_config: &GenerationConfig,
+) -> PolyhedronNode {
+    root_node(
+        generation_config.root_kind,
+        generation_config.root_scale,
+        shape_catalog,
+    )
 }
 
 pub(crate) fn reset_generation_state(
     generation_state: &mut GenerationState,
     shape_catalog: &ShapeCatalog,
+    generation_config: &GenerationConfig,
 ) -> PolyhedronNode {
-    let root = root_generation_node(shape_catalog);
+    let root = root_generation_node(shape_catalog, generation_config);
     generation_state.nodes = vec![root.clone()];
     generation_state.spawn_hold.reset();
     root
@@ -163,13 +171,16 @@ pub(crate) fn spawn_polyhedron_entity(
     materials: &mut Assets<StandardMaterial>,
     mesh: &Handle<Mesh>,
     node: &PolyhedronNode,
+    material_config: &MaterialConfig,
 ) {
-    let hue = (node.level as f32 * 45.0 + node.kind.hue_bias()) % 360.0;
+    let hue = (node.level as f32 * material_config.hue_step_per_level
+        + material_config.hue_bias(node.kind))
+        % 360.0;
     let material = materials.add(StandardMaterial {
-        base_color: Color::hsl(hue, 0.68, 0.56),
-        metallic: 0.05,
-        perceptual_roughness: 0.86,
-        reflectance: 0.24,
+        base_color: Color::hsl(hue, material_config.saturation, material_config.lightness),
+        metallic: material_config.metallic,
+        perceptual_roughness: material_config.perceptual_roughness,
+        reflectance: material_config.reflectance,
         ..default()
     });
 
@@ -190,14 +201,17 @@ pub(crate) fn spawn_polyhedron_entity(
 mod tests {
     use bevy::prelude::{Quat, Vec3};
 
-    use super::{GenerationState, ROOT_KIND, reset_generation_state, root_generation_node};
+    use crate::config::GenerationConfig;
     use crate::generation::SpawnHoldState;
     use crate::polyhedra::{PolyhedronKind, PolyhedronNode, ShapeCatalog};
+
+    use super::{GenerationState, reset_generation_state, root_generation_node};
 
     #[test]
     fn reset_generation_state_restores_root_only() {
         let shape_catalog = ShapeCatalog::new();
-        let mut root = root_generation_node(&shape_catalog);
+        let generation_config = GenerationConfig::default();
+        let mut root = root_generation_node(&shape_catalog, &generation_config);
         root.occupied_vertices[0] = true;
 
         let child = PolyhedronNode {
@@ -220,10 +234,11 @@ mod tests {
             },
         };
 
-        let reset_root = reset_generation_state(&mut generation_state, &shape_catalog);
+        let reset_root =
+            reset_generation_state(&mut generation_state, &shape_catalog, &generation_config);
 
         assert_eq!(generation_state.nodes.len(), 1);
-        assert_eq!(generation_state.nodes[0].kind, ROOT_KIND);
+        assert_eq!(generation_state.nodes[0].kind, generation_config.root_kind);
         assert_eq!(generation_state.nodes[0].level, 0);
         assert_eq!(generation_state.nodes[0].center, Vec3::ZERO);
         assert_eq!(generation_state.selected_kind, PolyhedronKind::Octahedron);

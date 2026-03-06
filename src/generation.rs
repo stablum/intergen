@@ -1,12 +1,10 @@
 use bevy::prelude::*;
 
-use crate::polyhedra::{MAX_SCALE_RATIO, MIN_SCALE_RATIO, PolyhedronKind, next_spawn};
+use crate::config::AppConfig;
+use crate::polyhedra::{PolyhedronKind, next_spawn};
 use crate::scene::{
     GenerationState, PolyhedronEntity, ShapeAssets, reset_generation_state, spawn_polyhedron_entity,
 };
-
-const SPAWN_HOLD_DELAY_SECS: f32 = 0.24;
-const SPAWN_REPEAT_INTERVAL_SECS: f32 = 0.07;
 
 #[derive(Default)]
 pub(crate) struct SpawnHoldState {
@@ -21,6 +19,8 @@ impl SpawnHoldState {
         pressed: bool,
         just_released: bool,
         delta_secs: f32,
+        hold_delay_secs: f32,
+        repeat_interval_secs: f32,
     ) -> bool {
         if just_released || !pressed {
             self.reset();
@@ -34,9 +34,9 @@ impl SpawnHoldState {
 
         self.elapsed_secs += delta_secs;
         let threshold = if self.repeating {
-            SPAWN_REPEAT_INTERVAL_SECS
+            repeat_interval_secs
         } else {
-            SPAWN_HOLD_DELAY_SECS
+            hold_delay_secs
         };
 
         if self.elapsed_secs < threshold {
@@ -58,6 +58,7 @@ pub(crate) fn generation_input_system(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
+    app_config: Res<AppConfig>,
     shape_assets: Res<ShapeAssets>,
     mut generation_state: ResMut<GenerationState>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -80,14 +81,17 @@ pub(crate) fn generation_input_system(
         println!("Selected child shape: {:?}", generation_state.selected_kind);
     }
 
+    let (min_scale_ratio, max_scale_ratio) = app_config.generation.scale_bounds();
     if keys.just_pressed(KeyCode::Minus) || keys.just_pressed(KeyCode::NumpadSubtract) {
-        generation_state.scale_ratio =
-            (generation_state.scale_ratio - 0.05).clamp(MIN_SCALE_RATIO, MAX_SCALE_RATIO);
+        generation_state.scale_ratio = (generation_state.scale_ratio
+            - app_config.generation.scale_adjust_step)
+            .clamp(min_scale_ratio, max_scale_ratio);
         println!("Child scale ratio: {:.2}", generation_state.scale_ratio);
     }
     if keys.just_pressed(KeyCode::Equal) || keys.just_pressed(KeyCode::NumpadAdd) {
-        generation_state.scale_ratio =
-            (generation_state.scale_ratio + 0.05).clamp(MIN_SCALE_RATIO, MAX_SCALE_RATIO);
+        generation_state.scale_ratio = (generation_state.scale_ratio
+            + app_config.generation.scale_adjust_step)
+            .clamp(min_scale_ratio, max_scale_ratio);
         println!("Child scale ratio: {:.2}", generation_state.scale_ratio);
     }
 
@@ -96,12 +100,17 @@ pub(crate) fn generation_input_system(
             commands.entity(entity).despawn();
         }
 
-        let root = reset_generation_state(&mut generation_state, &shape_assets.catalog);
+        let root = reset_generation_state(
+            &mut generation_state,
+            &shape_assets.catalog,
+            &app_config.generation,
+        );
         spawn_polyhedron_entity(
             &mut commands,
             &mut materials,
             shape_assets.mesh(root.kind),
             &root,
+            &app_config.materials,
         );
         println!("Reset scene to the root polyhedron.");
         return;
@@ -112,6 +121,8 @@ pub(crate) fn generation_input_system(
         keys.pressed(KeyCode::Space),
         keys.just_released(KeyCode::Space),
         time.delta_secs(),
+        app_config.generation.spawn_hold_delay_secs,
+        app_config.generation.spawn_repeat_interval_secs,
     );
     if !spawn_requested {
         return;
@@ -124,6 +135,7 @@ pub(crate) fn generation_input_system(
         &shape_assets.catalog,
         selected_kind,
         scale_ratio,
+        app_config.generation.spawn_tuning(),
     ) else {
         eprintln!("No valid spawn position is currently available.");
         return;
@@ -134,6 +146,7 @@ pub(crate) fn generation_input_system(
         &mut materials,
         shape_assets.mesh(spawn.kind),
         &spawn.node,
+        &app_config.materials,
     );
     println!(
         "Spawned {:?} at level {} from parent level {}",
@@ -143,25 +156,84 @@ pub(crate) fn generation_input_system(
 
 #[cfg(test)]
 mod tests {
-    use super::{SPAWN_HOLD_DELAY_SECS, SPAWN_REPEAT_INTERVAL_SECS, SpawnHoldState};
+    use super::SpawnHoldState;
+    use crate::config::GenerationConfig;
 
     #[test]
     fn spawn_hold_repeats_while_space_is_held() {
+        let generation_config = GenerationConfig::default();
         let mut spawn_hold = SpawnHoldState::default();
 
-        assert!(spawn_hold.update(true, true, false, 0.0));
-        assert!(!spawn_hold.update(false, true, false, SPAWN_HOLD_DELAY_SECS * 0.5));
-        assert!(spawn_hold.update(false, true, false, SPAWN_HOLD_DELAY_SECS * 0.5));
-        assert!(!spawn_hold.update(false, true, false, SPAWN_REPEAT_INTERVAL_SECS * 0.5));
-        assert!(spawn_hold.update(false, true, false, SPAWN_REPEAT_INTERVAL_SECS * 0.5));
+        assert!(spawn_hold.update(
+            true,
+            true,
+            false,
+            0.0,
+            generation_config.spawn_hold_delay_secs,
+            generation_config.spawn_repeat_interval_secs,
+        ));
+        assert!(!spawn_hold.update(
+            false,
+            true,
+            false,
+            generation_config.spawn_hold_delay_secs * 0.5,
+            generation_config.spawn_hold_delay_secs,
+            generation_config.spawn_repeat_interval_secs,
+        ));
+        assert!(spawn_hold.update(
+            false,
+            true,
+            false,
+            generation_config.spawn_hold_delay_secs * 0.5,
+            generation_config.spawn_hold_delay_secs,
+            generation_config.spawn_repeat_interval_secs,
+        ));
+        assert!(!spawn_hold.update(
+            false,
+            true,
+            false,
+            generation_config.spawn_repeat_interval_secs * 0.5,
+            generation_config.spawn_hold_delay_secs,
+            generation_config.spawn_repeat_interval_secs,
+        ));
+        assert!(spawn_hold.update(
+            false,
+            true,
+            false,
+            generation_config.spawn_repeat_interval_secs * 0.5,
+            generation_config.spawn_hold_delay_secs,
+            generation_config.spawn_repeat_interval_secs,
+        ));
     }
 
     #[test]
     fn spawn_hold_resets_after_release() {
+        let generation_config = GenerationConfig::default();
         let mut spawn_hold = SpawnHoldState::default();
 
-        assert!(spawn_hold.update(true, true, false, 0.0));
-        assert!(!spawn_hold.update(false, false, true, 0.0));
-        assert!(spawn_hold.update(true, true, false, 0.0));
+        assert!(spawn_hold.update(
+            true,
+            true,
+            false,
+            0.0,
+            generation_config.spawn_hold_delay_secs,
+            generation_config.spawn_repeat_interval_secs,
+        ));
+        assert!(!spawn_hold.update(
+            false,
+            false,
+            true,
+            0.0,
+            generation_config.spawn_hold_delay_secs,
+            generation_config.spawn_repeat_interval_secs,
+        ));
+        assert!(spawn_hold.update(
+            true,
+            true,
+            false,
+            0.0,
+            generation_config.spawn_hold_delay_secs,
+            generation_config.spawn_repeat_interval_secs,
+        ));
     }
 }

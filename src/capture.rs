@@ -7,24 +7,25 @@ use bevy::diagnostic::FrameCount;
 use bevy::prelude::*;
 use bevy::render::view::screenshot::{Screenshot, ScreenshotCaptured, save_to_disk};
 
-const SCREENSHOT_OUTPUT_DIR: &str = "screenshots";
-pub(crate) const AUTO_CAPTURE_FRAME_DELAY: u32 = 8;
+use crate::config::AppConfig;
 
-#[derive(Default)]
 pub(crate) struct LaunchConfig {
     pub(crate) capture_path: Option<PathBuf>,
     pub(crate) capture_delay_frames: u32,
 }
 
 impl LaunchConfig {
-    pub(crate) fn from_env() -> Result<Self, String> {
-        parse_launch_config(std::env::args_os().skip(1))
+    pub(crate) fn from_env(default_capture_delay_frames: u32) -> Result<Self, String> {
+        parse_launch_config(std::env::args_os().skip(1), default_capture_delay_frames)
     }
 }
 
-fn parse_launch_config(args: impl IntoIterator<Item = OsString>) -> Result<LaunchConfig, String> {
+fn parse_launch_config(
+    args: impl IntoIterator<Item = OsString>,
+    default_capture_delay_frames: u32,
+) -> Result<LaunchConfig, String> {
     let mut capture_path = None;
-    let mut capture_delay_frames = AUTO_CAPTURE_FRAME_DELAY;
+    let mut capture_delay_frames = default_capture_delay_frames;
     let mut args = args.into_iter();
 
     while let Some(arg) = args.next() {
@@ -87,13 +88,14 @@ impl AutomatedCapture {
 pub(crate) fn manual_screenshot_input_system(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
+    app_config: Res<AppConfig>,
     mut screenshot_counter: ResMut<ScreenshotCounter>,
 ) {
     if !keys.just_pressed(KeyCode::F12) {
         return;
     }
 
-    let path = PathBuf::from(SCREENSHOT_OUTPUT_DIR)
+    let path = PathBuf::from(&app_config.capture.output_dir)
         .join(format!("intergen-{:04}.png", screenshot_counter.next_index));
     screenshot_counter.next_index += 1;
     request_screenshot(&mut commands, path, false);
@@ -157,29 +159,39 @@ mod tests {
     use std::ffi::OsString;
     use std::path::Path;
 
-    use super::{AUTO_CAPTURE_FRAME_DELAY, parse_launch_config};
+    use super::parse_launch_config;
+    use crate::config::CaptureConfig;
 
     #[test]
     fn launch_config_parses_capture_path() {
-        let config = parse_launch_config([
-            OsString::from("--capture"),
-            OsString::from("screenshots/test.png"),
-        ])
+        let config = parse_launch_config(
+            [
+                OsString::from("--capture"),
+                OsString::from("screenshots/test.png"),
+            ],
+            CaptureConfig::default().default_capture_delay_frames,
+        )
         .expect("capture path should parse");
 
         assert_eq!(
             config.capture_path.as_deref(),
             Some(Path::new("screenshots/test.png"))
         );
-        assert_eq!(config.capture_delay_frames, AUTO_CAPTURE_FRAME_DELAY);
+        assert_eq!(
+            config.capture_delay_frames,
+            CaptureConfig::default().default_capture_delay_frames
+        );
     }
 
     #[test]
     fn launch_config_parses_capture_delay_frames() {
-        let config = parse_launch_config([
-            OsString::from("--capture-delay-frames"),
-            OsString::from("64"),
-        ])
+        let config = parse_launch_config(
+            [
+                OsString::from("--capture-delay-frames"),
+                OsString::from("64"),
+            ],
+            CaptureConfig::default().default_capture_delay_frames,
+        )
         .expect("capture delay should parse");
 
         assert_eq!(config.capture_delay_frames, 64);
