@@ -42,13 +42,19 @@ Current configuration sections:
 - `window`: title, resolution, and present mode
 - `rendering`: clear color and ambient light
 - `camera`: initial orbit and motion tuning
-- `generation`: root shape, default child shape, scale limits, spawn cadence, and spawn heuristics
+- `generation`: root shape, default child shape, scale limits, twist defaults and bounds, spawn cadence, and spawn heuristics
 - `lighting`: directional and point light colors, positions, and intensities
 - `materials`: color progression and PBR material tuning
 - `capture`: screenshot output directory and default capture delay
 - `ui`: font candidates plus overlay sizing and colors
 
 If `config.toml` is missing, the app falls back to the same built-in defaults.
+
+Live twist controls use these `generation` settings:
+- `twist_per_vertex_radians`: startup default for the child twist angle
+- `twist_adjust_step`: per-keypress twist change
+- `min_twist_per_vertex_radians` / `max_twist_per_vertex_radians`: live clamp range
+
 ## Run
 
 ```powershell
@@ -99,6 +105,9 @@ cargo test-plain
 - `4`: select dodecahedron
 - `-`: decrease child scale ratio
 - `+`: increase child scale ratio
+- `[` or `,`: decrease child twist angle
+- `]` or `.`: increase child twist angle
+- `T`: reset the child twist angle to the configured default
 
 ## Build Notes
 
@@ -120,4 +129,5 @@ Not implemented yet:
 - hardware ray tracing
 - more advanced visibility heuristics than simple containment rejection
 - export / save workflows
+
 

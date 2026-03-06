@@ -197,6 +197,9 @@ pub(crate) struct GenerationConfig {
     pub(crate) spawn_repeat_interval_secs: f32,
     pub(crate) containment_epsilon: f32,
     pub(crate) twist_per_vertex_radians: f32,
+    pub(crate) twist_adjust_step: f32,
+    pub(crate) min_twist_per_vertex_radians: f32,
+    pub(crate) max_twist_per_vertex_radians: f32,
 }
 
 impl GenerationConfig {
@@ -209,13 +212,27 @@ impl GenerationConfig {
         self.default_scale_ratio.clamp(min, max)
     }
 
-    pub(crate) fn spawn_tuning(&self) -> SpawnTuning {
+    pub(crate) fn twist_bounds(&self) -> (f32, f32) {
+        ordered_pair(
+            self.min_twist_per_vertex_radians,
+            self.max_twist_per_vertex_radians,
+        )
+    }
+
+    pub(crate) fn default_twist_per_vertex_radians_clamped(&self) -> f32 {
+        let (min, max) = self.twist_bounds();
+        self.twist_per_vertex_radians.clamp(min, max)
+    }
+
+    pub(crate) fn spawn_tuning(&self, twist_per_vertex_radians: f32) -> SpawnTuning {
         let (min_scale_ratio, max_scale_ratio) = self.scale_bounds();
+        let (min_twist_per_vertex_radians, max_twist_per_vertex_radians) = self.twist_bounds();
         SpawnTuning {
             min_scale_ratio,
             max_scale_ratio,
             containment_epsilon: self.containment_epsilon,
-            twist_per_vertex_radians: self.twist_per_vertex_radians,
+            twist_per_vertex_radians: twist_per_vertex_radians
+                .clamp(min_twist_per_vertex_radians, max_twist_per_vertex_radians),
         }
     }
 }
@@ -234,6 +251,9 @@ impl Default for GenerationConfig {
             spawn_repeat_interval_secs: 0.07,
             containment_epsilon: 0.02,
             twist_per_vertex_radians: std::f32::consts::PI / 5.0,
+            twist_adjust_step: std::f32::consts::PI / 18.0,
+            min_twist_per_vertex_radians: -std::f32::consts::PI,
+            max_twist_per_vertex_radians: std::f32::consts::PI,
         }
     }
 }
@@ -487,5 +507,23 @@ mod tests {
         let config = AppConfig::default();
 
         assert_eq!(config.window.present_mode, PresentModeSetting::AutoVsync);
+    }
+
+    #[test]
+    fn twist_default_is_clamped_to_bounds() {
+        let config = parse_config(
+            r#"
+            [generation]
+            twist_per_vertex_radians = 10.0
+            min_twist_per_vertex_radians = -0.5
+            max_twist_per_vertex_radians = 0.75
+            "#,
+        )
+        .expect("twist config should parse");
+
+        assert_eq!(
+            config.generation.default_twist_per_vertex_radians_clamped(),
+            0.75
+        );
     }
 }

@@ -172,6 +172,8 @@ pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
             "4: Select dodecahedron\n",
             "F12: Save a screenshot\n",
             "- / +: Adjust child scale ratio\n",
+            "[ / ] or , / .: Adjust child twist angle\n",
+            "T: Reset child twist angle\n",
             "\n",
             "{}"
         ),
@@ -201,6 +203,8 @@ mod tests {
         assert!(text.contains("R: Reset to the root polyhedron"));
         assert!(text.contains("F12: Save a screenshot"));
         assert!(text.contains("4: Select dodecahedron"));
+        assert!(text.contains("[ / ] or , / .: Adjust child twist angle"));
+        assert!(text.contains("T: Reset child twist angle"));
     }
 
     #[test]

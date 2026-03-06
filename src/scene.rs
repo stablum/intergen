@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 use crate::camera::{CameraRig, SceneCamera};
 use crate::config::{AppConfig, GenerationConfig, MaterialConfig};
-use crate::generation::SpawnHoldState;
+use crate::generation::{SpawnHoldState, twist_status_message};
 use crate::polyhedra::{
     PolyhedronKind, PolyhedronNode, ShapeCatalog, ShapeGeometry, build_mesh, root_node,
 };
@@ -58,6 +58,7 @@ pub(crate) struct GenerationState {
     pub(crate) nodes: Vec<PolyhedronNode>,
     pub(crate) selected_kind: PolyhedronKind,
     pub(crate) scale_ratio: f32,
+    pub(crate) twist_per_vertex_radians: f32,
     pub(crate) spawn_hold: SpawnHoldState,
 }
 
@@ -120,23 +121,28 @@ pub(crate) fn setup_scene(
 
     spawn_help_ui(&mut commands, &ui_theme, scene_camera, &app_config.ui);
 
+    let initial_scale_ratio = app_config.generation.default_scale_ratio_clamped();
+    let initial_twist = app_config
+        .generation
+        .default_twist_per_vertex_radians_clamped();
     commands.insert_resource(ui_theme.clone());
     commands.insert_resource(shape_assets);
     commands.insert_resource(GenerationState {
         nodes: vec![root],
         selected_kind: app_config.generation.default_child_kind,
-        scale_ratio: app_config.generation.default_scale_ratio_clamped(),
+        scale_ratio: initial_scale_ratio,
+        twist_per_vertex_radians: initial_twist,
         spawn_hold: SpawnHoldState::default(),
     });
 
     println!(
-        "Controls: F1/H help, arrows pitch/yaw, Q/E roll, W/S zoom, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio"
+        "Controls: F1/H help, arrows pitch/yaw, Q/E roll, W/S zoom, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, [/] or ,/. adjust child twist, T reset twist"
     );
     println!(
         "Selected child shape: {:?}, ratio: {:.2}",
-        app_config.generation.default_child_kind,
-        app_config.generation.default_scale_ratio_clamped()
+        app_config.generation.default_child_kind, initial_scale_ratio
     );
+    println!("{}", twist_status_message(initial_twist));
     if ui_theme.source == UiFontSource::Fallback {
         eprintln!(
             "Carbon Plus was not found in assets/fonts. Using Bevy's fallback font for UI text."
@@ -228,6 +234,7 @@ mod tests {
             nodes: vec![root, child],
             selected_kind: PolyhedronKind::Octahedron,
             scale_ratio: 0.42,
+            twist_per_vertex_radians: 0.3,
             spawn_hold: SpawnHoldState {
                 elapsed_secs: 1.0,
                 repeating: true,
@@ -243,6 +250,7 @@ mod tests {
         assert_eq!(generation_state.nodes[0].center, Vec3::ZERO);
         assert_eq!(generation_state.selected_kind, PolyhedronKind::Octahedron);
         assert_eq!(generation_state.scale_ratio, 0.42);
+        assert_eq!(generation_state.twist_per_vertex_radians, 0.3);
         assert!(
             generation_state.nodes[0]
                 .occupied_vertices

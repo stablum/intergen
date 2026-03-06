@@ -6,6 +6,8 @@ use crate::scene::{
     GenerationState, PolyhedronEntity, ShapeAssets, reset_generation_state, spawn_polyhedron_entity,
 };
 
+const RADIANS_TO_DEGREES: f32 = 180.0 / std::f32::consts::PI;
+
 #[derive(Default)]
 pub(crate) struct SpawnHoldState {
     pub(crate) elapsed_secs: f32,
@@ -95,6 +97,41 @@ pub(crate) fn generation_input_system(
         println!("Child scale ratio: {:.2}", generation_state.scale_ratio);
     }
 
+    let (min_twist, max_twist) = app_config.generation.twist_bounds();
+    if twist_decrease_requested(&keys) {
+        generation_state.twist_per_vertex_radians = adjust_clamped_value(
+            generation_state.twist_per_vertex_radians,
+            -app_config.generation.twist_adjust_step,
+            min_twist,
+            max_twist,
+        );
+        println!(
+            "{}",
+            twist_status_message(generation_state.twist_per_vertex_radians)
+        );
+    }
+    if twist_increase_requested(&keys) {
+        generation_state.twist_per_vertex_radians = adjust_clamped_value(
+            generation_state.twist_per_vertex_radians,
+            app_config.generation.twist_adjust_step,
+            min_twist,
+            max_twist,
+        );
+        println!(
+            "{}",
+            twist_status_message(generation_state.twist_per_vertex_radians)
+        );
+    }
+    if keys.just_pressed(KeyCode::KeyT) {
+        generation_state.twist_per_vertex_radians = app_config
+            .generation
+            .default_twist_per_vertex_radians_clamped();
+        println!(
+            "Reset {}",
+            twist_status_message(generation_state.twist_per_vertex_radians).to_lowercase()
+        );
+    }
+
     if keys.just_pressed(KeyCode::KeyR) {
         for entity in &polyhedron_entities {
             commands.entity(entity).despawn();
@@ -130,12 +167,13 @@ pub(crate) fn generation_input_system(
 
     let selected_kind = generation_state.selected_kind;
     let scale_ratio = generation_state.scale_ratio;
+    let twist_per_vertex_radians = generation_state.twist_per_vertex_radians;
     let Some(spawn) = next_spawn(
         &mut generation_state.nodes,
         &shape_assets.catalog,
         selected_kind,
         scale_ratio,
-        app_config.generation.spawn_tuning(),
+        app_config.generation.spawn_tuning(twist_per_vertex_radians),
     ) else {
         eprintln!("No valid spawn position is currently available.");
         return;
@@ -154,9 +192,29 @@ pub(crate) fn generation_input_system(
     );
 }
 
+fn twist_decrease_requested(keys: &ButtonInput<KeyCode>) -> bool {
+    keys.just_pressed(KeyCode::BracketLeft) || keys.just_pressed(KeyCode::Comma)
+}
+
+fn twist_increase_requested(keys: &ButtonInput<KeyCode>) -> bool {
+    keys.just_pressed(KeyCode::BracketRight) || keys.just_pressed(KeyCode::Period)
+}
+
+fn adjust_clamped_value(current: f32, delta: f32, min: f32, max: f32) -> f32 {
+    (current + delta).clamp(min, max)
+}
+
+pub(crate) fn twist_status_message(radians: f32) -> String {
+    format!(
+        "Child twist angle: {:.3} rad ({:.1} deg)",
+        radians,
+        radians * RADIANS_TO_DEGREES
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::SpawnHoldState;
+    use super::{SpawnHoldState, adjust_clamped_value, twist_status_message};
     use crate::config::GenerationConfig;
 
     #[test]
@@ -235,5 +293,19 @@ mod tests {
             generation_config.spawn_hold_delay_secs,
             generation_config.spawn_repeat_interval_secs,
         ));
+    }
+
+    #[test]
+    fn twist_adjustment_clamps_to_bounds() {
+        assert_eq!(adjust_clamped_value(0.7, 0.2, -0.5, 0.75), 0.75);
+        assert_eq!(adjust_clamped_value(-0.4, -0.3, -0.5, 0.75), -0.5);
+    }
+
+    #[test]
+    fn twist_status_message_includes_radians_and_degrees() {
+        let status = twist_status_message(std::f32::consts::FRAC_PI_2);
+
+        assert!(status.contains("1.571 rad"));
+        assert!(status.contains("90.0 deg"));
     }
 }
