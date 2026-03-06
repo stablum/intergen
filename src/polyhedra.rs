@@ -7,7 +7,6 @@ use bevy::prelude::*;
 pub const MIN_SCALE_RATIO: f32 = 0.15;
 pub const MAX_SCALE_RATIO: f32 = 1.0;
 
-const SPAWN_GAP_FACTOR: f32 = 0.12;
 const CONTAINMENT_EPSILON: f32 = 0.02;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -207,8 +206,7 @@ fn spawn_candidate(
 
     let scale = parent.scale * scale_ratio;
     let radius = child_geometry.radius * scale;
-    let separation = scale.max(0.2) * SPAWN_GAP_FACTOR;
-    let center = world_vertex + outward * (radius + separation);
+    let center = world_vertex;
 
     let align = Quat::from_rotation_arc(Vec3::Y, outward);
     let twist = Quat::from_axis_angle(outward, vertex_index as f32 * PI / 5.0);
@@ -486,5 +484,31 @@ mod tests {
 
         assert!(is_fully_contained(Vec3::new(0.5, 0.0, 0.0), 1.0, &nodes));
         assert!(!is_fully_contained(Vec3::new(5.0, 0.0, 0.0), 1.0, &nodes));
+    }
+
+    #[test]
+    fn spawned_child_center_matches_parent_vertex_position() {
+        let shapes = ShapeCatalog::new();
+        let parent_rotation = Quat::from_euler(EulerRot::YXZ, 0.45, -0.3, 0.2);
+        let parent_center = Vec3::new(1.5, -0.75, 2.25);
+        let parent_scale = 1.4;
+        let parent_kind = PolyhedronKind::Cube;
+        let parent_geometry = shapes.geometry(parent_kind);
+        let mut nodes = vec![PolyhedronNode {
+            kind: parent_kind,
+            level: 0,
+            center: parent_center,
+            rotation: parent_rotation,
+            scale: parent_scale,
+            radius: parent_geometry.radius * parent_scale,
+            occupied_vertices: vec![false; parent_geometry.vertices.len()],
+        }];
+
+        let spawn = next_spawn(&mut nodes, &shapes, PolyhedronKind::Tetrahedron, 0.35)
+            .expect("spawn should succeed");
+        let expected_center =
+            parent_center + parent_rotation * (parent_geometry.vertices[0] * parent_scale);
+
+        assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
     }
 }
