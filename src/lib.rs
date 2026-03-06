@@ -160,6 +160,9 @@ struct SceneCamera;
 #[derive(Component)]
 struct HelpOverlay;
 
+#[derive(Component)]
+struct UiCamera;
+
 fn setup_scene(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -179,12 +182,23 @@ fn setup_scene(
     );
 
     let camera_translation = camera_rig.orientation * Vec3::new(0.0, 0.0, camera_rig.distance);
-    let camera = commands
+    commands.spawn((
+        Camera3d::default(),
+        Transform::from_translation(camera_translation)
+            .looking_at(Vec3::ZERO, camera_rig.orientation * Vec3::Y),
+        SceneCamera,
+    ));
+
+    let ui_camera = commands
         .spawn((
-            Camera3d::default(),
-            Transform::from_translation(camera_translation)
-                .looking_at(Vec3::ZERO, camera_rig.orientation * Vec3::Y),
-            SceneCamera,
+            Camera2d,
+            Camera {
+                order: 1,
+                clear_color: ClearColorConfig::None,
+                ..default()
+            },
+            IsDefaultUiCamera,
+            UiCamera,
         ))
         .id();
 
@@ -207,7 +221,7 @@ fn setup_scene(
         Transform::from_xyz(-8.0, 6.0, -7.0),
     ));
 
-    spawn_help_ui(&mut commands, &ui_theme, camera);
+    spawn_help_ui(&mut commands, &ui_theme, ui_camera);
 
     commands.insert_resource(ui_theme.clone());
     commands.insert_resource(shape_assets);
