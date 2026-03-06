@@ -10,7 +10,10 @@ fast-compile = ["bevy/dynamic_linking"]
 [dependencies]
 bevy = { version = "0.17.3", default-features = false, features = [
     "bevy_pbr",
+    "bevy_text",
+    "bevy_ui",
     "bevy_winit",
+    "default_font",
     "multi_threaded",
     "png",
 ] }

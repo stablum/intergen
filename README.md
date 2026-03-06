@@ -8,6 +8,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - recursive polyhedron spawning from parent vertices
 - selectable child shape type
 - adjustable child scale ratio
+- toggleable in-app keybinding overlay
 - containment rejection so obviously hidden fully-inside spawns are skipped
 
 ## Requirements
@@ -15,6 +16,20 @@ The current prototype focuses on a fast local development loop and a usable vert
 - Windows
 - Rust stable MSVC toolchain
 - Visual Studio 2022 Build Tools with the C++ workload
+
+## Font
+
+UI text prefers `Carbon Plus` if you place a licensed font file in `assets/fonts/`.
+
+Supported filenames:
+- `assets/fonts/CarbonPlus-Regular.ttf`
+- `assets/fonts/CarbonPlus-Regular.otf`
+- `assets/fonts/Carbon Plus Regular.ttf`
+- `assets/fonts/Carbon Plus Regular.otf`
+- `assets/fonts/CarbonPlus.ttf`
+- `assets/fonts/Carbon Plus.ttf`
+
+If none of those files are present, the app falls back to Bevy's default font.
 
 ## Run
 
@@ -48,6 +63,7 @@ cargo test-plain
 - `Arrow Left` / `Arrow Right`: yaw camera
 - `Q` / `E`: roll camera
 - `W` / `S`: zoom in / out
+- `F1` or `H`: toggle the keybinding overlay
 - `Space`: spawn the next child polyhedron
 - `1`: select cube
 - `2`: select tetrahedron

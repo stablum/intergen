@@ -1,6 +1,7 @@
 mod polyhedra;
 
 use std::f32::consts::FRAC_PI_4;
+use std::path::Path;
 
 use bevy::prelude::*;
 use bevy::window::PresentMode;
@@ -19,11 +20,20 @@ const ANGULAR_DAMPING: f32 = 2.2;
 const ZOOM_DAMPING: f32 = 4.0;
 const MIN_CAMERA_DISTANCE: f32 = 4.0;
 const MAX_CAMERA_DISTANCE: f32 = 48.0;
+const CARBON_PLUS_FONT_CANDIDATES: &[&str] = &[
+    "fonts/CarbonPlus-Regular.ttf",
+    "fonts/CarbonPlus-Regular.otf",
+    "fonts/Carbon Plus Regular.ttf",
+    "fonts/Carbon Plus Regular.otf",
+    "fonts/CarbonPlus.ttf",
+    "fonts/Carbon Plus.ttf",
+];
 
 pub fn run() {
     App::new()
         .insert_resource(ClearColor(Color::srgb(0.035, 0.04, 0.06)))
         .insert_resource(CameraRig::default())
+        .insert_resource(HelpOverlayState::default())
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
                 title: "intergen".into(),
@@ -37,10 +47,12 @@ pub fn run() {
         .add_systems(
             Update,
             (
+                toggle_help_overlay_system,
                 camera_input_system,
                 camera_motion_system,
                 generation_input_system,
-            ),
+            )
+                .chain(),
         )
         .run();
 }
@@ -96,12 +108,39 @@ struct GenerationState {
     scale_ratio: f32,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum UiFontSource {
+    CarbonPlus,
+    Fallback,
+}
+
+#[derive(Clone, Resource)]
+struct UiTheme {
+    font: Handle<Font>,
+    source: UiFontSource,
+}
+
+impl UiTheme {
+    fn text_font(&self, font_size: f32) -> TextFont {
+        TextFont {
+            font: self.font.clone(),
+            font_size,
+            ..default()
+        }
+    }
+}
+
 #[derive(Resource)]
 struct CameraRig {
     orientation: Quat,
     angular_velocity: Vec3,
     distance: f32,
     zoom_velocity: f32,
+}
+
+#[derive(Resource, Default)]
+struct HelpOverlayState {
+    visible: bool,
 }
 
 impl Default for CameraRig {
@@ -118,12 +157,17 @@ impl Default for CameraRig {
 #[derive(Component)]
 struct SceneCamera;
 
+#[derive(Component)]
+struct HelpOverlay;
+
 fn setup_scene(
     mut commands: Commands,
+    asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     camera_rig: Res<CameraRig>,
 ) {
+    let ui_theme = load_ui_theme(&asset_server);
     let shape_assets = ShapeAssets::new(&mut meshes);
     let root = root_node(PolyhedronKind::Cube, ROOT_SCALE, &shape_assets.catalog);
 
@@ -135,12 +179,14 @@ fn setup_scene(
     );
 
     let camera_translation = camera_rig.orientation * Vec3::new(0.0, 0.0, camera_rig.distance);
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_translation(camera_translation)
-            .looking_at(Vec3::ZERO, camera_rig.orientation * Vec3::Y),
-        SceneCamera,
-    ));
+    let camera = commands
+        .spawn((
+            Camera3d::default(),
+            Transform::from_translation(camera_translation)
+                .looking_at(Vec3::ZERO, camera_rig.orientation * Vec3::Y),
+            SceneCamera,
+        ))
+        .id();
 
     commands.spawn((
         DirectionalLight {
@@ -161,6 +207,9 @@ fn setup_scene(
         Transform::from_xyz(-8.0, 6.0, -7.0),
     ));
 
+    spawn_help_ui(&mut commands, &ui_theme, camera);
+
+    commands.insert_resource(ui_theme.clone());
     commands.insert_resource(shape_assets);
     commands.insert_resource(GenerationState {
         nodes: vec![root],
@@ -169,20 +218,30 @@ fn setup_scene(
     });
 
     println!(
-        "Controls: arrows pitch/yaw, Q/E roll, W/S zoom, Space spawn, 1-4 select shape, -/+ adjust child scale ratio"
+        "Controls: F1/H help, arrows pitch/yaw, Q/E roll, W/S zoom, Space spawn, 1-4 select shape, -/+ adjust child scale ratio"
     );
     println!(
         "Selected child shape: {:?}, ratio: {:.2}",
         PolyhedronKind::Dodecahedron,
         DEFAULT_SCALE_RATIO
     );
+    if ui_theme.source == UiFontSource::Fallback {
+        eprintln!(
+            "Carbon Plus was not found in assets/fonts. Using Bevy's fallback font for UI text."
+        );
+    }
 }
 
 fn camera_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
+    help_overlay: Res<HelpOverlayState>,
     mut camera_rig: ResMut<CameraRig>,
 ) {
+    if help_overlay.visible {
+        return;
+    }
+
     let dt = time.delta_secs();
     let torque_step = CAMERA_ROTATION_ACCEL * dt;
 
@@ -241,9 +300,14 @@ fn generation_input_system(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
     shape_assets: Res<ShapeAssets>,
+    help_overlay: Res<HelpOverlayState>,
     mut generation_state: ResMut<GenerationState>,
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
+    if help_overlay.visible {
+        return;
+    }
+
     if keys.just_pressed(KeyCode::Digit1) {
         generation_state.selected_kind = PolyhedronKind::Cube;
         println!("Selected child shape: {:?}", generation_state.selected_kind);
@@ -300,6 +364,153 @@ fn generation_input_system(
     );
 }
 
+fn toggle_help_overlay_system(
+    keys: Res<ButtonInput<KeyCode>>,
+    mut help_overlay: ResMut<HelpOverlayState>,
+    mut overlay_query: Query<&mut Visibility, With<HelpOverlay>>,
+) {
+    if !(keys.just_pressed(KeyCode::F1) || keys.just_pressed(KeyCode::KeyH)) {
+        return;
+    }
+
+    help_overlay.visible = !help_overlay.visible;
+
+    let Ok(mut visibility) = overlay_query.single_mut() else {
+        return;
+    };
+
+    *visibility = if help_overlay.visible {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+}
+
+fn load_ui_theme(asset_server: &AssetServer) -> UiTheme {
+    if let Some(font_asset) = carbon_plus_font_asset() {
+        return UiTheme {
+            font: asset_server.load(font_asset),
+            source: UiFontSource::CarbonPlus,
+        };
+    }
+
+    UiTheme {
+        font: default(),
+        source: UiFontSource::Fallback,
+    }
+}
+
+fn carbon_plus_font_asset() -> Option<&'static str> {
+    CARBON_PLUS_FONT_CANDIDATES
+        .iter()
+        .copied()
+        .find(|path| Path::new("assets").join(path).is_file())
+}
+
+fn spawn_help_ui(commands: &mut Commands, ui_theme: &UiTheme, camera: Entity) {
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                top: px(18),
+                left: px(18),
+                padding: UiRect::axes(px(12), px(8)),
+                ..default()
+            },
+            UiTargetCamera(camera),
+            BackgroundColor(Color::srgba(0.06, 0.08, 0.13, 0.86)),
+            BorderRadius::MAX,
+            GlobalZIndex(20),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new("F1 / H: controls"),
+                ui_theme.text_font(14.0),
+                TextColor(Color::srgb(0.93, 0.95, 0.99)),
+            ));
+        });
+
+    commands
+        .spawn((
+            Node {
+                width: percent(100),
+                height: percent(100),
+                position_type: PositionType::Absolute,
+                padding: UiRect::all(px(24)),
+                flex_direction: FlexDirection::Column,
+                align_items: AlignItems::FlexEnd,
+                ..default()
+            },
+            UiTargetCamera(camera),
+            BackgroundColor(Color::srgba(0.01, 0.02, 0.04, 0.72)),
+            GlobalZIndex(30),
+            Visibility::Hidden,
+            HelpOverlay,
+        ))
+        .with_children(|parent| {
+            parent
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        max_width: px(460),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: px(12),
+                        padding: UiRect::all(px(20)),
+                        ..default()
+                    },
+                    BackgroundColor(Color::srgba(0.07, 0.1, 0.16, 0.95)),
+                    BorderRadius::all(px(20)),
+                ))
+                .with_children(|panel| {
+                    panel.spawn((
+                        Text::new("Keybindings"),
+                        ui_theme.text_font(28.0),
+                        TextColor(Color::srgb(0.98, 0.99, 1.0)),
+                    ));
+                    panel.spawn((
+                        Text::new(controls_overlay_text(ui_theme.source)),
+                        ui_theme.text_font(16.0),
+                        TextColor(Color::srgb(0.89, 0.92, 0.96)),
+                        TextLayout::new_with_justify(Justify::Left),
+                        Node {
+                            max_width: px(420),
+                            ..default()
+                        },
+                    ));
+                });
+        });
+}
+
+fn controls_overlay_text(font_source: UiFontSource) -> String {
+    format!(
+        concat!(
+            "F1 / H: Toggle this overlay\n",
+            "Arrow Up / Down: Pitch camera\n",
+            "Arrow Left / Right: Yaw camera\n",
+            "Q / E: Roll camera\n",
+            "W / S: Zoom in / out\n",
+            "Space: Spawn next child polyhedron\n",
+            "1: Select cube\n",
+            "2: Select tetrahedron\n",
+            "3: Select octahedron\n",
+            "4: Select dodecahedron\n",
+            "- / +: Adjust child scale ratio\n",
+            "\n",
+            "{}"
+        ),
+        font_status_line(font_source)
+    )
+}
+
+fn font_status_line(font_source: UiFontSource) -> &'static str {
+    match font_source {
+        UiFontSource::CarbonPlus => "Font: Carbon Plus",
+        UiFontSource::Fallback => {
+            "Font: fallback active. Add a Carbon Plus .ttf or .otf under assets/fonts/."
+        }
+    }
+}
+
 fn spawn_polyhedron_entity(
     commands: &mut Commands,
     materials: &mut Assets<StandardMaterial>,
@@ -324,4 +535,26 @@ fn spawn_polyhedron_entity(
             scale: Vec3::splat(node.scale),
         },
     ));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{UiFontSource, controls_overlay_text, font_status_line};
+
+    #[test]
+    fn overlay_text_lists_help_and_spawn_controls() {
+        let text = controls_overlay_text(UiFontSource::CarbonPlus);
+
+        assert!(text.contains("F1 / H: Toggle this overlay"));
+        assert!(text.contains("Space: Spawn next child polyhedron"));
+        assert!(text.contains("4: Select dodecahedron"));
+    }
+
+    #[test]
+    fn fallback_font_status_mentions_assets_directory() {
+        let status = font_status_line(UiFontSource::Fallback);
+
+        assert!(status.contains("assets/fonts"));
+        assert!(status.contains("Carbon Plus"));
+    }
 }
