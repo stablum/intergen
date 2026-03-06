@@ -25,6 +25,8 @@ const ANGULAR_DAMPING: f32 = 2.2;
 const ZOOM_DAMPING: f32 = 4.0;
 const MIN_CAMERA_DISTANCE: f32 = 4.0;
 const MAX_CAMERA_DISTANCE: f32 = 48.0;
+const SPAWN_HOLD_DELAY_SECS: f32 = 0.24;
+const SPAWN_REPEAT_INTERVAL_SECS: f32 = 0.07;
 const SCREENSHOT_OUTPUT_DIR: &str = "screenshots";
 const AUTO_CAPTURE_FRAME_DELAY: u32 = 8;
 const CARBON_PLUS_FONT_CANDIDATES: &[&str] = &[
@@ -191,6 +193,53 @@ struct GenerationState {
     nodes: Vec<PolyhedronNode>,
     selected_kind: PolyhedronKind,
     scale_ratio: f32,
+    spawn_hold: SpawnHoldState,
+}
+
+#[derive(Default)]
+struct SpawnHoldState {
+    elapsed_secs: f32,
+    repeating: bool,
+}
+
+impl SpawnHoldState {
+    fn update(
+        &mut self,
+        just_pressed: bool,
+        pressed: bool,
+        just_released: bool,
+        delta_secs: f32,
+    ) -> bool {
+        if just_released || !pressed {
+            self.reset();
+            return false;
+        }
+
+        if just_pressed {
+            self.reset();
+            return true;
+        }
+
+        self.elapsed_secs += delta_secs;
+        let threshold = if self.repeating {
+            SPAWN_REPEAT_INTERVAL_SECS
+        } else {
+            SPAWN_HOLD_DELAY_SECS
+        };
+
+        if self.elapsed_secs < threshold {
+            return false;
+        }
+
+        self.elapsed_secs = 0.0;
+        self.repeating = true;
+        true
+    }
+
+    fn reset(&mut self) {
+        self.elapsed_secs = 0.0;
+        self.repeating = false;
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -326,10 +375,11 @@ fn setup_scene(
         nodes: vec![root],
         selected_kind: PolyhedronKind::Dodecahedron,
         scale_ratio: DEFAULT_SCALE_RATIO,
+        spawn_hold: SpawnHoldState::default(),
     });
 
     println!(
-        "Controls: F1/H help, arrows pitch/yaw, Q/E roll, W/S zoom, Space spawn, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio"
+        "Controls: F1/H help, arrows pitch/yaw, Q/E roll, W/S zoom, hold Space to spawn, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio"
     );
     println!(
         "Selected child shape: {:?}, ratio: {:.2}",
@@ -405,6 +455,7 @@ fn camera_motion_system(
 fn generation_input_system(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
     shape_assets: Res<ShapeAssets>,
     mut generation_state: ResMut<GenerationState>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -437,7 +488,13 @@ fn generation_input_system(
         println!("Child scale ratio: {:.2}", generation_state.scale_ratio);
     }
 
-    if !keys.just_pressed(KeyCode::Space) {
+    let spawn_requested = generation_state.spawn_hold.update(
+        keys.just_pressed(KeyCode::Space),
+        keys.pressed(KeyCode::Space),
+        keys.just_released(KeyCode::Space),
+        time.delta_secs(),
+    );
+    if !spawn_requested {
         return;
     }
 
@@ -658,7 +715,7 @@ fn controls_overlay_text(font_source: UiFontSource) -> String {
             "Arrow Left / Right: Yaw camera\n",
             "Q / E: Roll camera\n",
             "W / S: Zoom in / out\n",
-            "Space: Spawn next child polyhedron\n",
+            "Space: Spawn polyhedra (hold to repeat)\n",
             "1: Select cube\n",
             "2: Select tetrahedron\n",
             "3: Select octahedron\n",
@@ -714,8 +771,8 @@ mod tests {
     use std::path::Path;
 
     use super::{
-        AUTO_CAPTURE_FRAME_DELAY, UiFontSource, controls_overlay_text, font_status_line,
-        parse_launch_config,
+        AUTO_CAPTURE_FRAME_DELAY, SPAWN_HOLD_DELAY_SECS, SPAWN_REPEAT_INTERVAL_SECS,
+        SpawnHoldState, UiFontSource, controls_overlay_text, font_status_line, parse_launch_config,
     };
 
     #[test]
@@ -723,7 +780,7 @@ mod tests {
         let text = controls_overlay_text(UiFontSource::CarbonPlus);
 
         assert!(text.contains("F1 / H: Toggle this overlay"));
-        assert!(text.contains("Space: Spawn next child polyhedron"));
+        assert!(text.contains("Space: Spawn polyhedra (hold to repeat)"));
         assert!(text.contains("F12: Save a screenshot"));
         assert!(text.contains("4: Select dodecahedron"));
     }
@@ -759,5 +816,25 @@ mod tests {
         .expect("capture delay should parse");
         assert_eq!(config.capture_delay_frames, 64);
         assert_eq!(config.capture_path, None);
+    }
+
+    #[test]
+    fn spawn_hold_repeats_while_space_is_held() {
+        let mut spawn_hold = SpawnHoldState::default();
+
+        assert!(spawn_hold.update(true, true, false, 0.0));
+        assert!(!spawn_hold.update(false, true, false, SPAWN_HOLD_DELAY_SECS * 0.5));
+        assert!(spawn_hold.update(false, true, false, SPAWN_HOLD_DELAY_SECS * 0.5));
+        assert!(!spawn_hold.update(false, true, false, SPAWN_REPEAT_INTERVAL_SECS * 0.5,));
+        assert!(spawn_hold.update(false, true, false, SPAWN_REPEAT_INTERVAL_SECS * 0.5,));
+    }
+
+    #[test]
+    fn spawn_hold_resets_after_release() {
+        let mut spawn_hold = SpawnHoldState::default();
+
+        assert!(spawn_hold.update(true, true, false, 0.0));
+        assert!(!spawn_hold.update(false, false, true, 0.0));
+        assert!(spawn_hold.update(true, true, false, 0.0));
     }
 }

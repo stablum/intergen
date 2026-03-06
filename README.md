@@ -74,7 +74,7 @@ cargo test-plain
 - `W` / `S`: zoom in / out
 - `F1` or `H`: toggle the keybinding overlay
 - `F12`: save a screenshot to `screenshots/`
-- `Space`: spawn the next child polyhedron
+- `Space`: spawn child polyhedra, or hold to keep spawning
 - `1`: select cube
 - `2`: select tetrahedron
 - `3`: select octahedron
@@ -102,4 +102,5 @@ Not implemented yet:
 - hardware ray tracing
 - more advanced visibility heuristics than simple containment rejection
 - export / save workflows
+
 
