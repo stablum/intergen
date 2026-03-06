@@ -16,6 +16,7 @@ use polyhedra::{
     next_spawn, root_node,
 };
 
+const ROOT_KIND: PolyhedronKind = PolyhedronKind::Cube;
 const ROOT_SCALE: f32 = 1.9;
 const DEFAULT_SCALE_RATIO: f32 = 0.58;
 const CAMERA_DISTANCE: f32 = 14.0;
@@ -316,6 +317,9 @@ struct SceneCamera;
 #[derive(Component)]
 struct HelpOverlay;
 
+#[derive(Component)]
+struct PolyhedronEntity;
+
 fn setup_scene(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -325,7 +329,7 @@ fn setup_scene(
 ) {
     let ui_theme = load_ui_theme(&asset_server);
     let shape_assets = ShapeAssets::new(&mut meshes);
-    let root = root_node(PolyhedronKind::Cube, ROOT_SCALE, &shape_assets.catalog);
+    let root = root_generation_node(&shape_assets.catalog);
 
     spawn_polyhedron_entity(
         &mut commands,
@@ -379,7 +383,7 @@ fn setup_scene(
     });
 
     println!(
-        "Controls: F1/H help, arrows pitch/yaw, Q/E roll, W/S zoom, hold Space to spawn, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio"
+        "Controls: F1/H help, arrows pitch/yaw, Q/E roll, W/S zoom, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio"
     );
     println!(
         "Selected child shape: {:?}, ratio: {:.2}",
@@ -459,6 +463,7 @@ fn generation_input_system(
     shape_assets: Res<ShapeAssets>,
     mut generation_state: ResMut<GenerationState>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    polyhedron_entities: Query<Entity, With<PolyhedronEntity>>,
 ) {
     if keys.just_pressed(KeyCode::Digit1) {
         generation_state.selected_kind = PolyhedronKind::Cube;
@@ -486,6 +491,22 @@ fn generation_input_system(
         generation_state.scale_ratio =
             (generation_state.scale_ratio + 0.05).clamp(MIN_SCALE_RATIO, MAX_SCALE_RATIO);
         println!("Child scale ratio: {:.2}", generation_state.scale_ratio);
+    }
+
+    if keys.just_pressed(KeyCode::KeyR) {
+        for entity in &polyhedron_entities {
+            commands.entity(entity).despawn();
+        }
+
+        let root = reset_generation_state(&mut generation_state, &shape_assets.catalog);
+        spawn_polyhedron_entity(
+            &mut commands,
+            &mut materials,
+            shape_assets.mesh(root.kind),
+            &root,
+        );
+        println!("Reset scene to the root polyhedron.");
+        return;
     }
 
     let spawn_requested = generation_state.spawn_hold.update(
@@ -633,6 +654,20 @@ fn carbon_plus_font_asset() -> Option<&'static str> {
         .find(|path| Path::new("assets").join(path).is_file())
 }
 
+fn root_generation_node(shape_catalog: &ShapeCatalog) -> PolyhedronNode {
+    root_node(ROOT_KIND, ROOT_SCALE, shape_catalog)
+}
+
+fn reset_generation_state(
+    generation_state: &mut GenerationState,
+    shape_catalog: &ShapeCatalog,
+) -> PolyhedronNode {
+    let root = root_generation_node(shape_catalog);
+    generation_state.nodes = vec![root.clone()];
+    generation_state.spawn_hold.reset();
+    root
+}
+
 fn spawn_help_ui(commands: &mut Commands, ui_theme: &UiTheme, scene_camera: Entity) {
     commands
         .spawn((
@@ -716,6 +751,7 @@ fn controls_overlay_text(font_source: UiFontSource) -> String {
             "Q / E: Roll camera\n",
             "W / S: Zoom in / out\n",
             "Space: Spawn polyhedra (hold to repeat)\n",
+            "R: Reset to the root polyhedron\n",
             "1: Select cube\n",
             "2: Select tetrahedron\n",
             "3: Select octahedron\n",
@@ -756,6 +792,7 @@ fn spawn_polyhedron_entity(
     commands.spawn((
         Mesh3d(mesh.clone()),
         MeshMaterial3d(material),
+        PolyhedronEntity,
         Transform {
             translation: node.center,
             rotation: node.rotation,
@@ -771,9 +808,12 @@ mod tests {
     use std::path::Path;
 
     use super::{
-        AUTO_CAPTURE_FRAME_DELAY, SPAWN_HOLD_DELAY_SECS, SPAWN_REPEAT_INTERVAL_SECS,
-        SpawnHoldState, UiFontSource, controls_overlay_text, font_status_line, parse_launch_config,
+        AUTO_CAPTURE_FRAME_DELAY, GenerationState, PolyhedronKind, PolyhedronNode, ROOT_KIND,
+        SPAWN_HOLD_DELAY_SECS, SPAWN_REPEAT_INTERVAL_SECS, ShapeCatalog, SpawnHoldState,
+        UiFontSource, controls_overlay_text, font_status_line, parse_launch_config,
+        reset_generation_state,
     };
+    use bevy::prelude::{Quat, Vec3};
 
     #[test]
     fn overlay_text_lists_help_and_spawn_controls() {
@@ -781,6 +821,7 @@ mod tests {
 
         assert!(text.contains("F1 / H: Toggle this overlay"));
         assert!(text.contains("Space: Spawn polyhedra (hold to repeat)"));
+        assert!(text.contains("R: Reset to the root polyhedron"));
         assert!(text.contains("F12: Save a screenshot"));
         assert!(text.contains("4: Select dodecahedron"));
     }
@@ -836,5 +877,50 @@ mod tests {
         assert!(spawn_hold.update(true, true, false, 0.0));
         assert!(!spawn_hold.update(false, false, true, 0.0));
         assert!(spawn_hold.update(true, true, false, 0.0));
+    }
+
+    #[test]
+    fn reset_generation_state_restores_root_only() {
+        let shape_catalog = ShapeCatalog::new();
+        let mut root = super::root_generation_node(&shape_catalog);
+        root.occupied_vertices[0] = true;
+
+        let child = PolyhedronNode {
+            kind: PolyhedronKind::Tetrahedron,
+            level: 1,
+            center: Vec3::new(2.0, -1.0, 0.5),
+            rotation: Quat::IDENTITY,
+            scale: 0.4,
+            radius: 0.7,
+            occupied_vertices: vec![false; 4],
+        };
+
+        let mut generation_state = GenerationState {
+            nodes: vec![root, child],
+            selected_kind: PolyhedronKind::Octahedron,
+            scale_ratio: 0.42,
+            spawn_hold: SpawnHoldState {
+                elapsed_secs: 1.0,
+                repeating: true,
+            },
+        };
+
+        let reset_root = reset_generation_state(&mut generation_state, &shape_catalog);
+
+        assert_eq!(generation_state.nodes.len(), 1);
+        assert_eq!(generation_state.nodes[0].kind, ROOT_KIND);
+        assert_eq!(generation_state.nodes[0].level, 0);
+        assert_eq!(generation_state.nodes[0].center, Vec3::ZERO);
+        assert_eq!(generation_state.selected_kind, PolyhedronKind::Octahedron);
+        assert_eq!(generation_state.scale_ratio, 0.42);
+        assert!(
+            generation_state.nodes[0]
+                .occupied_vertices
+                .iter()
+                .all(|occupied| !occupied)
+        );
+        assert_eq!(reset_root.center, Vec3::ZERO);
+        assert_eq!(generation_state.spawn_hold.elapsed_secs, 0.0);
+        assert!(!generation_state.spawn_hold.repeating);
     }
 }
