@@ -198,6 +198,8 @@ pub(crate) struct GenerationConfig {
     pub(crate) containment_epsilon: f32,
     pub(crate) twist_per_vertex_radians: f32,
     pub(crate) twist_adjust_step: f32,
+    pub(crate) twist_hold_delay_secs: f32,
+    pub(crate) twist_repeat_interval_secs: f32,
     pub(crate) min_twist_per_vertex_radians: f32,
     pub(crate) max_twist_per_vertex_radians: f32,
 }
@@ -251,6 +253,8 @@ impl Default for GenerationConfig {
             containment_epsilon: 0.02,
             twist_per_vertex_radians: std::f32::consts::PI / 5.0,
             twist_adjust_step: std::f32::consts::PI / 18.0,
+            twist_hold_delay_secs: 0.24,
+            twist_repeat_interval_secs: 0.07,
             min_twist_per_vertex_radians: 0.0,
             max_twist_per_vertex_radians: std::f32::consts::PI,
         }
@@ -556,6 +560,21 @@ mod tests {
         .expect("material config should parse");
 
         assert_eq!(config.materials.default_opacity_clamped(), 0.8);
+    }
+
+    #[test]
+    fn twist_hold_timings_parse_from_config() {
+        let config = parse_config(
+            r#"
+            [generation]
+            twist_hold_delay_secs = 0.12
+            twist_repeat_interval_secs = 0.03
+            "#,
+        )
+        .expect("twist config should parse");
+
+        assert_eq!(config.generation.twist_hold_delay_secs, 0.12);
+        assert_eq!(config.generation.twist_repeat_interval_secs, 0.03);
     }
 
     #[test]

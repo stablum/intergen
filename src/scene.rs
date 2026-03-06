@@ -60,6 +60,8 @@ pub(crate) struct GenerationState {
     pub(crate) scale_ratio: f32,
     pub(crate) twist_per_vertex_radians: f32,
     pub(crate) spawn_hold: SpawnHoldState,
+    pub(crate) twist_decrease_hold: SpawnHoldState,
+    pub(crate) twist_increase_hold: SpawnHoldState,
 }
 
 #[derive(Resource)]
@@ -143,13 +145,15 @@ pub(crate) fn setup_scene(
         scale_ratio: initial_scale_ratio,
         twist_per_vertex_radians: initial_twist,
         spawn_hold: SpawnHoldState::default(),
+        twist_decrease_hold: SpawnHoldState::default(),
+        twist_increase_hold: SpawnHoldState::default(),
     });
     commands.insert_resource(MaterialState {
         opacity: initial_opacity,
     });
 
     println!(
-        "Controls: F1/H help, arrows pitch/yaw, Q/E roll, W/S zoom, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, [/] or ,/. adjust child twist, T reset twist"
+        "Controls: F1/H help, arrows pitch/yaw, Q/E roll, W/S zoom, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist"
     );
     println!(
         "Selected child shape: {:?}, ratio: {:.2}",
@@ -183,6 +187,8 @@ pub(crate) fn reset_generation_state(
     let root = root_generation_node(shape_catalog, generation_config);
     generation_state.nodes = vec![root.clone()];
     generation_state.spawn_hold.reset();
+    generation_state.twist_decrease_hold.reset();
+    generation_state.twist_increase_hold.reset();
     root
 }
 
@@ -303,6 +309,8 @@ mod tests {
                 elapsed_secs: 1.0,
                 repeating: true,
             },
+            twist_decrease_hold: SpawnHoldState::default(),
+            twist_increase_hold: SpawnHoldState::default(),
         };
 
         let reset_root =
@@ -324,6 +332,10 @@ mod tests {
         assert_eq!(reset_root.center, Vec3::ZERO);
         assert_eq!(generation_state.spawn_hold.elapsed_secs, 0.0);
         assert!(!generation_state.spawn_hold.repeating);
+        assert_eq!(generation_state.twist_decrease_hold.elapsed_secs, 0.0);
+        assert!(!generation_state.twist_decrease_hold.repeating);
+        assert_eq!(generation_state.twist_increase_hold.elapsed_secs, 0.0);
+        assert!(!generation_state.twist_increase_hold.repeating);
     }
 
     #[test]

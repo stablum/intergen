@@ -2,7 +2,7 @@
 
 Interactive 3D polyhedron generation tool built with Rust and Bevy.
 
-Runtime tuning lives in config.toml at the repository root.
+Runtime tuning lives in `config.toml` at the repository root.
 
 The current prototype focuses on a fast local development loop and a usable vertical slice:
 - inertial camera rotation on all 3 axes
@@ -53,6 +53,8 @@ If `config.toml` is missing, the app falls back to the same built-in defaults.
 Live twist controls use these `generation` settings:
 - `twist_per_vertex_radians`: startup default for the child twist angle
 - `twist_adjust_step`: per-keypress twist change
+- `twist_hold_delay_secs`: how long to hold before twist repeat starts
+- `twist_repeat_interval_secs`: time between repeated twist updates while held
 - `min_twist_per_vertex_radians` / `max_twist_per_vertex_radians`: live clamp range, with `0.0` as the minimum allowed floor
 
 Live opacity controls use these `materials` settings:
@@ -110,8 +112,8 @@ cargo test-plain
 - `4`: select dodecahedron
 - `-`: decrease child scale ratio
 - `+`: increase child scale ratio
-- `[` or `,`: decrease child twist angle
-- `]` or `.`: increase child twist angle
+- `[` or `,`: decrease child twist angle, or hold to keep decreasing
+- `]` or `.`: increase child twist angle, or hold to keep increasing
 - `O`: decrease global object opacity
 - `P`: increase global object opacity
 - `I`: reset global object opacity to the configured default
@@ -137,5 +139,3 @@ Not implemented yet:
 - hardware ray tracing
 - more advanced visibility heuristics than simple containment rejection
 - export / save workflows
-
-

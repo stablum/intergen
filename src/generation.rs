@@ -9,6 +9,8 @@ use crate::scene::{
 };
 
 const RADIANS_TO_DEGREES: f32 = 180.0 / std::f32::consts::PI;
+const TWIST_DECREASE_KEYS: [KeyCode; 2] = [KeyCode::BracketLeft, KeyCode::Comma];
+const TWIST_INCREASE_KEYS: [KeyCode; 2] = [KeyCode::BracketRight, KeyCode::Period];
 
 #[derive(Default)]
 pub(crate) struct SpawnHoldState {
@@ -142,7 +144,15 @@ pub(crate) fn generation_input_system(
 
     let (min_twist, max_twist) = app_config.generation.twist_bounds();
     let mut twist_changed = false;
-    if twist_decrease_requested(&keys) {
+    let twist_decrease_requested = generation_state.twist_decrease_hold.update(
+        key_group_just_pressed(&keys, &TWIST_DECREASE_KEYS),
+        key_group_pressed(&keys, &TWIST_DECREASE_KEYS),
+        key_group_just_released(&keys, &TWIST_DECREASE_KEYS),
+        time.delta_secs(),
+        app_config.generation.twist_hold_delay_secs,
+        app_config.generation.twist_repeat_interval_secs,
+    );
+    if twist_decrease_requested {
         generation_state.twist_per_vertex_radians = adjust_clamped_value(
             generation_state.twist_per_vertex_radians,
             -app_config.generation.twist_adjust_step,
@@ -155,7 +165,15 @@ pub(crate) fn generation_input_system(
             twist_status_message(generation_state.twist_per_vertex_radians)
         );
     }
-    if twist_increase_requested(&keys) {
+    let twist_increase_requested = generation_state.twist_increase_hold.update(
+        key_group_just_pressed(&keys, &TWIST_INCREASE_KEYS),
+        key_group_pressed(&keys, &TWIST_INCREASE_KEYS),
+        key_group_just_released(&keys, &TWIST_INCREASE_KEYS),
+        time.delta_secs(),
+        app_config.generation.twist_hold_delay_secs,
+        app_config.generation.twist_repeat_interval_secs,
+    );
+    if twist_increase_requested {
         generation_state.twist_per_vertex_radians = adjust_clamped_value(
             generation_state.twist_per_vertex_radians,
             app_config.generation.twist_adjust_step,
@@ -173,6 +191,8 @@ pub(crate) fn generation_input_system(
             .generation
             .default_twist_per_vertex_radians_clamped();
         twist_changed = true;
+        generation_state.twist_decrease_hold.reset();
+        generation_state.twist_increase_hold.reset();
         println!(
             "Reset {}",
             twist_status_message(generation_state.twist_per_vertex_radians).to_lowercase()
@@ -253,12 +273,26 @@ pub(crate) fn generation_input_system(
     );
 }
 
-fn twist_decrease_requested(keys: &ButtonInput<KeyCode>) -> bool {
-    keys.just_pressed(KeyCode::BracketLeft) || keys.just_pressed(KeyCode::Comma)
+fn key_group_just_pressed(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool {
+    key_codes
+        .iter()
+        .copied()
+        .any(|key_code| keys.just_pressed(key_code))
 }
 
-fn twist_increase_requested(keys: &ButtonInput<KeyCode>) -> bool {
-    keys.just_pressed(KeyCode::BracketRight) || keys.just_pressed(KeyCode::Period)
+fn key_group_pressed(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool {
+    key_codes
+        .iter()
+        .copied()
+        .any(|key_code| keys.pressed(key_code))
+}
+
+fn key_group_just_released(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool {
+    !key_group_pressed(keys, key_codes)
+        && key_codes
+            .iter()
+            .copied()
+            .any(|key_code| keys.just_released(key_code))
 }
 
 fn adjust_clamped_value(current: f32, delta: f32, min: f32, max: f32) -> f32 {
