@@ -44,7 +44,7 @@ Current configuration sections:
 - `camera`: initial orbit and motion tuning
 - `generation`: root shape, default child shape, scale limits, twist defaults and bounds, spawn cadence, and spawn heuristics
 - `lighting`: directional and point light colors, positions, and intensities
-- `materials`: color progression and PBR material tuning
+- `materials`: color progression, PBR tuning, and live opacity defaults
 - `capture`: screenshot output directory and default capture delay
 - `ui`: font candidates plus overlay sizing and colors
 
@@ -54,6 +54,11 @@ Live twist controls use these `generation` settings:
 - `twist_per_vertex_radians`: startup default for the child twist angle
 - `twist_adjust_step`: per-keypress twist change
 - `min_twist_per_vertex_radians` / `max_twist_per_vertex_radians`: live clamp range
+
+Live opacity controls use these `materials` settings:
+- `default_opacity`: startup default for all object materials
+- `opacity_adjust_step`: per-keypress opacity change
+- `min_opacity` / `max_opacity`: live clamp range
 
 ## Run
 
@@ -107,6 +112,9 @@ cargo test-plain
 - `+`: increase child scale ratio
 - `[` or `,`: decrease child twist angle
 - `]` or `.`: increase child twist angle
+- `O`: decrease global object opacity
+- `P`: increase global object opacity
+- `I`: reset global object opacity to the configured default
 - `T`: reset the child twist angle to the configured default
 
 ## Build Notes
@@ -129,5 +137,4 @@ Not implemented yet:
 - hardware ray tracing
 - more advanced visibility heuristics than simple containment rejection
 - export / save workflows
-
 

@@ -351,6 +351,10 @@ pub(crate) struct MaterialConfig {
     pub(crate) metallic: f32,
     pub(crate) perceptual_roughness: f32,
     pub(crate) reflectance: f32,
+    pub(crate) default_opacity: f32,
+    pub(crate) opacity_adjust_step: f32,
+    pub(crate) min_opacity: f32,
+    pub(crate) max_opacity: f32,
     pub(crate) cube_hue_bias: f32,
     pub(crate) tetrahedron_hue_bias: f32,
     pub(crate) octahedron_hue_bias: f32,
@@ -366,6 +370,15 @@ impl MaterialConfig {
             PolyhedronKind::Dodecahedron => self.dodecahedron_hue_bias,
         }
     }
+
+    pub(crate) fn opacity_bounds(&self) -> (f32, f32) {
+        ordered_pair(self.min_opacity, self.max_opacity)
+    }
+
+    pub(crate) fn default_opacity_clamped(&self) -> f32 {
+        let (min, max) = self.opacity_bounds();
+        self.default_opacity.clamp(min, max)
+    }
 }
 
 impl Default for MaterialConfig {
@@ -377,6 +390,10 @@ impl Default for MaterialConfig {
             metallic: 0.05,
             perceptual_roughness: 0.86,
             reflectance: 0.24,
+            default_opacity: 1.0,
+            opacity_adjust_step: 0.1,
+            min_opacity: 0.1,
+            max_opacity: 1.0,
             cube_hue_bias: 35.0,
             tetrahedron_hue_bias: 110.0,
             octahedron_hue_bias: 205.0,
@@ -525,5 +542,20 @@ mod tests {
             config.generation.default_twist_per_vertex_radians_clamped(),
             0.75
         );
+    }
+
+    #[test]
+    fn material_opacity_default_is_clamped_to_bounds() {
+        let config = parse_config(
+            r#"
+            [materials]
+            default_opacity = 2.0
+            min_opacity = 0.2
+            max_opacity = 0.8
+            "#,
+        )
+        .expect("material config should parse");
+
+        assert_eq!(config.materials.default_opacity_clamped(), 0.8);
     }
 }

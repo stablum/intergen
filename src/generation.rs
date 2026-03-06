@@ -3,7 +3,8 @@ use bevy::prelude::*;
 use crate::config::AppConfig;
 use crate::polyhedra::{PolyhedronKind, next_spawn};
 use crate::scene::{
-    GenerationState, PolyhedronEntity, ShapeAssets, reset_generation_state, spawn_polyhedron_entity,
+    GenerationState, MaterialState, PolyhedronEntity, ShapeAssets, alpha_mode_for_opacity,
+    opacity_status_message, reset_generation_state, spawn_polyhedron_entity,
 };
 
 const RADIANS_TO_DEGREES: f32 = 180.0 / std::f32::consts::PI;
@@ -63,8 +64,10 @@ pub(crate) fn generation_input_system(
     app_config: Res<AppConfig>,
     shape_assets: Res<ShapeAssets>,
     mut generation_state: ResMut<GenerationState>,
+    mut material_state: ResMut<MaterialState>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     polyhedron_entities: Query<Entity, With<PolyhedronEntity>>,
+    polyhedron_materials: Query<&MeshMaterial3d<StandardMaterial>, With<PolyhedronEntity>>,
 ) {
     if keys.just_pressed(KeyCode::Digit1) {
         generation_state.selected_kind = PolyhedronKind::Cube;
@@ -95,6 +98,44 @@ pub(crate) fn generation_input_system(
             + app_config.generation.scale_adjust_step)
             .clamp(min_scale_ratio, max_scale_ratio);
         println!("Child scale ratio: {:.2}", generation_state.scale_ratio);
+    }
+
+    let (min_opacity, max_opacity) = app_config.materials.opacity_bounds();
+    let mut opacity_changed = false;
+    if keys.just_pressed(KeyCode::KeyO) {
+        material_state.opacity = adjust_clamped_value(
+            material_state.opacity,
+            -app_config.materials.opacity_adjust_step,
+            min_opacity,
+            max_opacity,
+        );
+        opacity_changed = true;
+        println!("{}", opacity_status_message(material_state.opacity));
+    }
+    if keys.just_pressed(KeyCode::KeyP) {
+        material_state.opacity = adjust_clamped_value(
+            material_state.opacity,
+            app_config.materials.opacity_adjust_step,
+            min_opacity,
+            max_opacity,
+        );
+        opacity_changed = true;
+        println!("{}", opacity_status_message(material_state.opacity));
+    }
+    if keys.just_pressed(KeyCode::KeyI) {
+        material_state.opacity = app_config.materials.default_opacity_clamped();
+        opacity_changed = true;
+        println!(
+            "Reset {}",
+            opacity_status_message(material_state.opacity).to_lowercase()
+        );
+    }
+    if opacity_changed {
+        apply_global_opacity(
+            material_state.opacity,
+            &mut materials,
+            &polyhedron_materials,
+        );
     }
 
     let (min_twist, max_twist) = app_config.generation.twist_bounds();
@@ -148,6 +189,7 @@ pub(crate) fn generation_input_system(
             shape_assets.mesh(root.kind),
             &root,
             &app_config.materials,
+            material_state.opacity,
         );
         println!("Reset scene to the root polyhedron.");
         return;
@@ -185,6 +227,7 @@ pub(crate) fn generation_input_system(
         shape_assets.mesh(spawn.kind),
         &spawn.node,
         &app_config.materials,
+        material_state.opacity,
     );
     println!(
         "Spawned {:?} at level {} from parent level {}",
@@ -202,6 +245,19 @@ fn twist_increase_requested(keys: &ButtonInput<KeyCode>) -> bool {
 
 fn adjust_clamped_value(current: f32, delta: f32, min: f32, max: f32) -> f32 {
     (current + delta).clamp(min, max)
+}
+
+fn apply_global_opacity(
+    opacity: f32,
+    materials: &mut Assets<StandardMaterial>,
+    polyhedron_materials: &Query<&MeshMaterial3d<StandardMaterial>, With<PolyhedronEntity>>,
+) {
+    for material_handle in polyhedron_materials {
+        if let Some(material) = materials.get_mut(&material_handle.0) {
+            material.base_color.set_alpha(opacity);
+            material.alpha_mode = alpha_mode_for_opacity(opacity);
+        }
+    }
 }
 
 pub(crate) fn twist_status_message(radians: f32) -> String {

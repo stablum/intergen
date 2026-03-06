@@ -62,6 +62,11 @@ pub(crate) struct GenerationState {
     pub(crate) spawn_hold: SpawnHoldState,
 }
 
+#[derive(Resource)]
+pub(crate) struct MaterialState {
+    pub(crate) opacity: f32,
+}
+
 #[derive(Component)]
 pub(crate) struct PolyhedronEntity;
 
@@ -76,6 +81,7 @@ pub(crate) fn setup_scene(
     let ui_theme = load_ui_theme(&asset_server, &app_config.ui);
     let shape_assets = ShapeAssets::new(&mut meshes);
     let root = root_generation_node(&shape_assets.catalog, &app_config.generation);
+    let initial_opacity = app_config.materials.default_opacity_clamped();
 
     spawn_polyhedron_entity(
         &mut commands,
@@ -83,6 +89,7 @@ pub(crate) fn setup_scene(
         shape_assets.mesh(root.kind),
         &root,
         &app_config.materials,
+        initial_opacity,
     );
 
     let camera_translation = camera_rig.orientation * Vec3::new(0.0, 0.0, camera_rig.distance);
@@ -134,15 +141,19 @@ pub(crate) fn setup_scene(
         twist_per_vertex_radians: initial_twist,
         spawn_hold: SpawnHoldState::default(),
     });
+    commands.insert_resource(MaterialState {
+        opacity: initial_opacity,
+    });
 
     println!(
-        "Controls: F1/H help, arrows pitch/yaw, Q/E roll, W/S zoom, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, [/] or ,/. adjust child twist, T reset twist"
+        "Controls: F1/H help, arrows pitch/yaw, Q/E roll, W/S zoom, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, [/] or ,/. adjust child twist, T reset twist"
     );
     println!(
         "Selected child shape: {:?}, ratio: {:.2}",
         app_config.generation.default_child_kind, initial_scale_ratio
     );
     println!("{}", twist_status_message(initial_twist));
+    println!("{}", opacity_status_message(initial_opacity));
     if ui_theme.source == UiFontSource::Fallback {
         eprintln!(
             "Carbon Plus was not found in assets/fonts. Using Bevy's fallback font for UI text."
@@ -178,17 +189,9 @@ pub(crate) fn spawn_polyhedron_entity(
     mesh: &Handle<Mesh>,
     node: &PolyhedronNode,
     material_config: &MaterialConfig,
+    opacity: f32,
 ) {
-    let hue = (node.level as f32 * material_config.hue_step_per_level
-        + material_config.hue_bias(node.kind))
-        % 360.0;
-    let material = materials.add(StandardMaterial {
-        base_color: Color::hsl(hue, material_config.saturation, material_config.lightness),
-        metallic: material_config.metallic,
-        perceptual_roughness: material_config.perceptual_roughness,
-        reflectance: material_config.reflectance,
-        ..default()
-    });
+    let material = materials.add(polyhedron_material(node, material_config, opacity));
 
     commands.spawn((
         Mesh3d(mesh.clone()),
@@ -203,15 +206,53 @@ pub(crate) fn spawn_polyhedron_entity(
     ));
 }
 
+fn polyhedron_material(
+    node: &PolyhedronNode,
+    material_config: &MaterialConfig,
+    opacity: f32,
+) -> StandardMaterial {
+    let hue = (node.level as f32 * material_config.hue_step_per_level
+        + material_config.hue_bias(node.kind))
+        % 360.0;
+    let opacity = opacity.clamp(0.0, 1.0);
+
+    StandardMaterial {
+        base_color: Color::hsl(hue, material_config.saturation, material_config.lightness)
+            .with_alpha(opacity),
+        alpha_mode: alpha_mode_for_opacity(opacity),
+        metallic: material_config.metallic,
+        perceptual_roughness: material_config.perceptual_roughness,
+        reflectance: material_config.reflectance,
+        ..default()
+    }
+}
+
+pub(crate) fn alpha_mode_for_opacity(opacity: f32) -> AlphaMode {
+    if opacity < 0.999 {
+        AlphaMode::Blend
+    } else {
+        AlphaMode::Opaque
+    }
+}
+
+pub(crate) fn opacity_status_message(opacity: f32) -> String {
+    format!(
+        "Global object opacity: {:.0}%",
+        opacity.clamp(0.0, 1.0) * 100.0
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use bevy::prelude::{Quat, Vec3};
+    use bevy::prelude::{AlphaMode, Quat, Vec3};
 
     use crate::config::GenerationConfig;
     use crate::generation::SpawnHoldState;
     use crate::polyhedra::{PolyhedronKind, PolyhedronNode, ShapeCatalog};
 
-    use super::{GenerationState, reset_generation_state, root_generation_node};
+    use super::{
+        GenerationState, alpha_mode_for_opacity, reset_generation_state, root_generation_node,
+    };
 
     #[test]
     fn reset_generation_state_restores_root_only() {
@@ -260,5 +301,11 @@ mod tests {
         assert_eq!(reset_root.center, Vec3::ZERO);
         assert_eq!(generation_state.spawn_hold.elapsed_secs, 0.0);
         assert!(!generation_state.spawn_hold.repeating);
+    }
+
+    #[test]
+    fn transparent_materials_use_blend_mode() {
+        assert!(matches!(alpha_mode_for_opacity(0.6), AlphaMode::Blend));
+        assert!(matches!(alpha_mode_for_opacity(1.0), AlphaMode::Opaque));
     }
 }
