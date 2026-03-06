@@ -1,0 +1,4 @@
+[alias]
+check-plain = "check --no-default-features"
+run-plain = "run --no-default-features"
+test-plain = "test --no-default-features"

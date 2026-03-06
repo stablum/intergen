@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [features]
+default = ["fast-compile"]
 fast-compile = ["bevy/dynamic_linking"]
 
 [dependencies]
@@ -16,6 +17,13 @@ bevy = { version = "0.17.3", default-features = false, features = [
 
 [profile.dev]
 opt-level = 1
+debug = 1
+incremental = true
 
 [profile.dev.package."*"]
 opt-level = 3
+debug = false
+
+[profile.dev.package.bevy_dylib]
+opt-level = 0
+debug = false
