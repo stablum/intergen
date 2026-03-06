@@ -155,17 +155,14 @@ pub fn build_mesh(geometry: &ShapeGeometry) -> Mesh {
     let mut positions = Vec::new();
     let mut normals = Vec::new();
     let mut indices = Vec::new();
-
     for face in &geometry.faces {
-        let vertices: Vec<Vec3> = face.iter().map(|index| geometry.vertices[*index]).collect();
+        let vertices = outward_face_vertices(geometry, face);
         let normal = face_normal(&vertices);
         let base = positions.len() as u32;
-
         for vertex in &vertices {
             positions.push([vertex.x, vertex.y, vertex.z]);
             normals.push([normal.x, normal.y, normal.z]);
         }
-
         for triangle_index in 1..vertices.len() - 1 {
             indices.extend_from_slice(&[
                 base,
@@ -174,7 +171,6 @@ pub fn build_mesh(geometry: &ShapeGeometry) -> Mesh {
             ]);
         }
     }
-
     let mut mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::default(),
@@ -183,6 +179,13 @@ pub fn build_mesh(geometry: &ShapeGeometry) -> Mesh {
     mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     mesh.insert_indices(Indices::U32(indices));
     mesh
+}
+fn outward_face_vertices(geometry: &ShapeGeometry, face: &[usize]) -> Vec<Vec3> {
+    let mut vertices: Vec<Vec3> = face.iter().map(|index| geometry.vertices[*index]).collect();
+    if face_normal(&vertices).dot(centroid(&vertices)) < 0.0 {
+        vertices.reverse();
+    }
+    vertices
 }
 
 fn spawn_candidate(

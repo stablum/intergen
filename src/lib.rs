@@ -32,6 +32,11 @@ const CARBON_PLUS_FONT_CANDIDATES: &[&str] = &[
 pub fn run() {
     App::new()
         .insert_resource(ClearColor(Color::srgb(0.035, 0.04, 0.06)))
+        .insert_resource(AmbientLight {
+            color: Color::srgb(0.7, 0.74, 0.82),
+            brightness: 12.0,
+            ..default()
+        })
         .insert_resource(CameraRig::default())
         .insert_resource(HelpOverlayState::default())
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -198,21 +203,22 @@ fn setup_scene(
 
     commands.spawn((
         DirectionalLight {
-            illuminance: 40_000.0,
+            color: Color::srgb(1.0, 0.97, 0.93),
+            illuminance: 22_000.0,
             shadows_enabled: true,
             ..default()
         },
-        Transform::from_xyz(8.0, 16.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
+        Transform::from_xyz(12.0, 18.0, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
     ));
-
     commands.spawn((
         PointLight {
-            intensity: 50_000_000.0,
-            range: 120.0,
-            shadows_enabled: true,
+            color: Color::srgb(0.5, 0.6, 0.85),
+            intensity: 1_200_000.0,
+            range: 60.0,
+            shadows_enabled: false,
             ..default()
         },
-        Transform::from_xyz(-8.0, 6.0, -7.0),
+        Transform::from_xyz(-9.0, 5.0, -12.0),
     ));
 
     spawn_help_ui(&mut commands, &ui_theme);
@@ -515,10 +521,10 @@ fn spawn_polyhedron_entity(
 ) {
     let hue = (node.level as f32 * 45.0 + node.kind.hue_bias()) % 360.0;
     let material = materials.add(StandardMaterial {
-        base_color: Color::hsl(hue, 0.72, 0.58),
-        metallic: 0.82,
-        perceptual_roughness: 0.18,
-        reflectance: 0.82,
+        base_color: Color::hsl(hue, 0.68, 0.56),
+        metallic: 0.05,
+        perceptual_roughness: 0.86,
+        reflectance: 0.24,
         ..default()
     });
 
