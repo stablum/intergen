@@ -144,6 +144,7 @@ pub(crate) struct CameraConfig {
     pub(crate) initial_roll: f32,
     pub(crate) initial_distance: f32,
     pub(crate) rotation_accel: f32,
+    pub(crate) preserve_angular_momentum: bool,
     pub(crate) zoom_accel: f32,
     pub(crate) angular_damping: f32,
     pub(crate) zoom_damping: f32,
@@ -174,6 +175,7 @@ impl Default for CameraConfig {
             initial_roll: 0.15,
             initial_distance: 14.0,
             rotation_accel: 1.9,
+            preserve_angular_momentum: true,
             zoom_accel: 24.0,
             angular_damping: 2.2,
             zoom_damping: 4.0,
@@ -527,6 +529,13 @@ mod tests {
         let config = AppConfig::default();
 
         assert_eq!(config.window.present_mode, PresentModeSetting::AutoVsync);
+    }
+
+    #[test]
+    fn camera_preserves_angular_momentum_by_default() {
+        let config = parse_config("").expect("empty config should parse");
+
+        assert!(config.camera.preserve_angular_momentum);
     }
 
     #[test]

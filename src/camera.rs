@@ -75,7 +75,12 @@ pub(crate) fn camera_motion_system(
         camera_rig.orientation = (delta * camera_rig.orientation).normalize();
     }
 
-    camera_rig.angular_velocity *= f32::exp(-app_config.camera.angular_damping * dt);
+    camera_rig.angular_velocity = damped_angular_velocity(
+        camera_rig.angular_velocity,
+        app_config.camera.angular_damping,
+        dt,
+        app_config.camera.preserve_angular_momentum,
+    );
     camera_rig.zoom_velocity *= f32::exp(-app_config.camera.zoom_damping * dt);
     let (min_distance, max_distance) = app_config.camera.distance_bounds();
     camera_rig.distance =
@@ -84,4 +89,41 @@ pub(crate) fn camera_motion_system(
     let translation = camera_rig.orientation * Vec3::new(0.0, 0.0, camera_rig.distance);
     *transform = Transform::from_translation(translation)
         .looking_at(Vec3::ZERO, camera_rig.orientation * Vec3::Y);
+}
+
+fn damped_angular_velocity(
+    angular_velocity: Vec3,
+    angular_damping: f32,
+    dt: f32,
+    preserve_angular_momentum: bool,
+) -> Vec3 {
+    if preserve_angular_momentum {
+        return angular_velocity;
+    }
+
+    angular_velocity * f32::exp(-angular_damping * dt)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::damped_angular_velocity;
+    use bevy::prelude::Vec3;
+
+    #[test]
+    fn preserved_angular_momentum_keeps_velocity_constant() {
+        let angular_velocity = Vec3::new(1.0, -0.5, 0.25);
+
+        assert_eq!(
+            damped_angular_velocity(angular_velocity, 2.2, 0.5, true),
+            angular_velocity
+        );
+    }
+
+    #[test]
+    fn damped_angular_momentum_slows_velocity() {
+        let angular_velocity = Vec3::new(1.0, -0.5, 0.25);
+        let next_velocity = damped_angular_velocity(angular_velocity, 2.2, 0.5, false);
+
+        assert!(next_velocity.length() < angular_velocity.length());
+    }
 }

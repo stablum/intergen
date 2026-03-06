@@ -5,7 +5,7 @@ Interactive 3D polyhedron generation tool built with Rust and Bevy.
 Runtime tuning lives in `config.toml` at the repository root.
 
 The current prototype focuses on a fast local development loop and a usable vertical slice:
-- inertial camera rotation on all 3 axes
+- inertial camera rotation on all 3 axes with preserved angular momentum
 - keyboard zoom
 - recursive polyhedron spawning from parent vertices
 - selectable child shape type
@@ -41,7 +41,7 @@ The app loads `config.toml` from the repository root on startup.
 Current configuration sections:
 - `window`: title, resolution, and present mode
 - `rendering`: clear color and ambient light
-- `camera`: initial orbit and motion tuning
+- `camera`: initial orbit, motion tuning, and angular-momentum preservation
 - `generation`: root shape, default child shape, scale limits, twist defaults and bounds, spawn cadence, and spawn heuristics
 - `lighting`: directional and point light colors, positions, and intensities
 - `materials`: color progression, PBR tuning, and live opacity defaults
