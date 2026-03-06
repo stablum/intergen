@@ -212,7 +212,6 @@ fn child_transform(
         Vec3::Y
     };
 
-    let align = Quat::from_rotation_arc(Vec3::Y, outward);
     let twist_step = if twist_per_vertex_radians.is_finite() {
         twist_per_vertex_radians
     } else {
@@ -220,7 +219,7 @@ fn child_transform(
     };
     let twist = Quat::from_axis_angle(outward, vertex_index as f32 * twist_step);
 
-    (world_vertex, twist * align)
+    (world_vertex, twist * parent.rotation)
 }
 
 fn is_fully_contained(
@@ -340,6 +339,38 @@ mod tests {
             parent_center + parent_rotation * (parent_geometry.vertices[0] * parent_scale);
 
         assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
+    }
+
+    #[test]
+    fn zero_twist_keeps_child_orientation_aligned_with_parent() {
+        let shapes = ShapeCatalog::new();
+        let parent_rotation = Quat::from_euler(EulerRot::YXZ, 0.45, -0.3, 0.2);
+        let parent_kind = PolyhedronKind::Cube;
+        let parent_geometry = shapes.geometry(parent_kind);
+        let mut nodes = vec![PolyhedronNode {
+            kind: parent_kind,
+            level: 0,
+            center: Vec3::new(1.5, -0.75, 2.25),
+            rotation: parent_rotation,
+            scale: 1.4,
+            radius: parent_geometry.radius * 1.4,
+            occupied_vertices: vec![false; parent_geometry.vertices.len()],
+            origin: NodeOrigin::Root,
+        }];
+
+        let spawn = next_spawn(
+            &mut nodes,
+            &shapes,
+            PolyhedronKind::Tetrahedron,
+            0.35,
+            SpawnTuning {
+                twist_per_vertex_radians: 0.0,
+                ..test_tuning()
+            },
+        )
+        .expect("spawn should succeed");
+
+        assert!(spawn.node.rotation.angle_between(parent_rotation) <= 1.0e-5);
     }
 
     #[test]
