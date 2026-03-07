@@ -216,28 +216,6 @@ pub(crate) fn spawn_help_ui(
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                top: px(ui_config.hint_top),
-                left: px(ui_config.hint_left),
-                padding: UiRect::axes(px(ui_config.hint_padding_x), px(ui_config.hint_padding_y)),
-                ..default()
-            },
-            BackgroundColor(srgba(ui_config.hint_background)),
-            BorderRadius::MAX,
-            GlobalZIndex(20),
-            UiTargetCamera(scene_camera),
-        ))
-        .with_children(|parent| {
-            parent.spawn((
-                Text::new("F1 / H: controls"),
-                ui_theme.text_font(ui_config.hint_font_size),
-                TextColor(srgb(ui_config.hint_text)),
-            ));
-        });
-
-    commands
-        .spawn((
-            Node {
-                position_type: PositionType::Absolute,
                 left: px(ui_config.hint_left),
                 right: px(ui_config.hint_left),
                 bottom: px(ui_config.hint_top),
