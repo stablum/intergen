@@ -413,12 +413,22 @@ impl Default for MaterialConfig {
 #[serde(default)]
 pub(crate) struct EffectsConfig {
     pub(crate) color_wavefolder: ColorWavefolderConfig,
+    pub(crate) gaussian_blur: GaussianBlurConfig,
+    pub(crate) edge_detection: EdgeDetectionConfig,
+}
+
+impl EffectsConfig {
+    pub(crate) fn any_enabled(&self) -> bool {
+        self.color_wavefolder.enabled || self.gaussian_blur.enabled || self.edge_detection.enabled
+    }
 }
 
 impl Default for EffectsConfig {
     fn default() -> Self {
         Self {
             color_wavefolder: ColorWavefolderConfig::default(),
+            gaussian_blur: GaussianBlurConfig::default(),
+            edge_detection: EdgeDetectionConfig::default(),
         }
     }
 }
@@ -447,6 +457,70 @@ impl Default for ColorWavefolderConfig {
             enabled: true,
             gain: 2.4,
             modulus: 1.0,
+        }
+    }
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(default)]
+pub(crate) struct GaussianBlurConfig {
+    pub(crate) enabled: bool,
+    pub(crate) sigma: f32,
+    pub(crate) radius_pixels: u32,
+}
+
+impl GaussianBlurConfig {
+    pub(crate) fn sigma_clamped(&self) -> f32 {
+        self.sigma.max(0.0001)
+    }
+
+    pub(crate) fn radius_pixels_clamped(&self) -> u32 {
+        self.radius_pixels.min(3)
+    }
+}
+
+impl Default for GaussianBlurConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            sigma: 1.2,
+            radius_pixels: 2,
+        }
+    }
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(default)]
+pub(crate) struct EdgeDetectionConfig {
+    pub(crate) enabled: bool,
+    pub(crate) strength: f32,
+    pub(crate) threshold: f32,
+    pub(crate) mix: f32,
+    pub(crate) color: [f32; 3],
+}
+
+impl EdgeDetectionConfig {
+    pub(crate) fn strength_clamped(&self) -> f32 {
+        self.strength.max(0.0)
+    }
+
+    pub(crate) fn threshold_clamped(&self) -> f32 {
+        self.threshold.max(0.0)
+    }
+
+    pub(crate) fn mix_clamped(&self) -> f32 {
+        self.mix.clamp(0.0, 1.0)
+    }
+}
+
+impl Default for EdgeDetectionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            strength: 3.0,
+            threshold: 0.2,
+            mix: 0.85,
+            color: [1.0, 1.0, 1.0],
         }
     }
 }
@@ -597,6 +671,44 @@ mod tests {
         assert!(!config.effects.color_wavefolder.enabled);
         assert_eq!(config.effects.color_wavefolder.gain_clamped(), 3.25);
         assert_eq!(config.effects.color_wavefolder.modulus_clamped(), 0.5);
+    }
+
+    #[test]
+    fn gaussian_blur_settings_parse_from_config() {
+        let config = parse_config(
+            r#"
+            [effects.gaussian_blur]
+            enabled = true
+            sigma = 2.75
+            radius_pixels = 7
+            "#,
+        )
+        .expect("gaussian blur config should parse");
+
+        assert!(config.effects.gaussian_blur.enabled);
+        assert_eq!(config.effects.gaussian_blur.sigma_clamped(), 2.75);
+        assert_eq!(config.effects.gaussian_blur.radius_pixels_clamped(), 3);
+    }
+
+    #[test]
+    fn edge_detection_settings_parse_from_config() {
+        let config = parse_config(
+            r#"
+            [effects.edge_detection]
+            enabled = true
+            strength = 4.25
+            threshold = 0.35
+            mix = 2.0
+            color = [0.9, 0.2, 1.4]
+            "#,
+        )
+        .expect("edge detection config should parse");
+
+        assert!(config.effects.edge_detection.enabled);
+        assert_eq!(config.effects.edge_detection.strength_clamped(), 4.25);
+        assert_eq!(config.effects.edge_detection.threshold_clamped(), 0.35);
+        assert_eq!(config.effects.edge_detection.mix_clamped(), 1.0);
+        assert_eq!(config.effects.edge_detection.color, [0.9, 0.2, 1.4]);
     }
 
     #[test]

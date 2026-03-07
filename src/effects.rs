@@ -27,34 +27,31 @@ use bevy::{
     },
 };
 
-use crate::config::ColorWavefolderConfig;
+use crate::config::EffectsConfig;
 
-const COLOR_WAVEFOLDER_SHADER_PATH: &str = "shaders/color_wavefolder.wgsl";
+const CAMERA_EFFECTS_SHADER_PATH: &str = "shaders/color_wavefolder.wgsl";
 
 pub(crate) struct EffectsPlugin;
 
 impl Plugin for EffectsPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins((
-            ExtractComponentPlugin::<CameraColorWavefolder>::default(),
-            UniformComponentPlugin::<CameraColorWavefolder>::default(),
+            ExtractComponentPlugin::<CameraEffectsSettings>::default(),
+            UniformComponentPlugin::<CameraEffectsSettings>::default(),
         ));
 
         let Some(render_app) = app.get_sub_app_mut(RenderApp) else {
             return;
         };
 
-        render_app.add_systems(RenderStartup, init_color_wavefolder_pipeline);
+        render_app.add_systems(RenderStartup, init_camera_effects_pipeline);
         render_app
-            .add_render_graph_node::<ViewNodeRunner<ColorWavefolderNode>>(
-                Core3d,
-                ColorWavefolderLabel,
-            )
+            .add_render_graph_node::<ViewNodeRunner<CameraEffectsNode>>(Core3d, CameraEffectsLabel)
             .add_render_graph_edges(
                 Core3d,
                 (
                     Node3d::Tonemapping,
-                    ColorWavefolderLabel,
+                    CameraEffectsLabel,
                     Node3d::EndMainPassPostProcessing,
                 ),
             );
@@ -62,16 +59,16 @@ impl Plugin for EffectsPlugin {
 }
 
 #[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
-struct ColorWavefolderLabel;
+struct CameraEffectsLabel;
 
 #[derive(Default)]
-struct ColorWavefolderNode;
+struct CameraEffectsNode;
 
-impl ViewNode for ColorWavefolderNode {
+impl ViewNode for CameraEffectsNode {
     type ViewQuery = (
         &'static ViewTarget,
-        &'static CameraColorWavefolder,
-        &'static DynamicUniformIndex<CameraColorWavefolder>,
+        &'static CameraEffectsSettings,
+        &'static DynamicUniformIndex<CameraEffectsSettings>,
     );
 
     fn run(
@@ -81,21 +78,21 @@ impl ViewNode for ColorWavefolderNode {
         (view_target, _settings, settings_index): QueryItem<Self::ViewQuery>,
         world: &World,
     ) -> Result<(), NodeRunError> {
-        let pipeline = world.resource::<ColorWavefolderPipeline>();
+        let pipeline = world.resource::<CameraEffectsPipeline>();
         let pipeline_cache = world.resource::<PipelineCache>();
 
         let Some(render_pipeline) = pipeline_cache.get_render_pipeline(pipeline.pipeline_id) else {
             return Ok(());
         };
 
-        let settings_uniforms = world.resource::<ComponentUniforms<CameraColorWavefolder>>();
+        let settings_uniforms = world.resource::<ComponentUniforms<CameraEffectsSettings>>();
         let Some(settings_binding) = settings_uniforms.uniforms().binding() else {
             return Ok(());
         };
 
         let post_process = view_target.post_process_write();
         let bind_group = render_context.render_device().create_bind_group(
-            "color_wavefolder_bind_group",
+            "camera_effects_bind_group",
             &pipeline.layout,
             &BindGroupEntries::sequential((
                 post_process.source,
@@ -105,7 +102,7 @@ impl ViewNode for ColorWavefolderNode {
         );
 
         let mut render_pass = render_context.begin_tracked_render_pass(RenderPassDescriptor {
-            label: Some("color_wavefolder_pass"),
+            label: Some("camera_effects_pass"),
             color_attachments: &[Some(RenderPassColorAttachment {
                 view: post_process.destination,
                 depth_slice: None,
@@ -126,13 +123,13 @@ impl ViewNode for ColorWavefolderNode {
 }
 
 #[derive(Resource)]
-struct ColorWavefolderPipeline {
+struct CameraEffectsPipeline {
     layout: BindGroupLayout,
     sampler: Sampler,
     pipeline_id: CachedRenderPipelineId,
 }
 
-fn init_color_wavefolder_pipeline(
+fn init_camera_effects_pipeline(
     mut commands: Commands,
     render_device: Res<RenderDevice>,
     asset_server: Res<AssetServer>,
@@ -140,20 +137,20 @@ fn init_color_wavefolder_pipeline(
     pipeline_cache: Res<PipelineCache>,
 ) {
     let layout = render_device.create_bind_group_layout(
-        "color_wavefolder_bind_group_layout",
+        "camera_effects_bind_group_layout",
         &BindGroupLayoutEntries::sequential(
             ShaderStages::FRAGMENT,
             (
                 texture_2d(TextureSampleType::Float { filterable: true }),
                 sampler(SamplerBindingType::Filtering),
-                uniform_buffer::<CameraColorWavefolder>(true),
+                uniform_buffer::<CameraEffectsSettings>(true),
             ),
         ),
     );
     let sampler = render_device.create_sampler(&SamplerDescriptor::default());
-    let shader = asset_server.load(COLOR_WAVEFOLDER_SHADER_PATH);
+    let shader = asset_server.load(CAMERA_EFFECTS_SHADER_PATH);
     let pipeline_id = pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
-        label: Some("color_wavefolder_pipeline".into()),
+        label: Some("camera_effects_pipeline".into()),
         layout: vec![layout.clone()],
         vertex: fullscreen_shader.to_vertex_state(),
         fragment: Some(FragmentState {
@@ -169,7 +166,7 @@ fn init_color_wavefolder_pipeline(
         ..default()
     });
 
-    commands.insert_resource(ColorWavefolderPipeline {
+    commands.insert_resource(CameraEffectsPipeline {
         layout,
         sampler,
         pipeline_id,
@@ -177,35 +174,96 @@ fn init_color_wavefolder_pipeline(
 }
 
 #[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
-pub(crate) struct CameraColorWavefolder {
-    pub(crate) enabled: u32,
-    pub(crate) gain: f32,
-    pub(crate) modulus: f32,
-    pub(crate) _padding: f32,
+pub(crate) struct CameraEffectsSettings {
+    pub(crate) wavefolder: Vec4,
+    pub(crate) gaussian_blur: Vec4,
+    pub(crate) edge_detection: Vec4,
+    pub(crate) edge_color: Vec4,
 }
 
-pub(crate) fn camera_color_wavefolder_from_config(
-    color_wavefolder_config: &ColorWavefolderConfig,
-) -> CameraColorWavefolder {
-    CameraColorWavefolder {
-        enabled: u32::from(color_wavefolder_config.enabled),
-        gain: color_wavefolder_config.gain_clamped(),
-        modulus: color_wavefolder_config.modulus_clamped(),
-        _padding: 0.0,
+pub(crate) fn camera_effects_from_config(effects_config: &EffectsConfig) -> CameraEffectsSettings {
+    CameraEffectsSettings {
+        wavefolder: Vec4::new(
+            if effects_config.color_wavefolder.enabled {
+                1.0
+            } else {
+                0.0
+            },
+            effects_config.color_wavefolder.gain_clamped(),
+            effects_config.color_wavefolder.modulus_clamped(),
+            0.0,
+        ),
+        gaussian_blur: Vec4::new(
+            if effects_config.gaussian_blur.enabled {
+                1.0
+            } else {
+                0.0
+            },
+            effects_config.gaussian_blur.sigma_clamped(),
+            effects_config.gaussian_blur.radius_pixels_clamped() as f32,
+            0.0,
+        ),
+        edge_detection: Vec4::new(
+            if effects_config.edge_detection.enabled {
+                1.0
+            } else {
+                0.0
+            },
+            effects_config.edge_detection.strength_clamped(),
+            effects_config.edge_detection.threshold_clamped(),
+            effects_config.edge_detection.mix_clamped(),
+        ),
+        edge_color: Vec4::new(
+            effects_config.edge_detection.color[0].clamp(0.0, 1.0),
+            effects_config.edge_detection.color[1].clamp(0.0, 1.0),
+            effects_config.edge_detection.color[2].clamp(0.0, 1.0),
+            1.0,
+        ),
     }
 }
 
-pub(crate) fn color_wavefolder_status_message(
-    color_wavefolder_config: &ColorWavefolderConfig,
-) -> String {
-    if !color_wavefolder_config.enabled {
+pub(crate) fn effects_status_messages(effects_config: &EffectsConfig) -> Vec<String> {
+    vec![
+        color_wavefolder_status_message(effects_config),
+        gaussian_blur_status_message(effects_config),
+        edge_detection_status_message(effects_config),
+    ]
+}
+
+fn color_wavefolder_status_message(effects_config: &EffectsConfig) -> String {
+    if !effects_config.color_wavefolder.enabled {
         return "Camera-output color wavefolder: disabled".to_string();
     }
 
     format!(
         "Camera-output color wavefolder: hard wrap enabled, gain {:.2}, modulus {:.2}",
-        color_wavefolder_config.gain_clamped(),
-        color_wavefolder_config.modulus_clamped()
+        effects_config.color_wavefolder.gain_clamped(),
+        effects_config.color_wavefolder.modulus_clamped()
+    )
+}
+
+fn gaussian_blur_status_message(effects_config: &EffectsConfig) -> String {
+    if !effects_config.gaussian_blur.enabled {
+        return "Camera-output gaussian blur: disabled".to_string();
+    }
+
+    format!(
+        "Camera-output gaussian blur: enabled, sigma {:.2}, radius {} px",
+        effects_config.gaussian_blur.sigma_clamped(),
+        effects_config.gaussian_blur.radius_pixels_clamped()
+    )
+}
+
+fn edge_detection_status_message(effects_config: &EffectsConfig) -> String {
+    if !effects_config.edge_detection.enabled {
+        return "Camera-output edge detection: disabled".to_string();
+    }
+
+    format!(
+        "Camera-output edge detection: enabled, strength {:.2}, threshold {:.2}, mix {:.2}",
+        effects_config.edge_detection.strength_clamped(),
+        effects_config.edge_detection.threshold_clamped(),
+        effects_config.edge_detection.mix_clamped()
     )
 }
 
@@ -220,10 +278,12 @@ fn hard_wrap_wavefold(value: f32, gain: f32, modulus: f32) -> f32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        camera_color_wavefolder_from_config, color_wavefolder_status_message, hard_wrap_wavefold,
+    use bevy::prelude::Vec4;
+
+    use super::{camera_effects_from_config, effects_status_messages, hard_wrap_wavefold};
+    use crate::config::{
+        ColorWavefolderConfig, EdgeDetectionConfig, EffectsConfig, GaussianBlurConfig,
     };
-    use crate::config::ColorWavefolderConfig;
 
     #[test]
     fn hard_wrap_wavefold_keeps_only_division_remainder() {
@@ -233,26 +293,40 @@ mod tests {
     }
 
     #[test]
-    fn camera_wavefolder_component_uses_clamped_config_values() {
-        let settings = camera_color_wavefolder_from_config(&ColorWavefolderConfig {
-            enabled: true,
-            gain: -3.0,
-            modulus: 0.0,
+    fn camera_effects_settings_use_clamped_config_values() {
+        let settings = camera_effects_from_config(&EffectsConfig {
+            color_wavefolder: ColorWavefolderConfig {
+                enabled: true,
+                gain: -3.0,
+                modulus: 0.0,
+            },
+            gaussian_blur: GaussianBlurConfig {
+                enabled: true,
+                sigma: -2.0,
+                radius_pixels: 99,
+            },
+            edge_detection: EdgeDetectionConfig {
+                enabled: true,
+                strength: -1.0,
+                threshold: -0.5,
+                mix: 4.0,
+                color: [1.2, -0.3, 0.4],
+            },
         });
 
-        assert_eq!(settings.enabled, 1);
-        assert_eq!(settings.gain, 0.0);
-        assert_eq!(settings.modulus, 0.0001);
+        assert_eq!(settings.wavefolder, Vec4::new(1.0, 0.0, 0.0001, 0.0));
+        assert_eq!(settings.gaussian_blur, Vec4::new(1.0, 0.0001, 3.0, 0.0));
+        assert_eq!(settings.edge_detection, Vec4::new(1.0, 0.0, 0.0, 1.0));
+        assert_eq!(settings.edge_color, Vec4::new(1.0, 0.0, 0.4, 1.0));
     }
 
     #[test]
-    fn disabled_status_message_is_explicit() {
-        let status = color_wavefolder_status_message(&ColorWavefolderConfig {
-            enabled: false,
-            gain: 2.4,
-            modulus: 1.0,
-        });
+    fn status_messages_report_all_effects() {
+        let messages = effects_status_messages(&EffectsConfig::default());
 
-        assert_eq!(status, "Camera-output color wavefolder: disabled");
+        assert_eq!(messages.len(), 3);
+        assert!(messages[0].contains("wavefolder"));
+        assert!(messages[1].contains("gaussian blur"));
+        assert!(messages[2].contains("edge detection"));
     }
 }

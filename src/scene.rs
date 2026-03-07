@@ -3,7 +3,7 @@ use bevy::prelude::*;
 
 use crate::camera::{CameraRig, SceneCamera};
 use crate::config::{AppConfig, GenerationConfig, MaterialConfig};
-use crate::effects::{camera_color_wavefolder_from_config, color_wavefolder_status_message};
+use crate::effects::{camera_effects_from_config, effects_status_messages};
 use crate::generation::{SpawnHoldState, twist_status_message};
 use crate::polyhedra::{
     PolyhedronKind, PolyhedronNode, ShapeCatalog, ShapeGeometry, build_mesh, root_node,
@@ -107,10 +107,8 @@ pub(crate) fn setup_scene(
         SceneCamera,
         IsDefaultUiCamera,
     ));
-    if app_config.effects.color_wavefolder.enabled {
-        scene_camera.insert(camera_color_wavefolder_from_config(
-            &app_config.effects.color_wavefolder,
-        ));
+    if app_config.effects.any_enabled() {
+        scene_camera.insert(camera_effects_from_config(&app_config.effects));
     }
     let scene_camera = scene_camera.id();
 
@@ -166,10 +164,9 @@ pub(crate) fn setup_scene(
     );
     println!("{}", twist_status_message(initial_twist));
     println!("{}", opacity_status_message(initial_opacity));
-    println!(
-        "{}",
-        color_wavefolder_status_message(&app_config.effects.color_wavefolder)
-    );
+    for message in effects_status_messages(&app_config.effects) {
+        println!("{message}");
+    }
     if ui_theme.source == UiFontSource::Fallback {
         eprintln!(
             "Carbon Plus was not found in assets/fonts. Using Bevy's fallback font for UI text."

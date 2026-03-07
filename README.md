@@ -13,7 +13,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - toggleable in-app keybinding overlay
 - built-in screenshot capture for manual and scripted verification
 - containment rejection so obviously hidden fully-inside spawns are skipped
-- camera-output shader wavefolder with hard wrapping
+- camera-output shader stack with hard-wrap wavefolder, gaussian blur, and edge detection
 
 ## Requirements
 
@@ -59,10 +59,27 @@ Live twist controls use these `generation` settings:
 - `twist_repeat_interval_secs`: time between repeated twist updates while held
 - `min_twist_per_vertex_radians` / `max_twist_per_vertex_radians`: live clamp range, with `0.0` as the minimum allowed floor
 
+Camera-output effects run in this order:
+- `effects.color_wavefolder`: hard-wrap the camera color by amplification plus remainder
+- `effects.gaussian_blur`: blur the already-wavefolded image
+- `effects.edge_detection`: detect edges from the processed image and mix a configurable edge color over it
+
 Camera-output color wavefolder uses these `effects.color_wavefolder` settings:
-- `enabled`: turns the camera post-process on or off
+- `enabled`: turns the hard-wrap post-process on or off
 - `gain`: amplifies the color before wrapping
 - `modulus`: the divisor whose remainder is kept after amplification
+
+Camera-output gaussian blur uses these `effects.gaussian_blur` settings:
+- `enabled`: turns blur on or off
+- `sigma`: controls the gaussian falloff
+- `radius_pixels`: blur radius in pixels, clamped to `3` in the current single-pass shader
+
+Camera-output edge detection uses these `effects.edge_detection` settings:
+- `enabled`: turns the edge pass on or off
+- `strength`: scales edge magnitude before thresholding
+- `threshold`: subtracts a floor from the detected edge magnitude
+- `mix`: blends the edge color over the processed image
+- `color`: RGB edge overlay color
 
 Live opacity controls use these `materials` settings:
 - `default_opacity`: startup default for all object materials
@@ -139,7 +156,7 @@ Implemented now:
 - custom meshes for cube, tetrahedron, octahedron, and dodecahedron
 - recursive level-by-level spawning
 - metallic lit PBR scene
-- camera-output hard-wrap wavefolder post process
+- camera-output hard-wrap wavefolder, gaussian blur, and edge-detection post process
 - unit tests for geometry counts and spawn ordering
 
 Not implemented yet:

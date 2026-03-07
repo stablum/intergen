@@ -5,8 +5,8 @@ height = 960
 present_mode = "auto_vsync"
 
 [rendering]
-clear_color = [0.035, 0.04, 0.06]
-ambient_light_color = [0.7, 0.74, 0.82]
+clear_color = [0.0, 0.0, 0.0]
+ambient_light_color = [1.0, 0.0, 0.0]
 ambient_light_brightness = 12.0
 
 [camera]
@@ -24,21 +24,21 @@ max_distance = 48.0
 [generation]
 root_kind = "cube"
 root_scale = 1.9
-default_child_kind = "dodecahedron"
+default_child_kind = "cube"
 default_scale_ratio = 0.58
 scale_adjust_step = 0.05
 min_scale_ratio = 0.15
 max_scale_ratio = 1.0
 spawn_hold_delay_secs = 0.24
-spawn_repeat_interval_secs = 0.07
+spawn_repeat_interval_secs = 0.0005
 containment_epsilon = 0.02
 twist_per_vertex_radians = 0.62831855
-twist_adjust_step = 0.17453292
+twist_adjust_step = 0.017453292
 min_twist_per_vertex_radians = 0.0
 max_twist_per_vertex_radians = 3.1415927
 
 [lighting.directional]
-color = [1.0, 0.97, 0.93]
+color = [1.0, 0.0, 0.0]
 illuminance = 22000.0
 shadows_enabled = true
 translation = [12.0, 18.0, 9.0]
@@ -100,4 +100,19 @@ body_font_size = 16.0
 body_text = [0.89, 0.92, 0.96]
 body_max_width = 420.0
 
+[effects.color_wavefolder]
+enabled = true
+gain = 100000
+modulus = 3.0
 
+[effects.gaussian_blur]
+enabled = false
+sigma = 1.2
+radius_pixels = 2
+
+[effects.edge_detection]
+enabled = false
+strength = 3.0
+threshold = 0.2
+mix = 0.85
+color = [1.0, 1.0, 1.0]
