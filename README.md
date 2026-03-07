@@ -263,6 +263,15 @@ Not implemented yet:
 - more advanced visibility heuristics than simple containment rejection
 - automatic conversion of effect LFOs into native Blender animation/drivers
 
+## License
+
+`intergen` is licensed under `GPL-3.0-or-later`.
+
+Copyright (C) 2026 Francesco Stablum.
+
+See [LICENSE](LICENSE) for the project notice and [COPYING](COPYING) for the full GNU General Public License text.
+
+
 
 
 
