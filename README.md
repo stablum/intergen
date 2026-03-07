@@ -59,6 +59,13 @@ Live twist controls use these `generation` settings:
 - `twist_repeat_interval_secs`: time between repeated twist updates while held
 - `min_twist_per_vertex_radians` / `max_twist_per_vertex_radians`: live clamp range, with `0.0` as the minimum allowed floor
 
+Live child-offset controls use these `generation` settings:
+- `default_vertex_offset_ratio`: startup default for the center offset from a parent vertex, measured in child-radius units
+- `vertex_offset_adjust_step`: per-keypress offset change
+- `vertex_offset_hold_delay_secs`: how long to hold before offset repeat starts
+- `vertex_offset_repeat_interval_secs`: time between repeated offset updates while held
+- `min_vertex_offset_ratio` / `max_vertex_offset_ratio`: live clamp range, with `0.0` as the minimum allowed floor
+
 Camera-output effects run in this order:
 - `effects.color_wavefolder`: hard-wrap the camera color by amplification plus remainder
 - `effects.gaussian_blur`: blur the already-wavefolded image
@@ -138,6 +145,9 @@ cargo test-plain
 - `+`: increase child scale ratio
 - `[` or `,`: decrease child twist angle, or hold to keep decreasing
 - `]` or `.`: increase child twist angle, or hold to keep increasing
+- `Z`: decrease the child vertex offset, or hold to keep decreasing
+- `X`: increase the child vertex offset, or hold to keep increasing
+- `C`: reset the child vertex offset to the configured default
 - `O`: decrease global object opacity
 - `P`: increase global object opacity
 - `I`: reset global object opacity to the configured default

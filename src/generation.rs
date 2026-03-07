@@ -11,6 +11,8 @@ use crate::scene::{
 const RADIANS_TO_DEGREES: f32 = 180.0 / std::f32::consts::PI;
 const TWIST_DECREASE_KEYS: [KeyCode; 2] = [KeyCode::BracketLeft, KeyCode::Comma];
 const TWIST_INCREASE_KEYS: [KeyCode; 2] = [KeyCode::BracketRight, KeyCode::Period];
+const VERTEX_OFFSET_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyZ];
+const VERTEX_OFFSET_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyX];
 
 #[derive(Default)]
 pub(crate) struct SpawnHoldState {
@@ -143,7 +145,8 @@ pub(crate) fn generation_input_system(
     }
 
     let (min_twist, max_twist) = app_config.generation.twist_bounds();
-    let mut twist_changed = false;
+    let (min_vertex_offset, max_vertex_offset) = app_config.generation.vertex_offset_bounds();
+    let mut transform_changed = false;
     let twist_decrease_requested = generation_state.twist_decrease_hold.update(
         key_group_just_pressed(&keys, &TWIST_DECREASE_KEYS),
         key_group_pressed(&keys, &TWIST_DECREASE_KEYS),
@@ -159,7 +162,7 @@ pub(crate) fn generation_input_system(
             min_twist,
             max_twist,
         );
-        twist_changed = true;
+        transform_changed = true;
         println!(
             "{}",
             twist_status_message(generation_state.twist_per_vertex_radians)
@@ -180,7 +183,7 @@ pub(crate) fn generation_input_system(
             min_twist,
             max_twist,
         );
-        twist_changed = true;
+        transform_changed = true;
         println!(
             "{}",
             twist_status_message(generation_state.twist_per_vertex_radians)
@@ -190,7 +193,7 @@ pub(crate) fn generation_input_system(
         generation_state.twist_per_vertex_radians = app_config
             .generation
             .default_twist_per_vertex_radians_clamped();
-        twist_changed = true;
+        transform_changed = true;
         generation_state.twist_decrease_hold.reset();
         generation_state.twist_increase_hold.reset();
         println!(
@@ -198,12 +201,69 @@ pub(crate) fn generation_input_system(
             twist_status_message(generation_state.twist_per_vertex_radians).to_lowercase()
         );
     }
-    if twist_changed {
+
+    let vertex_offset_decrease_requested = generation_state.vertex_offset_decrease_hold.update(
+        key_group_just_pressed(&keys, &VERTEX_OFFSET_DECREASE_KEYS),
+        key_group_pressed(&keys, &VERTEX_OFFSET_DECREASE_KEYS),
+        key_group_just_released(&keys, &VERTEX_OFFSET_DECREASE_KEYS),
+        time.delta_secs(),
+        app_config.generation.vertex_offset_hold_delay_secs,
+        app_config.generation.vertex_offset_repeat_interval_secs,
+    );
+    if vertex_offset_decrease_requested {
+        generation_state.vertex_offset_ratio = adjust_clamped_value(
+            generation_state.vertex_offset_ratio,
+            -app_config.generation.vertex_offset_adjust_step,
+            min_vertex_offset,
+            max_vertex_offset,
+        );
+        transform_changed = true;
+        println!(
+            "{}",
+            vertex_offset_status_message(generation_state.vertex_offset_ratio)
+        );
+    }
+    let vertex_offset_increase_requested = generation_state.vertex_offset_increase_hold.update(
+        key_group_just_pressed(&keys, &VERTEX_OFFSET_INCREASE_KEYS),
+        key_group_pressed(&keys, &VERTEX_OFFSET_INCREASE_KEYS),
+        key_group_just_released(&keys, &VERTEX_OFFSET_INCREASE_KEYS),
+        time.delta_secs(),
+        app_config.generation.vertex_offset_hold_delay_secs,
+        app_config.generation.vertex_offset_repeat_interval_secs,
+    );
+    if vertex_offset_increase_requested {
+        generation_state.vertex_offset_ratio = adjust_clamped_value(
+            generation_state.vertex_offset_ratio,
+            app_config.generation.vertex_offset_adjust_step,
+            min_vertex_offset,
+            max_vertex_offset,
+        );
+        transform_changed = true;
+        println!(
+            "{}",
+            vertex_offset_status_message(generation_state.vertex_offset_ratio)
+        );
+    }
+    if keys.just_pressed(KeyCode::KeyC) {
+        generation_state.vertex_offset_ratio =
+            app_config.generation.default_vertex_offset_ratio_clamped();
+        transform_changed = true;
+        generation_state.vertex_offset_decrease_hold.reset();
+        generation_state.vertex_offset_increase_hold.reset();
+        println!(
+            "Reset {}",
+            vertex_offset_status_message(generation_state.vertex_offset_ratio).to_lowercase()
+        );
+    }
+
+    if transform_changed {
         let twist_per_vertex_radians = generation_state.twist_per_vertex_radians;
+        let vertex_offset_ratio = generation_state.vertex_offset_ratio;
         recompute_spawn_tree(
             &mut generation_state.nodes,
             &shape_assets.catalog,
             twist_per_vertex_radians,
+            vertex_offset_ratio,
         );
         sync_polyhedron_transforms(&generation_state.nodes, &mut polyhedron_transforms);
     }
@@ -246,12 +306,15 @@ pub(crate) fn generation_input_system(
     let selected_kind = generation_state.selected_kind;
     let scale_ratio = generation_state.scale_ratio;
     let twist_per_vertex_radians = generation_state.twist_per_vertex_radians;
+    let vertex_offset_ratio = generation_state.vertex_offset_ratio;
     let Some(spawn) = next_spawn(
         &mut generation_state.nodes,
         &shape_assets.catalog,
         selected_kind,
         scale_ratio,
-        app_config.generation.spawn_tuning(twist_per_vertex_radians),
+        app_config
+            .generation
+            .spawn_tuning(twist_per_vertex_radians, vertex_offset_ratio),
     ) else {
         eprintln!("No valid spawn position is currently available.");
         return;
@@ -320,9 +383,18 @@ pub(crate) fn twist_status_message(radians: f32) -> String {
     )
 }
 
+pub(crate) fn vertex_offset_status_message(offset_ratio: f32) -> String {
+    format!(
+        "Child vertex offset: {:.2}x child radius",
+        offset_ratio.max(0.0)
+    )
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{SpawnHoldState, adjust_clamped_value, twist_status_message};
+    use super::{
+        SpawnHoldState, adjust_clamped_value, twist_status_message, vertex_offset_status_message,
+    };
     use crate::config::GenerationConfig;
 
     #[test]
@@ -415,5 +487,12 @@ mod tests {
 
         assert!(status.contains("1.571 rad"));
         assert!(status.contains("90.0 deg"));
+    }
+
+    #[test]
+    fn vertex_offset_status_message_mentions_child_radius_scale() {
+        let status = vertex_offset_status_message(0.75);
+
+        assert!(status.contains("0.75x child radius"));
     }
 }

@@ -206,6 +206,12 @@ pub(crate) struct GenerationConfig {
     pub(crate) twist_repeat_interval_secs: f32,
     pub(crate) min_twist_per_vertex_radians: f32,
     pub(crate) max_twist_per_vertex_radians: f32,
+    pub(crate) default_vertex_offset_ratio: f32,
+    pub(crate) vertex_offset_adjust_step: f32,
+    pub(crate) vertex_offset_hold_delay_secs: f32,
+    pub(crate) vertex_offset_repeat_interval_secs: f32,
+    pub(crate) min_vertex_offset_ratio: f32,
+    pub(crate) max_vertex_offset_ratio: f32,
 }
 
 impl GenerationConfig {
@@ -229,15 +235,33 @@ impl GenerationConfig {
         self.twist_per_vertex_radians.clamp(min, max)
     }
 
-    pub(crate) fn spawn_tuning(&self, twist_per_vertex_radians: f32) -> SpawnTuning {
+    pub(crate) fn vertex_offset_bounds(&self) -> (f32, f32) {
+        let min = self.min_vertex_offset_ratio.max(0.0);
+        let max = self.max_vertex_offset_ratio.max(min);
+        (min, max)
+    }
+
+    pub(crate) fn default_vertex_offset_ratio_clamped(&self) -> f32 {
+        let (min, max) = self.vertex_offset_bounds();
+        self.default_vertex_offset_ratio.clamp(min, max)
+    }
+
+    pub(crate) fn spawn_tuning(
+        &self,
+        twist_per_vertex_radians: f32,
+        vertex_offset_ratio: f32,
+    ) -> SpawnTuning {
         let (min_scale_ratio, max_scale_ratio) = self.scale_bounds();
         let (min_twist_per_vertex_radians, max_twist_per_vertex_radians) = self.twist_bounds();
+        let (min_vertex_offset_ratio, max_vertex_offset_ratio) = self.vertex_offset_bounds();
         SpawnTuning {
             min_scale_ratio,
             max_scale_ratio,
             containment_epsilon: self.containment_epsilon,
             twist_per_vertex_radians: twist_per_vertex_radians
                 .clamp(min_twist_per_vertex_radians, max_twist_per_vertex_radians),
+            vertex_offset_ratio: vertex_offset_ratio
+                .clamp(min_vertex_offset_ratio, max_vertex_offset_ratio),
         }
     }
 }
@@ -261,6 +285,12 @@ impl Default for GenerationConfig {
             twist_repeat_interval_secs: 0.07,
             min_twist_per_vertex_radians: 0.0,
             max_twist_per_vertex_radians: std::f32::consts::PI,
+            default_vertex_offset_ratio: 0.0,
+            vertex_offset_adjust_step: 0.1,
+            vertex_offset_hold_delay_secs: 0.24,
+            vertex_offset_repeat_interval_secs: 0.07,
+            min_vertex_offset_ratio: 0.0,
+            max_vertex_offset_ratio: 6.0,
         }
     }
 }
@@ -760,6 +790,39 @@ mod tests {
     }
 
     #[test]
+    fn vertex_offset_default_is_clamped_to_bounds() {
+        let config = parse_config(
+            r#"
+            [generation]
+            default_vertex_offset_ratio = 10.0
+            min_vertex_offset_ratio = 0.0
+            max_vertex_offset_ratio = 0.75
+            "#,
+        )
+        .expect("vertex offset config should parse");
+
+        assert_eq!(
+            config.generation.default_vertex_offset_ratio_clamped(),
+            0.75
+        );
+    }
+
+    #[test]
+    fn vertex_offset_hold_timings_parse_from_config() {
+        let config = parse_config(
+            r#"
+            [generation]
+            vertex_offset_hold_delay_secs = 0.11
+            vertex_offset_repeat_interval_secs = 0.02
+            "#,
+        )
+        .expect("vertex offset config should parse");
+
+        assert_eq!(config.generation.vertex_offset_hold_delay_secs, 0.11);
+        assert_eq!(config.generation.vertex_offset_repeat_interval_secs, 0.02);
+    }
+
+    #[test]
     fn twist_bounds_never_allow_negative_floor() {
         let config = parse_config(
             r#"
@@ -771,5 +834,19 @@ mod tests {
         .expect("twist config should parse");
 
         assert_eq!(config.generation.twist_bounds(), (0.0, 0.75));
+    }
+
+    #[test]
+    fn vertex_offset_bounds_never_allow_negative_floor() {
+        let config = parse_config(
+            r#"
+            [generation]
+            min_vertex_offset_ratio = -1.0
+            max_vertex_offset_ratio = 0.75
+            "#,
+        )
+        .expect("vertex offset config should parse");
+
+        assert_eq!(config.generation.vertex_offset_bounds(), (0.0, 0.75));
     }
 }

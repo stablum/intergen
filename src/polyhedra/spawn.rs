@@ -11,6 +11,7 @@ pub(crate) struct SpawnTuning {
     pub(crate) max_scale_ratio: f32,
     pub(crate) containment_epsilon: f32,
     pub(crate) twist_per_vertex_radians: f32,
+    pub(crate) vertex_offset_ratio: f32,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Hash)]
@@ -100,6 +101,7 @@ pub(crate) fn next_spawn(
                     vertex_index,
                     scale_ratio,
                     tuning.twist_per_vertex_radians,
+                    tuning.vertex_offset_ratio,
                 );
 
                 if is_fully_contained(
@@ -135,6 +137,7 @@ pub(crate) fn recompute_spawn_tree(
     nodes: &mut [PolyhedronNode],
     shapes: &ShapeCatalog,
     twist_per_vertex_radians: f32,
+    vertex_offset_ratio: f32,
 ) {
     for node_index in 1..nodes.len() {
         let (parents, current_and_rest) = nodes.split_at_mut(node_index);
@@ -150,16 +153,19 @@ pub(crate) fn recompute_spawn_tree(
         let parent = &parents[parent_index];
         let parent_geometry = shapes.geometry(parent.kind);
         let child_geometry = shapes.geometry(node.kind);
+        let child_radius = child_geometry.radius * node.scale;
         let (center, rotation) = child_transform(
             parent,
             parent_geometry,
             vertex_index,
+            child_radius,
             twist_per_vertex_radians,
+            vertex_offset_ratio,
         );
 
         node.center = center;
         node.rotation = rotation;
-        node.radius = child_geometry.radius * node.scale;
+        node.radius = child_radius;
     }
 }
 
@@ -172,6 +178,7 @@ fn spawn_candidate(
     vertex_index: usize,
     scale_ratio: f32,
     twist_per_vertex_radians: f32,
+    vertex_offset_ratio: f32,
 ) -> PolyhedronNode {
     let scale = parent.scale * scale_ratio;
     let radius = child_geometry.radius * scale;
@@ -179,7 +186,9 @@ fn spawn_candidate(
         parent,
         parent_geometry,
         vertex_index,
+        radius,
         twist_per_vertex_radians,
+        vertex_offset_ratio,
     );
 
     PolyhedronNode {
@@ -201,7 +210,9 @@ fn child_transform(
     parent: &PolyhedronNode,
     parent_geometry: &ShapeGeometry,
     vertex_index: usize,
+    child_radius: f32,
     twist_per_vertex_radians: f32,
+    vertex_offset_ratio: f32,
 ) -> (Vec3, Quat) {
     let local_vertex = parent_geometry.vertices[vertex_index] * parent.scale;
     let world_vertex = parent.center + parent.rotation * local_vertex;
@@ -218,8 +229,12 @@ fn child_transform(
         PI / 5.0
     };
     let twist = Quat::from_axis_angle(outward, vertex_index as f32 * twist_step);
+    let vertex_offset = child_radius * vertex_offset_ratio.max(0.0);
 
-    (world_vertex, twist * parent.rotation)
+    (
+        world_vertex + outward * vertex_offset,
+        twist * parent.rotation,
+    )
 }
 
 fn is_fully_contained(
@@ -256,6 +271,7 @@ mod tests {
             max_scale_ratio: 1.0,
             containment_epsilon: 0.02,
             twist_per_vertex_radians: PI / 5.0,
+            vertex_offset_ratio: 0.0,
         }
     }
 
@@ -342,6 +358,46 @@ mod tests {
     }
 
     #[test]
+    fn spawned_child_offset_scales_with_child_radius() {
+        let shapes = ShapeCatalog::new();
+        let parent_kind = PolyhedronKind::Cube;
+        let parent_scale = 1.4;
+        let parent_geometry = shapes.geometry(parent_kind);
+        let child_kind = PolyhedronKind::Tetrahedron;
+        let child_geometry = shapes.geometry(child_kind);
+        let scale_ratio = 0.35;
+        let vertex_offset_ratio = 0.5;
+        let mut nodes = vec![PolyhedronNode {
+            kind: parent_kind,
+            level: 0,
+            center: Vec3::new(1.5, -0.75, 2.25),
+            rotation: Quat::IDENTITY,
+            scale: parent_scale,
+            radius: parent_geometry.radius * parent_scale,
+            occupied_vertices: vec![false; parent_geometry.vertices.len()],
+            origin: NodeOrigin::Root,
+        }];
+
+        let spawn = next_spawn(
+            &mut nodes,
+            &shapes,
+            child_kind,
+            scale_ratio,
+            SpawnTuning {
+                vertex_offset_ratio,
+                ..test_tuning()
+            },
+        )
+        .expect("spawn should succeed");
+        let parent_vertex = nodes[0].center + parent_geometry.vertices[0] * parent_scale;
+        let child_radius = child_geometry.radius * parent_scale * scale_ratio;
+        let expected_center = parent_vertex
+            + parent_geometry.vertices[0].normalize() * child_radius * vertex_offset_ratio;
+
+        assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
+    }
+
+    #[test]
     fn zero_twist_keeps_child_orientation_aligned_with_parent() {
         let shapes = ShapeCatalog::new();
         let parent_rotation = Quat::from_euler(EulerRot::YXZ, 0.45, -0.3, 0.2);
@@ -389,9 +445,34 @@ mod tests {
         }
 
         let child_before = nodes[2].rotation * Vec3::X;
-        recompute_spawn_tree(&mut nodes, &shapes, 0.0);
+        recompute_spawn_tree(&mut nodes, &shapes, 0.0, 0.0);
         let child_after = nodes[2].rotation * Vec3::X;
 
         assert!(child_after.distance(child_before) > 1.0e-4);
+    }
+
+    #[test]
+    fn recompute_spawn_tree_updates_existing_children_for_new_vertex_offset() {
+        let shapes = ShapeCatalog::new();
+        let mut nodes = vec![root_node(PolyhedronKind::Cube, 1.4, &shapes)];
+        next_spawn(
+            &mut nodes,
+            &shapes,
+            PolyhedronKind::Cube,
+            0.35,
+            test_tuning(),
+        )
+        .expect("spawn should succeed");
+
+        let center_before = nodes[1].center;
+        recompute_spawn_tree(
+            &mut nodes,
+            &shapes,
+            test_tuning().twist_per_vertex_radians,
+            0.5,
+        );
+        let center_after = nodes[1].center;
+
+        assert!(center_after.distance(center_before) > 1.0e-4);
     }
 }
