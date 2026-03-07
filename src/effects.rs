@@ -177,7 +177,9 @@ fn init_camera_effects_pipeline(
 #[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
 pub(crate) struct CameraEffectsSettings {
     pub(crate) wavefolder: Vec4,
+    pub(crate) lens_distortion: Vec4,
     pub(crate) gaussian_blur: Vec4,
+    pub(crate) bloom: Vec4,
     pub(crate) edge_detection: Vec4,
     pub(crate) edge_color: Vec4,
 }
@@ -185,31 +187,31 @@ pub(crate) struct CameraEffectsSettings {
 pub(crate) fn camera_effects_from_config(effects_config: &EffectsConfig) -> CameraEffectsSettings {
     CameraEffectsSettings {
         wavefolder: Vec4::new(
-            if effects_config.color_wavefolder.enabled {
-                1.0
-            } else {
-                0.0
-            },
+            enabled_flag(effects_config.color_wavefolder.enabled),
             effects_config.color_wavefolder.gain_clamped(),
             effects_config.color_wavefolder.modulus_clamped(),
             0.0,
         ),
+        lens_distortion: Vec4::new(
+            enabled_flag(effects_config.lens_distortion.enabled),
+            effects_config.lens_distortion.strength_clamped(),
+            effects_config.lens_distortion.zoom_clamped(),
+            0.0,
+        ),
         gaussian_blur: Vec4::new(
-            if effects_config.gaussian_blur.enabled {
-                1.0
-            } else {
-                0.0
-            },
+            enabled_flag(effects_config.gaussian_blur.enabled),
             effects_config.gaussian_blur.sigma_clamped(),
             effects_config.gaussian_blur.radius_pixels_clamped() as f32,
             0.0,
         ),
+        bloom: Vec4::new(
+            enabled_flag(effects_config.bloom.enabled),
+            effects_config.bloom.threshold_clamped(),
+            effects_config.bloom.intensity_clamped(),
+            effects_config.bloom.radius_pixels_clamped() as f32,
+        ),
         edge_detection: Vec4::new(
-            if effects_config.edge_detection.enabled {
-                1.0
-            } else {
-                0.0
-            },
+            enabled_flag(effects_config.edge_detection.enabled),
             effects_config.edge_detection.strength_clamped(),
             effects_config.edge_detection.threshold_clamped(),
             effects_config.edge_detection.mix_clamped(),
@@ -226,9 +228,15 @@ pub(crate) fn camera_effects_from_config(effects_config: &EffectsConfig) -> Came
 pub(crate) fn effects_status_messages(effects_config: &EffectsConfig) -> Vec<String> {
     vec![
         color_wavefolder_status_message(effects_config),
+        lens_distortion_status_message(effects_config),
         gaussian_blur_status_message(effects_config),
+        bloom_status_message(effects_config),
         edge_detection_status_message(effects_config),
     ]
+}
+
+fn enabled_flag(enabled: bool) -> f32 {
+    if enabled { 1.0 } else { 0.0 }
 }
 
 fn color_wavefolder_status_message(effects_config: &EffectsConfig) -> String {
@@ -243,6 +251,18 @@ fn color_wavefolder_status_message(effects_config: &EffectsConfig) -> String {
     )
 }
 
+fn lens_distortion_status_message(effects_config: &EffectsConfig) -> String {
+    if !effects_config.lens_distortion.enabled {
+        return "Camera-output lens distortion: disabled".to_string();
+    }
+
+    format!(
+        "Camera-output lens distortion: enabled, strength {:.2}, zoom {:.2}",
+        effects_config.lens_distortion.strength_clamped(),
+        effects_config.lens_distortion.zoom_clamped()
+    )
+}
+
 fn gaussian_blur_status_message(effects_config: &EffectsConfig) -> String {
     if !effects_config.gaussian_blur.enabled {
         return "Camera-output gaussian blur: disabled".to_string();
@@ -252,6 +272,19 @@ fn gaussian_blur_status_message(effects_config: &EffectsConfig) -> String {
         "Camera-output gaussian blur: enabled, sigma {:.2}, radius {} px",
         effects_config.gaussian_blur.sigma_clamped(),
         effects_config.gaussian_blur.radius_pixels_clamped()
+    )
+}
+
+fn bloom_status_message(effects_config: &EffectsConfig) -> String {
+    if !effects_config.bloom.enabled {
+        return "Camera-output bloom: disabled".to_string();
+    }
+
+    format!(
+        "Camera-output bloom: enabled, threshold {:.2}, intensity {:.2}, radius {} px",
+        effects_config.bloom.threshold_clamped(),
+        effects_config.bloom.intensity_clamped(),
+        effects_config.bloom.radius_pixels_clamped()
     )
 }
 
@@ -278,12 +311,25 @@ fn hard_wrap_wavefold(value: f32, gain: f32, modulus: f32) -> f32 {
 }
 
 #[cfg(test)]
-mod tests {
-    use bevy::prelude::Vec4;
+fn distorted_uv(uv: Vec2, strength: f32, zoom: f32) -> Vec2 {
+    let centered = (uv - Vec2::splat(0.5)) * 2.0;
+    let scaled = centered / zoom.max(0.1);
+    let radius_sq = scaled.length_squared();
+    let distorted = scaled * (1.0 + strength.clamp(-1.5, 1.5) * radius_sq);
 
-    use super::{camera_effects_from_config, effects_status_messages, hard_wrap_wavefold};
+    distorted * 0.5 + Vec2::splat(0.5)
+}
+
+#[cfg(test)]
+mod tests {
+    use bevy::prelude::{Vec2, Vec4};
+
+    use super::{
+        camera_effects_from_config, distorted_uv, effects_status_messages, hard_wrap_wavefold,
+    };
     use crate::config::{
-        ColorWavefolderConfig, EdgeDetectionConfig, EffectsConfig, GaussianBlurConfig,
+        BloomConfig, ColorWavefolderConfig, EdgeDetectionConfig, EffectsConfig, GaussianBlurConfig,
+        LensDistortionConfig,
     };
 
     #[test]
@@ -294,6 +340,13 @@ mod tests {
     }
 
     #[test]
+    fn radial_lens_distortion_keeps_image_center_fixed() {
+        let uv = distorted_uv(Vec2::splat(0.5), 0.8, 0.7);
+
+        assert!(uv.distance(Vec2::splat(0.5)) < 1e-6);
+    }
+
+    #[test]
     fn camera_effects_settings_use_clamped_config_values() {
         let settings = camera_effects_from_config(&EffectsConfig {
             color_wavefolder: ColorWavefolderConfig {
@@ -301,10 +354,21 @@ mod tests {
                 gain: -3.0,
                 modulus: 0.0,
             },
+            lens_distortion: LensDistortionConfig {
+                enabled: true,
+                strength: 4.0,
+                zoom: 0.0,
+            },
             gaussian_blur: GaussianBlurConfig {
                 enabled: true,
                 sigma: -2.0,
                 radius_pixels: 99,
+            },
+            bloom: BloomConfig {
+                enabled: true,
+                threshold: -0.5,
+                intensity: -1.0,
+                radius_pixels: 42,
             },
             edge_detection: EdgeDetectionConfig {
                 enabled: true,
@@ -316,7 +380,9 @@ mod tests {
         });
 
         assert_eq!(settings.wavefolder, Vec4::new(1.0, 0.0, 0.0001, 0.0));
+        assert_eq!(settings.lens_distortion, Vec4::new(1.0, 1.5, 0.1, 0.0));
         assert_eq!(settings.gaussian_blur, Vec4::new(1.0, 0.0001, 16.0, 0.0));
+        assert_eq!(settings.bloom, Vec4::new(1.0, 0.0, 0.0, 16.0));
         assert_eq!(settings.edge_detection, Vec4::new(1.0, 0.0, 0.0, 1.0));
         assert_eq!(settings.edge_color, Vec4::new(1.0, 0.0, 0.4, 1.0));
     }
@@ -325,9 +391,11 @@ mod tests {
     fn status_messages_report_all_effects() {
         let messages = effects_status_messages(&EffectsConfig::default());
 
-        assert_eq!(messages.len(), 3);
+        assert_eq!(messages.len(), 5);
         assert!(messages[0].contains("wavefolder"));
-        assert!(messages[1].contains("gaussian blur"));
-        assert!(messages[2].contains("edge detection"));
+        assert!(messages[1].contains("lens distortion"));
+        assert!(messages[2].contains("gaussian blur"));
+        assert!(messages[3].contains("bloom"));
+        assert!(messages[4].contains("edge detection"));
     }
 }

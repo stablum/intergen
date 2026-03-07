@@ -105,10 +105,21 @@ enabled = true
 gain = 100000
 modulus = 3.0
 
+[effects.lens_distortion]
+enabled = false
+strength = 0.18
+zoom = 1.0
+
 [effects.gaussian_blur]
 enabled = false
 sigma = 1.2
 radius_pixels = 2
+
+[effects.bloom]
+enabled = false
+threshold = 0.8
+intensity = 0.65
+radius_pixels = 8
 
 [effects.edge_detection]
 enabled = false

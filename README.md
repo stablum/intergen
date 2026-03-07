@@ -13,7 +13,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - toggleable in-app keybinding overlay
 - built-in screenshot capture for manual and scripted verification
 - containment rejection so obviously hidden fully-inside spawns are skipped
-- camera-output shader stack with hard-wrap wavefolder, gaussian blur, and edge detection
+- camera-output shader stack with hard-wrap wavefolder, lens distortion, gaussian blur, bloom, and edge detection
 
 ## Requirements
 
@@ -68,18 +68,31 @@ Live child-offset controls use these `generation` settings:
 
 Camera-output effects run in this order:
 - `effects.color_wavefolder`: hard-wrap the camera color by amplification plus remainder
-- `effects.gaussian_blur`: blur the already-wavefolded image
-- `effects.edge_detection`: detect edges from the processed image and mix a configurable edge color over it
+- `effects.lens_distortion`: radially warp the camera image before later effects
+- `effects.gaussian_blur`: blur the distorted and wavefolded image
+- `effects.bloom`: add a bright-pass glow over the processed image
+- `effects.edge_detection`: detect edges from the distorted and wavefolded image and mix a configurable edge color over it
 
 Camera-output color wavefolder uses these `effects.color_wavefolder` settings:
 - `enabled`: turns the hard-wrap post-process on or off
 - `gain`: amplifies the color before wrapping
 - `modulus`: the divisor whose remainder is kept after amplification
 
+Camera-output lens distortion uses these `effects.lens_distortion` settings:
+- `enabled`: turns radial lens warping on or off
+- `strength`: distortion amount, with positive and negative values bending the image differently
+- `zoom`: scales the distorted image to keep more or less of the warped frame in view
+
 Camera-output gaussian blur uses these `effects.gaussian_blur` settings:
 - `enabled`: turns blur on or off
 - `sigma`: controls the gaussian falloff
 - `radius_pixels`: blur radius in pixels, clamped to `16` in the current single-pass shader
+
+Camera-output bloom uses these `effects.bloom` settings:
+- `enabled`: turns bright-pass bloom on or off
+- `threshold`: minimum brightness that contributes to the glow
+- `intensity`: bloom contribution added back onto the processed image
+- `radius_pixels`: bloom blur radius in pixels, clamped to `16` in the current single-pass shader
 
 Camera-output edge detection uses these `effects.edge_detection` settings:
 - `enabled`: turns the edge pass on or off
@@ -166,7 +179,7 @@ Implemented now:
 - custom meshes for cube, tetrahedron, octahedron, and dodecahedron
 - recursive level-by-level spawning
 - metallic lit PBR scene
-- camera-output hard-wrap wavefolder, gaussian blur, and edge-detection post process
+- camera-output hard-wrap wavefolder, lens distortion, gaussian blur, bloom, and edge-detection post process
 - unit tests for geometry counts and spawn ordering
 
 Not implemented yet:

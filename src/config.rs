@@ -443,13 +443,19 @@ impl Default for MaterialConfig {
 #[serde(default)]
 pub(crate) struct EffectsConfig {
     pub(crate) color_wavefolder: ColorWavefolderConfig,
+    pub(crate) lens_distortion: LensDistortionConfig,
     pub(crate) gaussian_blur: GaussianBlurConfig,
+    pub(crate) bloom: BloomConfig,
     pub(crate) edge_detection: EdgeDetectionConfig,
 }
 
 impl EffectsConfig {
     pub(crate) fn any_enabled(&self) -> bool {
-        self.color_wavefolder.enabled || self.gaussian_blur.enabled || self.edge_detection.enabled
+        self.color_wavefolder.enabled
+            || self.lens_distortion.enabled
+            || self.gaussian_blur.enabled
+            || self.bloom.enabled
+            || self.edge_detection.enabled
     }
 }
 
@@ -457,7 +463,9 @@ impl Default for EffectsConfig {
     fn default() -> Self {
         Self {
             color_wavefolder: ColorWavefolderConfig::default(),
+            lens_distortion: LensDistortionConfig::default(),
             gaussian_blur: GaussianBlurConfig::default(),
+            bloom: BloomConfig::default(),
             edge_detection: EdgeDetectionConfig::default(),
         }
     }
@@ -493,6 +501,34 @@ impl Default for ColorWavefolderConfig {
 
 #[derive(Clone, Deserialize)]
 #[serde(default)]
+pub(crate) struct LensDistortionConfig {
+    pub(crate) enabled: bool,
+    pub(crate) strength: f32,
+    pub(crate) zoom: f32,
+}
+
+impl LensDistortionConfig {
+    pub(crate) fn strength_clamped(&self) -> f32 {
+        self.strength.clamp(-1.5, 1.5)
+    }
+
+    pub(crate) fn zoom_clamped(&self) -> f32 {
+        self.zoom.max(0.1)
+    }
+}
+
+impl Default for LensDistortionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            strength: 0.18,
+            zoom: 1.0,
+        }
+    }
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(default)]
 pub(crate) struct GaussianBlurConfig {
     pub(crate) enabled: bool,
     pub(crate) sigma: f32,
@@ -515,6 +551,40 @@ impl Default for GaussianBlurConfig {
             enabled: false,
             sigma: 1.2,
             radius_pixels: 2,
+        }
+    }
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(default)]
+pub(crate) struct BloomConfig {
+    pub(crate) enabled: bool,
+    pub(crate) threshold: f32,
+    pub(crate) intensity: f32,
+    pub(crate) radius_pixels: u32,
+}
+
+impl BloomConfig {
+    pub(crate) fn threshold_clamped(&self) -> f32 {
+        self.threshold.max(0.0)
+    }
+
+    pub(crate) fn intensity_clamped(&self) -> f32 {
+        self.intensity.max(0.0)
+    }
+
+    pub(crate) fn radius_pixels_clamped(&self) -> u32 {
+        self.radius_pixels.min(16)
+    }
+}
+
+impl Default for BloomConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            threshold: 0.8,
+            intensity: 0.65,
+            radius_pixels: 8,
         }
     }
 }
@@ -704,6 +774,23 @@ mod tests {
     }
 
     #[test]
+    fn lens_distortion_settings_parse_from_config() {
+        let config = parse_config(
+            r#"
+            [effects.lens_distortion]
+            enabled = true
+            strength = 2.25
+            zoom = 0.05
+            "#,
+        )
+        .expect("lens distortion config should parse");
+
+        assert!(config.effects.lens_distortion.enabled);
+        assert_eq!(config.effects.lens_distortion.strength_clamped(), 1.5);
+        assert_eq!(config.effects.lens_distortion.zoom_clamped(), 0.1);
+    }
+
+    #[test]
     fn gaussian_blur_settings_parse_from_config() {
         let config = parse_config(
             r#"
@@ -718,6 +805,25 @@ mod tests {
         assert!(config.effects.gaussian_blur.enabled);
         assert_eq!(config.effects.gaussian_blur.sigma_clamped(), 2.75);
         assert_eq!(config.effects.gaussian_blur.radius_pixels_clamped(), 7);
+    }
+
+    #[test]
+    fn bloom_settings_parse_from_config() {
+        let config = parse_config(
+            r#"
+            [effects.bloom]
+            enabled = true
+            threshold = -0.25
+            intensity = 1.4
+            radius_pixels = 99
+            "#,
+        )
+        .expect("bloom config should parse");
+
+        assert!(config.effects.bloom.enabled);
+        assert_eq!(config.effects.bloom.threshold_clamped(), 0.0);
+        assert_eq!(config.effects.bloom.intensity_clamped(), 1.4);
+        assert_eq!(config.effects.bloom.radius_pixels_clamped(), 16);
     }
 
     #[test]
