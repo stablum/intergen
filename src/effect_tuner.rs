@@ -9,6 +9,47 @@ const HOLD_DELAY_SECS: f32 = 0.32;
 const REPEAT_INTERVAL_SECS: f32 = 0.08;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum EffectGroup {
+    ColorWavefolder,
+    LensDistortion,
+    GaussianBlur,
+    Bloom,
+    EdgeDetection,
+}
+
+impl EffectGroup {
+    fn label(self) -> &'static str {
+        match self {
+            Self::ColorWavefolder => "color_wavefolder",
+            Self::LensDistortion => "lens_distortion",
+            Self::GaussianBlur => "gaussian_blur",
+            Self::Bloom => "bloom",
+            Self::EdgeDetection => "edge_detection",
+        }
+    }
+
+    fn is_enabled(self, effects: &EffectsConfig) -> bool {
+        match self {
+            Self::ColorWavefolder => effects.color_wavefolder.enabled,
+            Self::LensDistortion => effects.lens_distortion.enabled,
+            Self::GaussianBlur => effects.gaussian_blur.enabled,
+            Self::Bloom => effects.bloom.enabled,
+            Self::EdgeDetection => effects.edge_detection.enabled,
+        }
+    }
+
+    fn set_enabled(self, effects: &mut EffectsConfig, enabled: bool) {
+        match self {
+            Self::ColorWavefolder => effects.color_wavefolder.enabled = enabled,
+            Self::LensDistortion => effects.lens_distortion.enabled = enabled,
+            Self::GaussianBlur => effects.gaussian_blur.enabled = enabled,
+            Self::Bloom => effects.bloom.enabled = enabled,
+            Self::EdgeDetection => effects.edge_detection.enabled = enabled,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum EffectNumericParameter {
     WavefolderGain,
     WavefolderModulus,
@@ -94,6 +135,31 @@ impl EffectNumericParameter {
             Self::EdgeColorR => "edge_detection.color.r",
             Self::EdgeColorG => "edge_detection.color.g",
             Self::EdgeColorB => "edge_detection.color.b",
+        }
+    }
+
+    fn effect_group(self) -> EffectGroup {
+        match self {
+            Self::WavefolderGain | Self::WavefolderModulus => EffectGroup::ColorWavefolder,
+            Self::LensStrength
+            | Self::LensRadialK2
+            | Self::LensRadialK3
+            | Self::LensCenterX
+            | Self::LensCenterY
+            | Self::LensScaleX
+            | Self::LensScaleY
+            | Self::LensTangentialX
+            | Self::LensTangentialY
+            | Self::LensZoom
+            | Self::LensChromaticAberration => EffectGroup::LensDistortion,
+            Self::GaussianBlurSigma | Self::GaussianBlurRadius => EffectGroup::GaussianBlur,
+            Self::BloomThreshold | Self::BloomIntensity | Self::BloomRadius => EffectGroup::Bloom,
+            Self::EdgeStrength
+            | Self::EdgeThreshold
+            | Self::EdgeMix
+            | Self::EdgeColorR
+            | Self::EdgeColorG
+            | Self::EdgeColorB => EffectGroup::EdgeDetection,
         }
     }
 
@@ -284,19 +350,30 @@ impl EffectTunerState {
         EffectNumericParameter::all()[self.selected_index]
     }
 
+    pub(crate) fn selected_effect(&self) -> EffectGroup {
+        self.selected_parameter().effect_group()
+    }
+
     pub(crate) fn is_visible(&self, now_secs: f32) -> bool {
         self.pinned || now_secs <= self.visible_until_secs
     }
 
     pub(crate) fn overlay_text(&self) -> String {
         let parameter = self.selected_parameter();
+        let effect = self.selected_effect();
         format!(
             concat!(
-                "FX Tuner{}\n",
+                "FX Tuner{}  {} [{}]\n",
                 "{}: {}\n",
-                "default {}  ctrl+arrows adjust/select  shift coarse  alt fine  enter reset"
+                "default {}  tab toggle effect  ctrl+arrows adjust/select  shift coarse  alt fine  enter reset  shift+enter all"
             ),
             if self.pinned { " [Pinned]" } else { "" },
+            effect.label(),
+            if effect.is_enabled(&self.current) {
+                "On"
+            } else {
+                "Off"
+            },
             parameter.label(),
             parameter.display_value(&self.current),
             parameter.display_value(&self.defaults),
@@ -335,6 +412,14 @@ impl EffectTunerState {
         self.note_interaction(now_secs);
     }
 
+    fn toggle_selected_effect(&mut self, now_secs: f32) -> bool {
+        let effect = self.selected_effect();
+        let next_enabled = !effect.is_enabled(&self.current);
+        effect.set_enabled(&mut self.current, next_enabled);
+        self.note_interaction(now_secs);
+        next_enabled
+    }
+
     fn reset_selected(&mut self, now_secs: f32) {
         let parameter = self.selected_parameter();
         parameter.set_value(&mut self.current, parameter.value(&self.defaults));
@@ -362,6 +447,16 @@ pub(crate) fn effect_tuner_input_system(
             } else {
                 "unpinned"
             }
+        );
+    }
+
+    if keys.just_pressed(KeyCode::Tab) {
+        let selected_effect = effect_tuner.selected_effect();
+        let enabled = effect_tuner.toggle_selected_effect(now_secs);
+        println!(
+            "{} {}.",
+            selected_effect.label(),
+            if enabled { "enabled" } else { "disabled" }
         );
     }
 
@@ -431,7 +526,7 @@ pub(crate) fn effect_tuner_input_system(
     if keys.just_pressed(KeyCode::Enter) {
         if shift_pressed {
             effect_tuner.reset_all(now_secs);
-            println!("Reset all FX parameters to config defaults.");
+            println!("Reset all FX settings to config defaults.");
         } else {
             let selected_parameter = effect_tuner.selected_parameter();
             effect_tuner.reset_selected(now_secs);
@@ -468,8 +563,27 @@ fn modifier_pressed(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool 
 
 #[cfg(test)]
 mod tests {
-    use super::{EffectNumericParameter, EffectTunerState};
+    use super::{EffectGroup, EffectNumericParameter, EffectTunerState};
     use crate::config::EffectsConfig;
+
+    #[test]
+    fn selected_effect_matches_parameter_group() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        effect_tuner.selected_index = 17;
+
+        assert_eq!(effect_tuner.selected_effect(), EffectGroup::Bloom);
+    }
+
+    #[test]
+    fn toggle_selected_effect_updates_enabled_state() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        effect_tuner.selected_index = 13;
+
+        let enabled = effect_tuner.toggle_selected_effect(1.0);
+
+        assert!(enabled);
+        assert!(effect_tuner.current.gaussian_blur.enabled);
+    }
 
     #[test]
     fn reset_selected_restores_config_default() {
@@ -483,6 +597,18 @@ mod tests {
             effect_tuner.current.bloom.intensity,
             effect_tuner.defaults.bloom.intensity
         );
+    }
+
+    #[test]
+    fn reset_all_restores_effect_enable_defaults() {
+        let mut defaults = EffectsConfig::default();
+        defaults.edge_detection.enabled = true;
+        let mut effect_tuner = EffectTunerState::from_config(&defaults);
+        effect_tuner.current.edge_detection.enabled = false;
+
+        effect_tuner.reset_all(1.0);
+
+        assert!(effect_tuner.current.edge_detection.enabled);
     }
 
     #[test]

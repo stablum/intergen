@@ -165,7 +165,7 @@ pub(crate) fn setup_scene(
         "Controls: F1/H help, F2 FX tuner, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset"
     );
     println!(
-        "FX tuner: Ctrl+Up/Down selects a parameter, Ctrl+Left/Right adjusts it, Shift is coarse, Alt is fine, Enter resets the selection, Shift+Enter resets all effect values."
+        "FX tuner: Ctrl+Up/Down selects a parameter, Ctrl+Left/Right adjusts it, Tab toggles the selected effect, Shift is coarse, Alt is fine, Enter resets the selection, Shift+Enter resets all effect settings."
     );
     println!(
         "Selected child shape: {:?}, ratio: {:.2}",

@@ -11,7 +11,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - selectable child shape type
 - adjustable child scale ratio
 - toggleable in-app keybinding overlay
-- compact runtime FX tuner for all numeric effect parameters
+- compact runtime FX tuner for effect toggles and numeric effect parameters
 - built-in screenshot capture for manual and scripted verification
 - containment rejection so obviously hidden fully-inside spawns are skipped
 - camera-output shader stack with hard-wrap wavefolder, lens distortion, gaussian blur, bloom, and edge detection
@@ -109,8 +109,9 @@ Camera-output edge detection uses these `effects.edge_detection` settings:
 
 The in-app FX tuner starts from the values loaded from `config.toml` at launch.
 - Live edits affect the running app only.
+- `Tab` toggles the selected effect on or off.
 - `Enter` resets the selected effect parameter to its startup config value.
-- `Shift + Enter` resets all numeric effect parameters to their startup config values.
+- `Shift + Enter` resets all FX settings to their startup config values.
 - The tuner does not write changes back to `config.toml` automatically.
 
 Live opacity controls use these `materials` settings:
@@ -163,10 +164,11 @@ cargo test-plain
 - `F2`: pin or unpin the FX tuner overlay
 - `Ctrl + Up` / `Ctrl + Down`: select the active FX parameter
 - `Ctrl + Left` / `Ctrl + Right`: decrease or increase the active FX parameter, with hold-to-repeat
+- `Tab`: toggle the selected effect on or off
 - `Shift`: coarse FX adjustment modifier
 - `Alt`: fine FX adjustment modifier
 - `Enter`: reset the active FX parameter to the startup config value
-- `Shift + Enter`: reset all FX numeric parameters to their startup config values
+- `Shift + Enter`: reset all FX settings to their startup config values
 - `F12`: save a screenshot to `screenshots/`
 - `R`: reset the scene with the currently selected polyhedron as the new root
 - `Space`: spawn child polyhedra, or hold to keep spawning

@@ -224,10 +224,11 @@ pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
             "F2: Pin or unpin the FX tuner\n",
             "Ctrl + Up / Down: Select FX parameter\n",
             "Ctrl + Left / Right: Adjust selected FX parameter\n",
+            "Tab: Toggle the selected effect on or off\n",
             "Shift: Coarse FX adjustment\n",
             "Alt: Fine FX adjustment\n",
             "Enter: Reset selected FX parameter\n",
-            "Shift + Enter: Reset all FX parameters\n",
+            "Shift + Enter: Reset all FX settings\n",
             "Arrow Up / Down: Pitch camera\n",
             "Arrow Left / Right: Yaw camera\n",
             "Q / E: Roll camera\n",
@@ -275,7 +276,8 @@ mod tests {
         assert!(text.contains("F2: Pin or unpin the FX tuner"));
         assert!(text.contains("Ctrl + Up / Down: Select FX parameter"));
         assert!(text.contains("Ctrl + Left / Right: Adjust selected FX parameter"));
-        assert!(text.contains("Shift + Enter: Reset all FX parameters"));
+        assert!(text.contains("Tab: Toggle the selected effect on or off"));
+        assert!(text.contains("Shift + Enter: Reset all FX settings"));
         assert!(text.contains("Space: Spawn polyhedra (hold to repeat)"));
         assert!(text.contains("Backspace: Stop camera rotation momentum"));
         assert!(text.contains("R: Reset to the selected polyhedron as root"));
