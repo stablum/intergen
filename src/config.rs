@@ -3,13 +3,13 @@ use std::path::Path;
 
 use bevy::prelude::*;
 use bevy::window::PresentMode;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::polyhedra::{PolyhedronKind, SpawnTuning};
 
 const DEFAULT_CONFIG_PATH: &str = "config.toml";
 
-#[derive(Clone, Resource, Deserialize)]
+#[derive(Clone, Resource, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct AppConfig {
     pub(crate) window: WindowConfig,
@@ -60,7 +60,7 @@ fn parse_config(contents: &str) -> Result<AppConfig, toml::de::Error> {
     toml::from_str(contents)
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct WindowConfig {
     pub(crate) title: String,
@@ -80,7 +80,7 @@ impl Default for WindowConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum PresentModeSetting {
     AutoVsync,
@@ -110,7 +110,7 @@ impl From<PresentModeSetting> for PresentMode {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct RenderingConfig {
     pub(crate) clear_color: [f32; 3],
@@ -138,7 +138,7 @@ impl Default for RenderingConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct CameraConfig {
     pub(crate) initial_yaw: f32,
@@ -187,7 +187,7 @@ impl Default for CameraConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct GenerationConfig {
     pub(crate) root_kind: PolyhedronKind,
@@ -295,7 +295,7 @@ impl Default for GenerationConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct LightingConfig {
     pub(crate) directional: DirectionalLightConfig,
@@ -311,7 +311,7 @@ impl Default for LightingConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct DirectionalLightConfig {
     pub(crate) color: [f32; 3],
@@ -347,7 +347,7 @@ impl Default for DirectionalLightConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct PointLightConfig {
     pub(crate) color: [f32; 3],
@@ -379,7 +379,7 @@ impl Default for PointLightConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct MaterialConfig {
     pub(crate) hue_step_per_level: f32,
@@ -439,7 +439,7 @@ impl Default for MaterialConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct EffectsConfig {
     pub(crate) color_wavefolder: ColorWavefolderConfig,
@@ -461,7 +461,7 @@ impl Default for EffectsConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct ColorWavefolderConfig {
     pub(crate) enabled: bool,
@@ -489,7 +489,7 @@ impl Default for ColorWavefolderConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct LensDistortionConfig {
     pub(crate) enabled: bool,
@@ -559,7 +559,7 @@ impl Default for LensDistortionConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct GaussianBlurConfig {
     pub(crate) enabled: bool,
@@ -587,7 +587,7 @@ impl Default for GaussianBlurConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct BloomConfig {
     pub(crate) enabled: bool,
@@ -621,7 +621,7 @@ impl Default for BloomConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct EdgeDetectionConfig {
     pub(crate) enabled: bool,
@@ -657,7 +657,7 @@ impl Default for EdgeDetectionConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct CaptureConfig {
     pub(crate) output_dir: String,
@@ -673,7 +673,7 @@ impl Default for CaptureConfig {
     }
 }
 
-#[derive(Clone, Deserialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct UiConfig {
     pub(crate) font_candidates: Vec<String>,

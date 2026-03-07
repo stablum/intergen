@@ -122,6 +122,27 @@ Live opacity controls use these `materials` settings:
 - `opacity_adjust_step`: per-keypress opacity change
 - `min_opacity` / `max_opacity`: live clamp range
 
+
+## Scene Presets
+
+Press `F3` to toggle scene preset mode. The bottom preset strip shows the 10 banks (`0`-`9`), each with 10 slots.
+
+Preset behavior:
+- two digits (`00` to `99`) load the assigned scene preset for that bank and slot
+- `S` arms saving, then the next two digits choose the bank and slot assignment
+- `Delete` arms freeing, then the next two digits clear that slot assignment from any matching preset files
+- `Esc` cancels the pending preset command
+- if multiple preset files claim the same slot, a chooser appears; `Up` / `Down` selects which file keeps the slot and `Enter` confirms it
+
+Preset files are stored as TOML under `scene-presets/`. Filenames are unique and are not based on the bank and slot, so saving a new preset never overwrites an older file by name. The bank and slot assignment lives inside the preset file metadata.
+
+Current scene preset contents:
+- render clear color and ambient light
+- directional and point light settings
+- material palette/PBR settings and current global opacity
+- camera position, distance, and momentum
+- current polyhedron tree, selected child shape, scale ratio, twist, and vertex offset
+- live camera-output effect values plus all per-parameter LFO settings
 ## Run
 
 ```powershell
@@ -213,5 +234,6 @@ Not implemented yet:
 - mouse controls
 - hardware ray tracing
 - more advanced visibility heuristics than simple containment rejection
-- export / save workflows
+- export workflows beyond the built-in scene preset system
+
 

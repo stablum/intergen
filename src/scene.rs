@@ -78,6 +78,12 @@ pub(crate) struct PolyhedronEntity {
     pub(crate) node_index: usize,
 }
 
+#[derive(Component)]
+pub(crate) struct SceneDirectionalLight;
+
+#[derive(Component)]
+pub(crate) struct ScenePointLight;
+
 pub(crate) fn setup_scene(
     mut commands: Commands,
     asset_server: Res<AssetServer>,
@@ -115,6 +121,7 @@ pub(crate) fn setup_scene(
         .id();
 
     commands.spawn((
+        SceneDirectionalLight,
         DirectionalLight {
             color: app_config.lighting.directional.color(),
             illuminance: app_config.lighting.directional.illuminance,
@@ -126,6 +133,7 @@ pub(crate) fn setup_scene(
     ));
 
     commands.spawn((
+        ScenePointLight,
         PointLight {
             color: app_config.lighting.point.color(),
             intensity: app_config.lighting.point.intensity,
@@ -162,7 +170,7 @@ pub(crate) fn setup_scene(
     });
 
     println!(
-        "Controls: F1/H help, F2 FX strip, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset"
+        "Controls: F1/H help, F2 FX strip, F3 scene presets, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset"
     );
     println!(
         "FX strip: Ctrl+Up/Down selects a parameter, Ctrl+Left/Right adjusts the highlighted field, Tab toggles the effect, L toggles the selected parameter LFO, M cycles the highlighted value/amp/freq/shape field, Shift is coarse, Alt is fine, Enter resets the field, Shift+Enter resets all FX settings and LFOs."

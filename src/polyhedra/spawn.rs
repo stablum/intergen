@@ -1,7 +1,7 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::*;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use super::shapes::{ShapeCatalog, ShapeGeometry};
 
@@ -14,7 +14,7 @@ pub(crate) struct SpawnTuning {
     pub(crate) vertex_offset_ratio: f32,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum PolyhedronKind {
     Cube,

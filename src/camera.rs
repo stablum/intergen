@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 use crate::config::{AppConfig, CameraConfig};
+use crate::presets::PresetBrowserState;
 
 #[derive(Resource)]
 pub(crate) struct CameraRig {
@@ -28,8 +29,13 @@ pub(crate) fn camera_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     app_config: Res<AppConfig>,
+    preset_browser: Res<PresetBrowserState>,
     mut camera_rig: ResMut<CameraRig>,
 ) {
+    if preset_browser.blocks_input() {
+        return;
+    }
+
     if keys.just_pressed(KeyCode::Backspace) {
         stop_angular_momentum(&mut camera_rig);
         println!("Stopped camera rotation momentum.");

@@ -10,8 +10,12 @@ use crate::config::AppConfig;
 use crate::effect_tuner::{EffectTunerState, apply_effect_tuner_system, effect_tuner_input_system};
 use crate::effects::EffectsPlugin;
 use crate::generation::generation_input_system;
+use crate::presets::{PresetBrowserState, preset_input_system};
 use crate::scene::setup_scene;
-use crate::ui::{HelpOverlayState, toggle_help_overlay_system, update_effect_tuner_overlay_system};
+use crate::ui::{
+    HelpOverlayState, toggle_help_overlay_system, update_effect_tuner_overlay_system,
+    update_preset_overlay_system,
+};
 
 pub fn run() {
     let app_config = match AppConfig::load_from_default_path() {
@@ -42,6 +46,7 @@ pub fn run() {
         .insert_resource(CameraRig::from_config(&app_config.camera))
         .insert_resource(HelpOverlayState::default())
         .insert_resource(EffectTunerState::from_config(&app_config.effects))
+        .insert_resource(PresetBrowserState::load_from_disk())
         .insert_resource(ScreenshotCounter::default())
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
@@ -58,12 +63,14 @@ pub fn run() {
             Update,
             (
                 toggle_help_overlay_system,
+                preset_input_system,
                 effect_tuner_input_system,
                 camera_input_system,
                 camera_motion_system,
                 generation_input_system,
                 apply_effect_tuner_system,
                 update_effect_tuner_overlay_system,
+                update_preset_overlay_system,
             )
                 .chain(),
         )

@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::config::AppConfig;
 use crate::polyhedra::{PolyhedronKind, next_spawn, recompute_spawn_tree};
+use crate::presets::PresetBrowserState;
 use crate::scene::{
     GenerationState, MaterialState, PolyhedronEntity, ShapeAssets, alpha_mode_for_opacity,
     opacity_status_message, reset_generation_state, spawn_polyhedron_entity,
@@ -67,6 +68,7 @@ pub(crate) fn generation_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     app_config: Res<AppConfig>,
+    preset_browser: Res<PresetBrowserState>,
     shape_assets: Res<ShapeAssets>,
     mut generation_state: ResMut<GenerationState>,
     mut material_state: ResMut<MaterialState>,
@@ -75,6 +77,10 @@ pub(crate) fn generation_input_system(
     polyhedron_materials: Query<&MeshMaterial3d<StandardMaterial>, With<PolyhedronEntity>>,
     mut polyhedron_transforms: Query<(&PolyhedronEntity, &mut Transform)>,
 ) {
+    if preset_browser.blocks_input() {
+        return;
+    }
+
     if keys.just_pressed(KeyCode::Digit1) {
         generation_state.selected_kind = PolyhedronKind::Cube;
         println!("Selected child shape: {:?}", generation_state.selected_kind);

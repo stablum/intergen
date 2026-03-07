@@ -1,10 +1,12 @@
 use std::f32::consts::TAU;
 
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
 use crate::camera::SceneCamera;
 use crate::config::EffectsConfig;
 use crate::effects::{CameraEffectsSettings, camera_effects_from_config};
+use crate::presets::PresetBrowserState;
 
 const OVERLAY_HOLD_SECS: f32 = 2.5;
 const HOLD_DELAY_SECS: f32 = 0.32;
@@ -320,7 +322,8 @@ impl EffectNumericParameter {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
 enum LfoShape {
     Sine,
     Triangle,
@@ -488,8 +491,14 @@ pub(crate) struct EffectTunerOverlaySnapshot {
     pub(crate) active_field: EffectOverlayField,
 }
 
-#[derive(Clone, Copy, Debug)]
-struct ParameterLfo {
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct EffectRuntimeSnapshot {
+    pub(crate) current: EffectsConfig,
+    pub(crate) lfos: Vec<ParameterLfo>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize)]
+pub(crate) struct ParameterLfo {
     enabled: bool,
     shape: LfoShape,
     amplitude: f32,
@@ -603,6 +612,27 @@ impl EffectTunerState {
 
     pub(crate) fn has_active_lfos(&self) -> bool {
         self.lfos.iter().copied().any(ParameterLfo::is_active)
+    }
+
+    pub(crate) fn runtime_snapshot(&self) -> EffectRuntimeSnapshot {
+        EffectRuntimeSnapshot {
+            current: self.current.clone(),
+            lfos: self.lfos.clone(),
+        }
+    }
+
+    pub(crate) fn apply_runtime_snapshot(&mut self, snapshot: &EffectRuntimeSnapshot) {
+        self.current = snapshot.current.clone();
+        self.lfos = default_lfos();
+        for (target, source) in self.lfos.iter_mut().zip(snapshot.lfos.iter().copied()) {
+            *target = source;
+        }
+        self.selected_index = 0;
+        self.edit_mode = EffectEditMode::Value;
+        self.select_previous_hold.reset();
+        self.select_next_hold.reset();
+        self.decrease_hold.reset();
+        self.increase_hold.reset();
     }
 
     pub(crate) fn evaluated_effects(&self, now_secs: f32) -> EffectsConfig {
@@ -761,8 +791,13 @@ impl EffectTunerState {
 pub(crate) fn effect_tuner_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
+    preset_browser: Res<PresetBrowserState>,
     mut effect_tuner: ResMut<EffectTunerState>,
 ) {
+    if preset_browser.blocks_input() {
+        return;
+    }
+
     let now_secs = time.elapsed_secs();
     if keys.just_pressed(KeyCode::F2) {
         effect_tuner.toggle_pinned(now_secs);

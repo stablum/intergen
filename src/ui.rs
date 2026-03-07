@@ -4,6 +4,7 @@ use bevy::prelude::*;
 
 use crate::config::{AppConfig, UiConfig, srgb, srgba};
 use crate::effect_tuner::{EffectOverlayField, EffectTunerState};
+use crate::presets::PresetBrowserState;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum UiFontSource {
@@ -40,6 +41,18 @@ pub(crate) struct EffectTunerOverlay;
 
 #[derive(Component)]
 pub(crate) struct EffectTunerPinnedBadge;
+
+#[derive(Component)]
+pub(crate) struct PresetStripOverlay;
+
+#[derive(Component)]
+pub(crate) struct PresetStripText;
+
+#[derive(Component)]
+pub(crate) struct PresetChooserOverlay;
+
+#[derive(Component)]
+pub(crate) struct PresetChooserText;
 
 #[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum EffectTunerTextKind {
@@ -183,6 +196,130 @@ pub(crate) fn update_effect_tuner_overlay_system(
     }
 }
 
+pub(crate) fn update_preset_overlay_system(
+    preset_browser: Res<PresetBrowserState>,
+    mut strip_visibility: Query<
+        &mut Visibility,
+        (With<PresetStripOverlay>, Without<PresetChooserOverlay>),
+    >,
+    mut strip_text: Query<&mut Text, (With<PresetStripText>, Without<PresetChooserText>)>,
+    mut chooser_visibility: Query<
+        &mut Visibility,
+        (With<PresetChooserOverlay>, Without<PresetStripOverlay>),
+    >,
+    mut chooser_text: Query<&mut Text, (With<PresetChooserText>, Without<PresetStripText>)>,
+) {
+    let Ok(mut strip_visibility) = strip_visibility.single_mut() else {
+        return;
+    };
+    *strip_visibility = if preset_browser.is_visible() {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+
+    let Ok(mut strip_text) = strip_text.single_mut() else {
+        return;
+    };
+    *strip_text = Text::new(preset_browser.strip_text());
+
+    let Ok(mut chooser_visibility) = chooser_visibility.single_mut() else {
+        return;
+    };
+    *chooser_visibility = if preset_browser.chooser_visible() {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+
+    let Ok(mut chooser_text) = chooser_text.single_mut() else {
+        return;
+    };
+    *chooser_text = Text::new(preset_browser.chooser_text().unwrap_or_default());
+}
+
+fn spawn_preset_ui(
+    commands: &mut Commands,
+    ui_theme: &UiTheme,
+    scene_camera: Entity,
+    ui_config: &UiConfig,
+    strip_font_size: f32,
+) {
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(ui_config.hint_left),
+                right: px(ui_config.hint_left),
+                bottom: px(ui_config.hint_top + 34.0),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            GlobalZIndex(22),
+            Visibility::Hidden,
+            PresetStripOverlay,
+            UiTargetCamera(scene_camera),
+        ))
+        .with_children(|parent| {
+            parent
+                .spawn((
+                    Node {
+                        padding: UiRect::axes(
+                            px(ui_config.hint_padding_x),
+                            px((ui_config.hint_padding_y - 1.0).max(4.0)),
+                        ),
+                        ..default()
+                    },
+                    BackgroundColor(srgba(ui_config.panel_background)),
+                    BorderRadius::all(px(999.0)),
+                ))
+                .with_children(|panel| {
+                    panel.spawn((
+                        Text::new(""),
+                        ui_theme.text_font(strip_font_size),
+                        TextColor(srgb(ui_config.body_text)),
+                        PresetStripText,
+                    ));
+                });
+        });
+
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(ui_config.hint_left),
+                right: px(ui_config.hint_left),
+                bottom: px(ui_config.hint_top + 72.0),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            GlobalZIndex(23),
+            Visibility::Hidden,
+            PresetChooserOverlay,
+            UiTargetCamera(scene_camera),
+        ))
+        .with_children(|parent| {
+            parent
+                .spawn((
+                    Node {
+                        max_width: px(ui_config.panel_max_width),
+                        padding: UiRect::all(px(ui_config.panel_padding * 0.7)),
+                        ..default()
+                    },
+                    BackgroundColor(srgba(ui_config.panel_background)),
+                    BorderRadius::all(px(ui_config.panel_radius)),
+                ))
+                .with_children(|panel| {
+                    panel.spawn((
+                        Text::new(""),
+                        ui_theme.text_font(ui_config.body_font_size),
+                        TextColor(srgb(ui_config.body_text)),
+                        TextLayout::new_with_justify(Justify::Left),
+                        PresetChooserText,
+                    ));
+                });
+        });
+}
 pub(crate) fn load_ui_theme(asset_server: &AssetServer, ui_config: &UiConfig) -> UiTheme {
     if let Some(font_asset) = carbon_plus_font_asset(&ui_config.font_candidates) {
         return UiTheme {
@@ -211,6 +348,8 @@ pub(crate) fn spawn_help_ui(
     ui_config: &UiConfig,
 ) {
     let strip_font_size = (ui_config.hint_font_size - 1.0).max(12.0);
+
+    spawn_preset_ui(commands, ui_theme, scene_camera, ui_config, strip_font_size);
 
     commands
         .spawn((
@@ -463,6 +602,7 @@ pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
         concat!(
             "F1 / H: Toggle this overlay\n",
             "F2: Pin or unpin the bottom FX strip\n",
+            "F3: Toggle scene preset mode\n",
             "Ctrl + Up / Down: Select FX parameter\n",
             "Ctrl + Left / Right: Adjust the selected FX field\n",
             "Tab: Toggle the selected effect on or off\n",
@@ -472,6 +612,7 @@ pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
             "Alt: Fine FX adjustment\n",
             "Enter: Reset the selected FX field\n",
             "Shift + Enter: Reset all FX settings and LFOs\n",
+            "In preset mode: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions\n",
             "Arrow Up / Down: Pitch camera\n",
             "Arrow Left / Right: Yaw camera\n",
             "Q / E: Roll camera\n",
@@ -517,12 +658,16 @@ mod tests {
 
         assert!(text.contains("F1 / H: Toggle this overlay"));
         assert!(text.contains("F2: Pin or unpin the bottom FX strip"));
+        assert!(text.contains("F3: Toggle scene preset mode"));
         assert!(text.contains("Ctrl + Up / Down: Select FX parameter"));
         assert!(text.contains("Ctrl + Left / Right: Adjust the selected FX field"));
         assert!(text.contains("Tab: Toggle the selected effect on or off"));
         assert!(text.contains("L: Toggle the selected parameter LFO on or off"));
         assert!(text.contains("M: Cycle which FX value is editable (value / amp / freq / shape)"));
         assert!(text.contains("Shift + Enter: Reset all FX settings and LFOs"));
+        assert!(text.contains(
+            "In preset mode: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions"
+        ));
         assert!(text.contains("Space: Spawn polyhedra (hold to repeat)"));
         assert!(text.contains("Backspace: Stop camera rotation momentum"));
         assert!(text.contains("R: Reset to the selected polyhedron as root"));

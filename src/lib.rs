@@ -6,6 +6,7 @@ mod effect_tuner;
 mod effects;
 mod generation;
 mod polyhedra;
+mod presets;
 mod scene;
 mod ui;
 
