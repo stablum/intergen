@@ -504,16 +504,52 @@ impl Default for ColorWavefolderConfig {
 pub(crate) struct LensDistortionConfig {
     pub(crate) enabled: bool,
     pub(crate) strength: f32,
+    pub(crate) radial_k2: f32,
+    pub(crate) radial_k3: f32,
     pub(crate) zoom: f32,
+    pub(crate) center: [f32; 2],
+    pub(crate) scale: [f32; 2],
+    pub(crate) tangential: [f32; 2],
+    pub(crate) chromatic_aberration: f32,
 }
 
 impl LensDistortionConfig {
     pub(crate) fn strength_clamped(&self) -> f32 {
-        self.strength.clamp(-1.5, 1.5)
+        self.strength.clamp(-4.0, 4.0)
+    }
+
+    pub(crate) fn radial_k2_clamped(&self) -> f32 {
+        self.radial_k2.clamp(-4.0, 4.0)
+    }
+
+    pub(crate) fn radial_k3_clamped(&self) -> f32 {
+        self.radial_k3.clamp(-4.0, 4.0)
     }
 
     pub(crate) fn zoom_clamped(&self) -> f32 {
         self.zoom.max(0.1)
+    }
+
+    pub(crate) fn center_clamped(&self) -> [f32; 2] {
+        [
+            self.center[0].clamp(0.0, 1.0),
+            self.center[1].clamp(0.0, 1.0),
+        ]
+    }
+
+    pub(crate) fn scale_clamped(&self) -> [f32; 2] {
+        [self.scale[0].clamp(0.1, 4.0), self.scale[1].clamp(0.1, 4.0)]
+    }
+
+    pub(crate) fn tangential_clamped(&self) -> [f32; 2] {
+        [
+            self.tangential[0].clamp(-2.0, 2.0),
+            self.tangential[1].clamp(-2.0, 2.0),
+        ]
+    }
+
+    pub(crate) fn chromatic_aberration_clamped(&self) -> f32 {
+        self.chromatic_aberration.clamp(0.0, 0.5)
     }
 }
 
@@ -522,7 +558,13 @@ impl Default for LensDistortionConfig {
         Self {
             enabled: false,
             strength: 0.18,
+            radial_k2: 0.0,
+            radial_k3: 0.0,
             zoom: 1.0,
+            center: [0.5, 0.5],
+            scale: [1.0, 1.0],
+            tangential: [0.0, 0.0],
+            chromatic_aberration: 0.0,
         }
     }
 }
@@ -780,14 +822,35 @@ mod tests {
             [effects.lens_distortion]
             enabled = true
             strength = 2.25
+            radial_k2 = -0.75
+            radial_k3 = 5.0
             zoom = 0.05
+            center = [1.2, -0.4]
+            scale = [0.05, 5.0]
+            tangential = [3.0, -3.0]
+            chromatic_aberration = 2.0
             "#,
         )
         .expect("lens distortion config should parse");
 
         assert!(config.effects.lens_distortion.enabled);
-        assert_eq!(config.effects.lens_distortion.strength_clamped(), 1.5);
+        assert_eq!(config.effects.lens_distortion.strength_clamped(), 2.25);
+        assert_eq!(config.effects.lens_distortion.radial_k2_clamped(), -0.75);
+        assert_eq!(config.effects.lens_distortion.radial_k3_clamped(), 4.0);
         assert_eq!(config.effects.lens_distortion.zoom_clamped(), 0.1);
+        assert_eq!(config.effects.lens_distortion.center_clamped(), [1.0, 0.0]);
+        assert_eq!(config.effects.lens_distortion.scale_clamped(), [0.1, 4.0]);
+        assert_eq!(
+            config.effects.lens_distortion.tangential_clamped(),
+            [2.0, -2.0]
+        );
+        assert_eq!(
+            config
+                .effects
+                .lens_distortion
+                .chromatic_aberration_clamped(),
+            0.5
+        );
     }
 
     #[test]

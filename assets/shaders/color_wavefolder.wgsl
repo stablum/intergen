@@ -7,7 +7,9 @@ const MAX_KERNEL_RADIUS_PIXELS: i32 = 16;
 
 struct CameraEffectsSettings {
     wavefolder: vec4<f32>,
-    lens_distortion: vec4<f32>,
+    lens_radial: vec4<f32>,
+    lens_center: vec4<f32>,
+    lens_shape: vec4<f32>,
     gaussian_blur: vec4<f32>,
     bloom: vec4<f32>,
     edge_detection: vec4<f32>,
@@ -28,23 +30,51 @@ fn safe_sample_source(uv: vec2<f32>) -> vec4<f32> {
     return sample_source(uv);
 }
 
-fn distorted_uv(uv: vec2<f32>) -> vec2<f32> {
-    if settings.lens_distortion.x < 0.5 {
+fn lens_distorted_uv(uv: vec2<f32>, chroma_shift: f32) -> vec2<f32> {
+    if settings.lens_radial.x < 0.5 {
         return uv;
     }
 
-    let centered = (uv - vec2<f32>(0.5, 0.5)) * 2.0;
-    let zoom = max(settings.lens_distortion.z, 0.1);
-    let scaled = centered / zoom;
-    let radius_sq = dot(scaled, scaled);
-    let strength = clamp(settings.lens_distortion.y, -1.5, 1.5);
-    let distorted = scaled * (1.0 + strength * radius_sq);
+    let center = settings.lens_center.xy;
+    let zoom = max(settings.lens_center.z, 0.1);
+    let scale = max(settings.lens_shape.xy, vec2<f32>(0.1, 0.1));
+    let tangential = clamp(settings.lens_shape.zw, vec2<f32>(-2.0, -2.0), vec2<f32>(2.0, 2.0));
+    let centered = (uv - center) * 2.0;
+    let normalized = centered / zoom / scale;
+    let radius_sq = dot(normalized, normalized);
+    let radius_quartic = radius_sq * radius_sq;
+    let radius_sextic = radius_quartic * radius_sq;
+    let chroma = clamp(settings.lens_center.w, 0.0, 0.5) * chroma_shift;
+    let radial_gain = 1.0
+        + (settings.lens_radial.y + chroma) * radius_sq
+        + settings.lens_radial.z * radius_quartic
+        + settings.lens_radial.w * radius_sextic;
+    let tangential_offset = vec2<f32>(
+        2.0 * tangential.x * normalized.x * normalized.y
+            + tangential.y * (radius_sq + 2.0 * normalized.x * normalized.x),
+        tangential.x * (radius_sq + 2.0 * normalized.y * normalized.y)
+            + 2.0 * tangential.y * normalized.x * normalized.y,
+    );
+    let distorted = (normalized * radial_gain + tangential_offset) * scale;
 
-    return distorted * 0.5 + vec2<f32>(0.5, 0.5);
+    return center + distorted * (zoom * 0.5);
 }
 
 fn distorted_source_color(uv: vec2<f32>) -> vec4<f32> {
-    return safe_sample_source(distorted_uv(uv));
+    if settings.lens_radial.x < 0.5 {
+        return sample_source(uv);
+    }
+
+    let chroma = clamp(settings.lens_center.w, 0.0, 0.5);
+    if chroma < 0.0001 {
+        return safe_sample_source(lens_distorted_uv(uv, 0.0));
+    }
+
+    let red = safe_sample_source(lens_distorted_uv(uv, 1.0));
+    let green = safe_sample_source(lens_distorted_uv(uv, 0.0));
+    let blue = safe_sample_source(lens_distorted_uv(uv, -1.0));
+
+    return vec4<f32>(red.r, green.g, blue.b, green.a);
 }
 
 fn hard_wrap_wavefold_color(color: vec3<f32>) -> vec3<f32> {

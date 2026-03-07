@@ -177,7 +177,9 @@ fn init_camera_effects_pipeline(
 #[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
 pub(crate) struct CameraEffectsSettings {
     pub(crate) wavefolder: Vec4,
-    pub(crate) lens_distortion: Vec4,
+    pub(crate) lens_radial: Vec4,
+    pub(crate) lens_center: Vec4,
+    pub(crate) lens_shape: Vec4,
     pub(crate) gaussian_blur: Vec4,
     pub(crate) bloom: Vec4,
     pub(crate) edge_detection: Vec4,
@@ -185,6 +187,10 @@ pub(crate) struct CameraEffectsSettings {
 }
 
 pub(crate) fn camera_effects_from_config(effects_config: &EffectsConfig) -> CameraEffectsSettings {
+    let lens_center = effects_config.lens_distortion.center_clamped();
+    let lens_scale = effects_config.lens_distortion.scale_clamped();
+    let lens_tangential = effects_config.lens_distortion.tangential_clamped();
+
     CameraEffectsSettings {
         wavefolder: Vec4::new(
             enabled_flag(effects_config.color_wavefolder.enabled),
@@ -192,11 +198,25 @@ pub(crate) fn camera_effects_from_config(effects_config: &EffectsConfig) -> Came
             effects_config.color_wavefolder.modulus_clamped(),
             0.0,
         ),
-        lens_distortion: Vec4::new(
+        lens_radial: Vec4::new(
             enabled_flag(effects_config.lens_distortion.enabled),
             effects_config.lens_distortion.strength_clamped(),
+            effects_config.lens_distortion.radial_k2_clamped(),
+            effects_config.lens_distortion.radial_k3_clamped(),
+        ),
+        lens_center: Vec4::new(
+            lens_center[0],
+            lens_center[1],
             effects_config.lens_distortion.zoom_clamped(),
-            0.0,
+            effects_config
+                .lens_distortion
+                .chromatic_aberration_clamped(),
+        ),
+        lens_shape: Vec4::new(
+            lens_scale[0],
+            lens_scale[1],
+            lens_tangential[0],
+            lens_tangential[1],
         ),
         gaussian_blur: Vec4::new(
             enabled_flag(effects_config.gaussian_blur.enabled),
@@ -256,10 +276,19 @@ fn lens_distortion_status_message(effects_config: &EffectsConfig) -> String {
         return "Camera-output lens distortion: disabled".to_string();
     }
 
+    let center = effects_config.lens_distortion.center_clamped();
+
     format!(
-        "Camera-output lens distortion: enabled, strength {:.2}, zoom {:.2}",
+        "Camera-output lens distortion: enabled, k1 {:.2}, k2 {:.2}, k3 {:.2}, center ({:.2}, {:.2}), zoom {:.2}, chroma {:.3}",
         effects_config.lens_distortion.strength_clamped(),
-        effects_config.lens_distortion.zoom_clamped()
+        effects_config.lens_distortion.radial_k2_clamped(),
+        effects_config.lens_distortion.radial_k3_clamped(),
+        center[0],
+        center[1],
+        effects_config.lens_distortion.zoom_clamped(),
+        effects_config
+            .lens_distortion
+            .chromatic_aberration_clamped()
     )
 }
 
@@ -311,18 +340,38 @@ fn hard_wrap_wavefold(value: f32, gain: f32, modulus: f32) -> f32 {
 }
 
 #[cfg(test)]
-fn distorted_uv(uv: Vec2, strength: f32, zoom: f32) -> Vec2 {
-    let centered = (uv - Vec2::splat(0.5)) * 2.0;
-    let scaled = centered / zoom.max(0.1);
-    let radius_sq = scaled.length_squared();
-    let distorted = scaled * (1.0 + strength.clamp(-1.5, 1.5) * radius_sq);
+fn distorted_uv(
+    uv: Vec2,
+    center: Vec2,
+    zoom: f32,
+    scale: Vec2,
+    radial: Vec3,
+    tangential: Vec2,
+) -> Vec2 {
+    let centered = (uv - center) * 2.0;
+    let normalized = centered / zoom.max(0.1) / scale.max(Vec2::splat(0.1));
+    let radius_sq = normalized.length_squared();
+    let radius_quartic = radius_sq * radius_sq;
+    let radius_sextic = radius_quartic * radius_sq;
+    let radial_gain = 1.0
+        + radial.x.clamp(-4.0, 4.0) * radius_sq
+        + radial.y.clamp(-4.0, 4.0) * radius_quartic
+        + radial.z.clamp(-4.0, 4.0) * radius_sextic;
+    let tangential = tangential.clamp(Vec2::splat(-2.0), Vec2::splat(2.0));
+    let tangential_offset = Vec2::new(
+        2.0 * tangential.x * normalized.x * normalized.y
+            + tangential.y * (radius_sq + 2.0 * normalized.x * normalized.x),
+        tangential.x * (radius_sq + 2.0 * normalized.y * normalized.y)
+            + 2.0 * tangential.y * normalized.x * normalized.y,
+    );
+    let distorted = (normalized * radial_gain + tangential_offset) * scale.max(Vec2::splat(0.1));
 
-    distorted * 0.5 + Vec2::splat(0.5)
+    center + distorted * (zoom.max(0.1) * 0.5)
 }
 
 #[cfg(test)]
 mod tests {
-    use bevy::prelude::{Vec2, Vec4};
+    use bevy::prelude::{Vec2, Vec3, Vec4};
 
     use super::{
         camera_effects_from_config, distorted_uv, effects_status_messages, hard_wrap_wavefold,
@@ -340,10 +389,18 @@ mod tests {
     }
 
     #[test]
-    fn radial_lens_distortion_keeps_image_center_fixed() {
-        let uv = distorted_uv(Vec2::splat(0.5), 0.8, 0.7);
+    fn radial_lens_distortion_keeps_configured_center_fixed() {
+        let center = Vec2::new(0.3, 0.7);
+        let uv = distorted_uv(
+            center,
+            center,
+            0.8,
+            Vec2::new(1.4, 0.7),
+            Vec3::new(0.8, -0.25, 0.1),
+            Vec2::new(0.05, -0.03),
+        );
 
-        assert!(uv.distance(Vec2::splat(0.5)) < 1e-6);
+        assert!(uv.distance(center) < 1e-6);
     }
 
     #[test]
@@ -356,8 +413,14 @@ mod tests {
             },
             lens_distortion: LensDistortionConfig {
                 enabled: true,
-                strength: 4.0,
+                strength: 5.0,
+                radial_k2: -5.0,
+                radial_k3: 6.0,
                 zoom: 0.0,
+                center: [1.2, -0.3],
+                scale: [0.0, 9.0],
+                tangential: [3.0, -4.0],
+                chromatic_aberration: 2.0,
             },
             gaussian_blur: GaussianBlurConfig {
                 enabled: true,
@@ -380,7 +443,9 @@ mod tests {
         });
 
         assert_eq!(settings.wavefolder, Vec4::new(1.0, 0.0, 0.0001, 0.0));
-        assert_eq!(settings.lens_distortion, Vec4::new(1.0, 1.5, 0.1, 0.0));
+        assert_eq!(settings.lens_radial, Vec4::new(1.0, 4.0, -4.0, 4.0));
+        assert_eq!(settings.lens_center, Vec4::new(1.0, 0.0, 0.1, 0.5));
+        assert_eq!(settings.lens_shape, Vec4::new(0.1, 4.0, 2.0, -2.0));
         assert_eq!(settings.gaussian_blur, Vec4::new(1.0, 0.0001, 16.0, 0.0));
         assert_eq!(settings.bloom, Vec4::new(1.0, 0.0, 0.0, 16.0));
         assert_eq!(settings.edge_detection, Vec4::new(1.0, 0.0, 0.0, 1.0));

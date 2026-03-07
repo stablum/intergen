@@ -67,8 +67,8 @@ Live child-offset controls use these `generation` settings:
 - `min_vertex_offset_ratio` / `max_vertex_offset_ratio`: live clamp range, with `0.0` as the minimum allowed floor
 
 Camera-output effects run in this order:
-- `effects.color_wavefolder`: hard-wrap the camera color by amplification plus remainder
-- `effects.lens_distortion`: radially warp the camera image before later effects
+- `effects.lens_distortion`: warp the camera image with radial, tangential, and chromatic lens terms
+- `effects.color_wavefolder`: hard-wrap the distorted camera color by amplification plus remainder
 - `effects.gaussian_blur`: blur the distorted and wavefolded image
 - `effects.bloom`: add a bright-pass glow over the processed image
 - `effects.edge_detection`: detect edges from the distorted and wavefolded image and mix a configurable edge color over it
@@ -79,9 +79,14 @@ Camera-output color wavefolder uses these `effects.color_wavefolder` settings:
 - `modulus`: the divisor whose remainder is kept after amplification
 
 Camera-output lens distortion uses these `effects.lens_distortion` settings:
-- `enabled`: turns radial lens warping on or off
-- `strength`: distortion amount, with positive and negative values bending the image differently
+- `enabled`: turns lens warping on or off
+- `strength`: primary radial barrel/pincushion term (`k1`)
+- `radial_k2` / `radial_k3`: higher-order radial shaping terms for the shoulder of the warp
+- `center`: distortion center in normalized screen coordinates
+- `scale`: per-axis distortion scale for anamorphic or elliptical warping
+- `tangential`: tangential skew terms that decenter the lens model
 - `zoom`: scales the distorted image to keep more or less of the warped frame in view
+- `chromatic_aberration`: shifts color channels apart along the distortion field
 
 Camera-output gaussian blur uses these `effects.gaussian_blur` settings:
 - `enabled`: turns blur on or off
