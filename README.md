@@ -151,6 +151,7 @@ cargo test-plain
 - `Arrow Left` / `Arrow Right`: yaw camera
 - `Q` / `E`: roll camera
 - `W` / `S`: zoom in / out
+- `Backspace`: stop camera rotation momentum
 - `F1` or `H`: toggle the keybinding overlay
 - `F12`: save a screenshot to `screenshots/`
 - `R`: reset the scene with the currently selected polyhedron as the new root

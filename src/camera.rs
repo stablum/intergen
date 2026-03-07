@@ -30,6 +30,11 @@ pub(crate) fn camera_input_system(
     app_config: Res<AppConfig>,
     mut camera_rig: ResMut<CameraRig>,
 ) {
+    if keys.just_pressed(KeyCode::Backspace) {
+        stop_angular_momentum(&mut camera_rig);
+        println!("Stopped camera rotation momentum.");
+    }
+
     let dt = time.delta_secs();
     let torque_step = app_config.camera.rotation_accel * dt;
 
@@ -91,6 +96,10 @@ pub(crate) fn camera_motion_system(
         .looking_at(Vec3::ZERO, camera_rig.orientation * Vec3::Y);
 }
 
+fn stop_angular_momentum(camera_rig: &mut CameraRig) {
+    camera_rig.angular_velocity = Vec3::ZERO;
+}
+
 fn damped_angular_velocity(
     angular_velocity: Vec3,
     angular_damping: f32,
@@ -106,8 +115,8 @@ fn damped_angular_velocity(
 
 #[cfg(test)]
 mod tests {
-    use super::damped_angular_velocity;
-    use bevy::prelude::Vec3;
+    use super::{CameraRig, damped_angular_velocity, stop_angular_momentum};
+    use bevy::prelude::{Quat, Vec3};
 
     #[test]
     fn preserved_angular_momentum_keeps_velocity_constant() {
@@ -125,5 +134,21 @@ mod tests {
         let next_velocity = damped_angular_velocity(angular_velocity, 2.2, 0.5, false);
 
         assert!(next_velocity.length() < angular_velocity.length());
+    }
+
+    #[test]
+    fn stop_angular_momentum_clears_only_rotation_velocity() {
+        let mut camera_rig = CameraRig {
+            orientation: Quat::IDENTITY,
+            angular_velocity: Vec3::new(1.0, -0.5, 0.25),
+            distance: 14.0,
+            zoom_velocity: 3.0,
+        };
+
+        stop_angular_momentum(&mut camera_rig);
+
+        assert_eq!(camera_rig.angular_velocity, Vec3::ZERO);
+        assert_eq!(camera_rig.zoom_velocity, 3.0);
+        assert_eq!(camera_rig.distance, 14.0);
     }
 }
