@@ -128,7 +128,7 @@ cargo test-plain
 - `W` / `S`: zoom in / out
 - `F1` or `H`: toggle the keybinding overlay
 - `F12`: save a screenshot to `screenshots/`
-- `R`: reset the scene to the root polyhedron
+- `R`: reset the scene with the currently selected polyhedron as the new root
 - `Space`: spawn child polyhedra, or hold to keep spawning
 - `1`: select cube
 - `2`: select tetrahedron

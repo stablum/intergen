@@ -190,7 +190,11 @@ pub(crate) fn reset_generation_state(
     shape_catalog: &ShapeCatalog,
     generation_config: &GenerationConfig,
 ) -> PolyhedronNode {
-    let root = root_generation_node(shape_catalog, generation_config);
+    let root = root_node(
+        generation_state.selected_kind,
+        generation_config.root_scale,
+        shape_catalog,
+    );
     generation_state.nodes = vec![root.clone()];
     generation_state.spawn_hold.reset();
     generation_state.twist_decrease_hold.reset();
@@ -323,7 +327,7 @@ mod tests {
             reset_generation_state(&mut generation_state, &shape_catalog, &generation_config);
 
         assert_eq!(generation_state.nodes.len(), 1);
-        assert_eq!(generation_state.nodes[0].kind, generation_config.root_kind);
+        assert_eq!(generation_state.nodes[0].kind, PolyhedronKind::Octahedron);
         assert_eq!(generation_state.nodes[0].level, 0);
         assert_eq!(generation_state.nodes[0].center, Vec3::ZERO);
         assert_eq!(generation_state.selected_kind, PolyhedronKind::Octahedron);
@@ -336,6 +340,7 @@ mod tests {
                 .all(|occupied| !occupied)
         );
         assert_eq!(reset_root.center, Vec3::ZERO);
+        assert_eq!(reset_root.kind, PolyhedronKind::Octahedron);
         assert_eq!(generation_state.spawn_hold.elapsed_secs, 0.0);
         assert!(!generation_state.spawn_hold.repeating);
         assert_eq!(generation_state.twist_decrease_hold.elapsed_secs, 0.0);

@@ -165,7 +165,7 @@ pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
             "Q / E: Roll camera\n",
             "W / S: Zoom in / out\n",
             "Space: Spawn polyhedra (hold to repeat)\n",
-            "R: Reset to the root polyhedron\n",
+            "R: Reset to the selected polyhedron as root\n",
             "1: Select cube\n",
             "2: Select tetrahedron\n",
             "3: Select octahedron\n",
@@ -202,7 +202,7 @@ mod tests {
 
         assert!(text.contains("F1 / H: Toggle this overlay"));
         assert!(text.contains("Space: Spawn polyhedra (hold to repeat)"));
-        assert!(text.contains("R: Reset to the root polyhedron"));
+        assert!(text.contains("R: Reset to the selected polyhedron as root"));
         assert!(text.contains("F12: Save a screenshot"));
         assert!(text.contains("4: Select dodecahedron"));
         assert!(text.contains("O / P: Adjust global opacity"));

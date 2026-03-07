@@ -227,7 +227,7 @@ pub(crate) fn generation_input_system(
             material_state.opacity,
             0,
         );
-        println!("Reset scene to the root polyhedron.");
+        println!("Reset scene to a {:?} root polyhedron.", root.kind);
         return;
     }
 
