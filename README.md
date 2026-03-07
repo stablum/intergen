@@ -112,7 +112,7 @@ The in-app FX tuner starts from the values loaded from `config.toml` at launch.
 - `Tab` toggles the selected effect on or off.
 - `L` toggles the selected parameter LFO on or off.
 - `M` cycles the tuner edit target between parameter value, LFO amplitude, LFO frequency, and LFO shape.
-- LFO shapes currently available are `sine`, `triangle`, `saw`, and `square`.
+- LFO shapes currently available are `sine`, `triangle`, `saw`, `square`, `stepped random`, and `brownian motion`.
 - `Enter` resets the selected FX field.
 - `Shift + Enter` resets all FX settings and LFOs to their startup defaults.
 - The tuner does not write changes back to `config.toml` automatically.
@@ -164,12 +164,12 @@ cargo test-plain
 - `W` / `S`: zoom in / out
 - `Backspace`: stop camera rotation momentum
 - `F1` or `H`: toggle the keybinding overlay
-- `F2`: pin or unpin the FX tuner overlay
+- `F2`: pin or unpin the bottom FX strip
 - `Ctrl + Up` / `Ctrl + Down`: select the active FX parameter
 - `Ctrl + Left` / `Ctrl + Right`: adjust the active FX field, with hold-to-repeat
 - `Tab`: toggle the selected effect on or off
 - `L`: toggle the selected parameter LFO on or off
-- `M`: cycle FX tuner edit mode between value, LFO amplitude, LFO frequency, and LFO shape
+- `M`: cycle FX tuner edit mode between value, LFO amplitude, LFO frequency, and LFO shape, including the new random drift shapes
 - `Shift`: coarse FX adjustment modifier
 - `Alt`: fine FX adjustment modifier
 - `Enter`: reset the active FX field

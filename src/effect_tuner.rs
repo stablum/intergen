@@ -11,6 +11,7 @@ const HOLD_DELAY_SECS: f32 = 0.32;
 const REPEAT_INTERVAL_SECS: f32 = 0.08;
 const DEFAULT_LFO_FREQUENCY_HZ: f32 = 0.25;
 const LFO_FREQUENCY_STEP_HZ: f32 = 0.05;
+const BROWNIAN_OCTAVES: usize = 5;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum EffectGroup {
@@ -325,6 +326,8 @@ enum LfoShape {
     Triangle,
     Saw,
     Square,
+    SteppedRandom,
+    BrownianMotion,
 }
 
 impl LfoShape {
@@ -334,10 +337,12 @@ impl LfoShape {
             Self::Triangle => "triangle",
             Self::Saw => "saw",
             Self::Square => "square",
+            Self::SteppedRandom => "stepped random",
+            Self::BrownianMotion => "brownian motion",
         }
     }
 
-    fn sample(self, phase_cycles: f32) -> f32 {
+    fn sample(self, phase_cycles: f32, seed: u32) -> f32 {
         let phase = phase_cycles.rem_euclid(1.0);
         match self {
             Self::Sine => (phase * TAU).sin(),
@@ -358,16 +363,69 @@ impl LfoShape {
                     -1.0
                 }
             }
+            Self::SteppedRandom => sample_stepped_random(phase_cycles, seed),
+            Self::BrownianMotion => sample_brownian_motion(phase_cycles, seed),
         }
     }
 
     fn cycle(self, direction: f32) -> Self {
-        let all = [Self::Sine, Self::Triangle, Self::Saw, Self::Square];
+        let all = [
+            Self::Sine,
+            Self::Triangle,
+            Self::Saw,
+            Self::Square,
+            Self::SteppedRandom,
+            Self::BrownianMotion,
+        ];
         let index = all.iter().position(|shape| *shape == self).unwrap_or(0) as isize;
         let delta = if direction < 0.0 { -1 } else { 1 };
         let next_index = (index + delta).rem_euclid(all.len() as isize) as usize;
         all[next_index]
     }
+}
+
+fn sample_stepped_random(phase_cycles: f32, seed: u32) -> f32 {
+    signed_hash(phase_cycles.floor() as i32, seed)
+}
+
+fn sample_brownian_motion(phase_cycles: f32, seed: u32) -> f32 {
+    let mut value = 0.0;
+    let mut amplitude = 1.0;
+    let mut frequency = 1.0;
+    let mut amplitude_sum = 0.0;
+
+    for octave in 0..BROWNIAN_OCTAVES {
+        let octave_seed = seed.wrapping_add((octave as u32).wrapping_mul(0x9E37_79B9));
+        value += amplitude * smooth_value_noise_1d(phase_cycles * frequency, octave_seed);
+        amplitude_sum += amplitude;
+        amplitude *= 0.5;
+        frequency *= 2.0;
+    }
+
+    if amplitude_sum <= f32::EPSILON {
+        0.0
+    } else {
+        (value / amplitude_sum).clamp(-1.0, 1.0)
+    }
+}
+
+fn smooth_value_noise_1d(position: f32, seed: u32) -> f32 {
+    let left_index = position.floor() as i32;
+    let local_t = position - left_index as f32;
+    let blend = local_t * local_t * (3.0 - 2.0 * local_t);
+    let left_value = signed_hash(left_index, seed);
+    let right_value = signed_hash(left_index + 1, seed);
+    left_value + (right_value - left_value) * blend
+}
+
+fn signed_hash(index: i32, seed: u32) -> f32 {
+    let mut state = (index as u32).wrapping_add(seed.wrapping_mul(0x85EB_CA6B));
+    state ^= state >> 16;
+    state = state.wrapping_mul(0x7FEB_352D);
+    state ^= state >> 15;
+    state = state.wrapping_mul(0x846C_A68B);
+    state ^= state >> 16;
+    (state as f32 / u32::MAX as f32) * 2.0 - 1.0
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -557,7 +615,10 @@ impl EffectTunerState {
             }
 
             let base_value = parameter.value(&self.current);
-            let lfo_offset = lfo.amplitude * lfo.shape.sample(now_secs * lfo.frequency_hz);
+            let lfo_offset = lfo.amplitude
+                * lfo
+                    .shape
+                    .sample(now_secs * lfo.frequency_hz, index as u32 + 1);
             parameter.set_value(&mut effects, base_value + lfo_offset);
         }
 
@@ -926,6 +987,31 @@ mod tests {
         assert_eq!(snapshot.parameter_label, "k2");
         assert_eq!(snapshot.active_field, EffectOverlayField::LfoShape);
         assert!(snapshot.pinned);
+    }
+
+    #[test]
+    fn stepped_random_holds_its_value_within_a_cycle() {
+        let first = LfoShape::SteppedRandom.sample(0.10, 17);
+        let second = LfoShape::SteppedRandom.sample(0.90, 17);
+
+        assert_eq!(first, second);
+    }
+
+    #[test]
+    fn brownian_motion_is_bounded_and_smooth() {
+        let first = LfoShape::BrownianMotion.sample(0.50, 23);
+        let second = LfoShape::BrownianMotion.sample(0.52, 23);
+
+        assert!(first.abs() <= 1.0);
+        assert!(second.abs() <= 1.0);
+        assert!((second - first).abs() < 0.2);
+    }
+
+    #[test]
+    fn lfo_shape_cycle_includes_random_shapes() {
+        assert_eq!(LfoShape::Square.cycle(1.0), LfoShape::SteppedRandom);
+        assert_eq!(LfoShape::SteppedRandom.cycle(1.0), LfoShape::BrownianMotion);
+        assert_eq!(LfoShape::BrownianMotion.cycle(1.0), LfoShape::Sine);
     }
 
     #[test]
