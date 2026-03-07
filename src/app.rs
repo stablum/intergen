@@ -7,6 +7,7 @@ use crate::capture::{
     manual_screenshot_input_system,
 };
 use crate::config::AppConfig;
+use crate::effects::EffectsPlugin;
 use crate::generation::generation_input_system;
 use crate::scene::setup_scene;
 use crate::ui::{HelpOverlayState, toggle_help_overlay_system};
@@ -49,6 +50,7 @@ pub fn run() {
             }),
             ..default()
         }))
+        .add_plugins(EffectsPlugin)
         .add_systems(Startup, setup_scene)
         .add_systems(
             Update,

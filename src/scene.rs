@@ -3,6 +3,7 @@ use bevy::prelude::*;
 
 use crate::camera::{CameraRig, SceneCamera};
 use crate::config::{AppConfig, GenerationConfig, MaterialConfig};
+use crate::effects::{camera_color_wavefolder_from_config, color_wavefolder_status_message};
 use crate::generation::{SpawnHoldState, twist_status_message};
 use crate::polyhedra::{
     PolyhedronKind, PolyhedronNode, ShapeCatalog, ShapeGeometry, build_mesh, root_node,
@@ -98,16 +99,20 @@ pub(crate) fn setup_scene(
     );
 
     let camera_translation = camera_rig.orientation * Vec3::new(0.0, 0.0, camera_rig.distance);
-    let scene_camera = commands
-        .spawn((
-            Camera3d::default(),
-            Tonemapping::AcesFitted,
-            Transform::from_translation(camera_translation)
-                .looking_at(Vec3::ZERO, camera_rig.orientation * Vec3::Y),
-            SceneCamera,
-            IsDefaultUiCamera,
-        ))
-        .id();
+    let mut scene_camera = commands.spawn((
+        Camera3d::default(),
+        Tonemapping::AcesFitted,
+        Transform::from_translation(camera_translation)
+            .looking_at(Vec3::ZERO, camera_rig.orientation * Vec3::Y),
+        SceneCamera,
+        IsDefaultUiCamera,
+    ));
+    if app_config.effects.color_wavefolder.enabled {
+        scene_camera.insert(camera_color_wavefolder_from_config(
+            &app_config.effects.color_wavefolder,
+        ));
+    }
+    let scene_camera = scene_camera.id();
 
     commands.spawn((
         DirectionalLight {
@@ -161,6 +166,10 @@ pub(crate) fn setup_scene(
     );
     println!("{}", twist_status_message(initial_twist));
     println!("{}", opacity_status_message(initial_opacity));
+    println!(
+        "{}",
+        color_wavefolder_status_message(&app_config.effects.color_wavefolder)
+    );
     if ui_theme.source == UiFontSource::Fallback {
         eprintln!(
             "Carbon Plus was not found in assets/fonts. Using Bevy's fallback font for UI text."

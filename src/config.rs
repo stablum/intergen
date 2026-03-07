@@ -17,6 +17,7 @@ pub(crate) struct AppConfig {
     pub(crate) camera: CameraConfig,
     pub(crate) generation: GenerationConfig,
     pub(crate) lighting: LightingConfig,
+    pub(crate) effects: EffectsConfig,
     pub(crate) materials: MaterialConfig,
     pub(crate) capture: CaptureConfig,
     pub(crate) ui: UiConfig,
@@ -47,6 +48,7 @@ impl Default for AppConfig {
             camera: CameraConfig::default(),
             generation: GenerationConfig::default(),
             lighting: LightingConfig::default(),
+            effects: EffectsConfig::default(),
             materials: MaterialConfig::default(),
             capture: CaptureConfig::default(),
             ui: UiConfig::default(),
@@ -409,6 +411,48 @@ impl Default for MaterialConfig {
 
 #[derive(Clone, Deserialize)]
 #[serde(default)]
+pub(crate) struct EffectsConfig {
+    pub(crate) color_wavefolder: ColorWavefolderConfig,
+}
+
+impl Default for EffectsConfig {
+    fn default() -> Self {
+        Self {
+            color_wavefolder: ColorWavefolderConfig::default(),
+        }
+    }
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(default)]
+pub(crate) struct ColorWavefolderConfig {
+    pub(crate) enabled: bool,
+    pub(crate) gain: f32,
+    pub(crate) modulus: f32,
+}
+
+impl ColorWavefolderConfig {
+    pub(crate) fn gain_clamped(&self) -> f32 {
+        self.gain.max(0.0)
+    }
+
+    pub(crate) fn modulus_clamped(&self) -> f32 {
+        self.modulus.max(0.0001)
+    }
+}
+
+impl Default for ColorWavefolderConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            gain: 2.4,
+            modulus: 1.0,
+        }
+    }
+}
+
+#[derive(Clone, Deserialize)]
+#[serde(default)]
 pub(crate) struct CaptureConfig {
     pub(crate) output_dir: String,
     pub(crate) default_capture_delay_frames: u32,
@@ -536,6 +580,23 @@ mod tests {
         let config = parse_config("").expect("empty config should parse");
 
         assert!(config.camera.preserve_angular_momentum);
+    }
+
+    #[test]
+    fn color_wavefolder_settings_parse_from_config() {
+        let config = parse_config(
+            r#"
+            [effects.color_wavefolder]
+            enabled = false
+            gain = 3.25
+            modulus = 0.5
+            "#,
+        )
+        .expect("effects config should parse");
+
+        assert!(!config.effects.color_wavefolder.enabled);
+        assert_eq!(config.effects.color_wavefolder.gain_clamped(), 3.25);
+        assert_eq!(config.effects.color_wavefolder.modulus_clamped(), 0.5);
     }
 
     #[test]

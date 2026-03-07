@@ -13,6 +13,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - toggleable in-app keybinding overlay
 - built-in screenshot capture for manual and scripted verification
 - containment rejection so obviously hidden fully-inside spawns are skipped
+- camera-output shader wavefolder with hard wrapping
 
 ## Requirements
 
@@ -44,6 +45,7 @@ Current configuration sections:
 - `camera`: initial orbit, motion tuning, and angular-momentum preservation
 - `generation`: root shape, default child shape, scale limits, twist defaults and bounds, spawn cadence, and spawn heuristics
 - `lighting`: directional and point light colors, positions, and intensities
+- `effects`: camera-output shader effects
 - `materials`: color progression, PBR tuning, and live opacity defaults
 - `capture`: screenshot output directory and default capture delay
 - `ui`: font candidates plus overlay sizing and colors
@@ -56,6 +58,11 @@ Live twist controls use these `generation` settings:
 - `twist_hold_delay_secs`: how long to hold before twist repeat starts
 - `twist_repeat_interval_secs`: time between repeated twist updates while held
 - `min_twist_per_vertex_radians` / `max_twist_per_vertex_radians`: live clamp range, with `0.0` as the minimum allowed floor
+
+Camera-output color wavefolder uses these `effects.color_wavefolder` settings:
+- `enabled`: turns the camera post-process on or off
+- `gain`: amplifies the color before wrapping
+- `modulus`: the divisor whose remainder is kept after amplification
 
 Live opacity controls use these `materials` settings:
 - `default_opacity`: startup default for all object materials
@@ -132,6 +139,7 @@ Implemented now:
 - custom meshes for cube, tetrahedron, octahedron, and dodecahedron
 - recursive level-by-level spawning
 - metallic lit PBR scene
+- camera-output hard-wrap wavefolder post process
 - unit tests for geometry counts and spawn ordering
 
 Not implemented yet:
