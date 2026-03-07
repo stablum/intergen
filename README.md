@@ -27,14 +27,17 @@ The current prototype focuses on a fast local development loop and a usable vert
 UI text prefers `Carbon Plus` if you place a licensed font file in `assets/fonts/`.
 
 Supported filenames:
+- `assets/fonts/carbonplus-regular-bl.otf`
 - `assets/fonts/CarbonPlus-Regular.ttf`
 - `assets/fonts/CarbonPlus-Regular.otf`
 - `assets/fonts/Carbon Plus Regular.ttf`
 - `assets/fonts/Carbon Plus Regular.otf`
 - `assets/fonts/CarbonPlus.ttf`
 - `assets/fonts/Carbon Plus.ttf`
+- `assets/fonts/carbonplus-bold-bl.otf`
+- `assets/fonts/carbonplus-light-bl.otf`
 
-If none of those files are present, the app falls back to Bevy's default font.
+If you override `ui.font_candidates` in `config.toml`, the built-in Carbon Plus filenames above are still appended as fallback candidates. If none of those files are present, the app falls back to Bevy's default font.
 
 ## Configuration
 
@@ -235,5 +238,7 @@ Not implemented yet:
 - hardware ray tracing
 - more advanced visibility heuristics than simple containment rejection
 - export workflows beyond the built-in scene preset system
+
+
 
 

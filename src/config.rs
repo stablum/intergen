@@ -702,12 +702,15 @@ impl Default for UiConfig {
     fn default() -> Self {
         Self {
             font_candidates: vec![
+                "fonts/carbonplus-regular-bl.otf".to_string(),
                 "fonts/CarbonPlus-Regular.ttf".to_string(),
                 "fonts/CarbonPlus-Regular.otf".to_string(),
                 "fonts/Carbon Plus Regular.ttf".to_string(),
                 "fonts/Carbon Plus Regular.otf".to_string(),
                 "fonts/CarbonPlus.ttf".to_string(),
                 "fonts/Carbon Plus.ttf".to_string(),
+                "fonts/carbonplus-bold-bl.otf".to_string(),
+                "fonts/carbonplus-light-bl.otf".to_string(),
             ],
             hint_top: 18.0,
             hint_left: 18.0,

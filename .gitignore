@@ -1,1 +1,4 @@
 /target
+/scene-presets/
+/assets/fonts/*
+!/assets/fonts/README.md

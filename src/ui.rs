@@ -321,7 +321,14 @@ fn spawn_preset_ui(
         });
 }
 pub(crate) fn load_ui_theme(asset_server: &AssetServer, ui_config: &UiConfig) -> UiTheme {
-    if let Some(font_asset) = carbon_plus_font_asset(&ui_config.font_candidates) {
+    let mut font_candidates = ui_config.font_candidates.clone();
+    for fallback_candidate in UiConfig::default().font_candidates {
+        if !font_candidates.contains(&fallback_candidate) {
+            font_candidates.push(fallback_candidate);
+        }
+    }
+
+    if let Some(font_asset) = carbon_plus_font_asset(&font_candidates) {
         return UiTheme {
             font: asset_server.load(font_asset),
             source: UiFontSource::CarbonPlus,
