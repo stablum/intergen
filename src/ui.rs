@@ -81,7 +81,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
     } else {
         Visibility::Hidden
     };
-    *text = Text::new(effect_tuner.overlay_text());
+    *text = Text::new(effect_tuner.overlay_text(time.elapsed_secs()));
 }
 
 pub(crate) fn load_ui_theme(asset_server: &AssetServer, ui_config: &UiConfig) -> UiTheme {
@@ -141,7 +141,7 @@ pub(crate) fn spawn_help_ui(
                 position_type: PositionType::Absolute,
                 top: px(tuner_top),
                 left: px(ui_config.hint_left),
-                max_width: px(ui_config.body_max_width + 110.0),
+                max_width: px(ui_config.body_max_width + 150.0),
                 padding: UiRect::axes(px(ui_config.hint_padding_x), px(ui_config.hint_padding_y)),
                 ..default()
             },
@@ -159,7 +159,7 @@ pub(crate) fn spawn_help_ui(
                 TextColor(srgb(ui_config.body_text)),
                 TextLayout::new_with_justify(Justify::Left),
                 Node {
-                    max_width: px(ui_config.body_max_width + 110.0),
+                    max_width: px(ui_config.body_max_width + 150.0),
                     ..default()
                 },
                 EffectTunerOverlayText,
@@ -223,12 +223,14 @@ pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
             "F1 / H: Toggle this overlay\n",
             "F2: Pin or unpin the FX tuner\n",
             "Ctrl + Up / Down: Select FX parameter\n",
-            "Ctrl + Left / Right: Adjust selected FX parameter\n",
+            "Ctrl + Left / Right: Adjust the selected FX field\n",
             "Tab: Toggle the selected effect on or off\n",
+            "L: Toggle the selected parameter LFO on or off\n",
+            "M: Cycle FX tuner edit mode (value / amp / freq / shape)\n",
             "Shift: Coarse FX adjustment\n",
             "Alt: Fine FX adjustment\n",
-            "Enter: Reset selected FX parameter\n",
-            "Shift + Enter: Reset all FX settings\n",
+            "Enter: Reset the selected FX field\n",
+            "Shift + Enter: Reset all FX settings and LFOs\n",
             "Arrow Up / Down: Pitch camera\n",
             "Arrow Left / Right: Yaw camera\n",
             "Q / E: Roll camera\n",
@@ -275,9 +277,11 @@ mod tests {
         assert!(text.contains("F1 / H: Toggle this overlay"));
         assert!(text.contains("F2: Pin or unpin the FX tuner"));
         assert!(text.contains("Ctrl + Up / Down: Select FX parameter"));
-        assert!(text.contains("Ctrl + Left / Right: Adjust selected FX parameter"));
+        assert!(text.contains("Ctrl + Left / Right: Adjust the selected FX field"));
         assert!(text.contains("Tab: Toggle the selected effect on or off"));
-        assert!(text.contains("Shift + Enter: Reset all FX settings"));
+        assert!(text.contains("L: Toggle the selected parameter LFO on or off"));
+        assert!(text.contains("M: Cycle FX tuner edit mode (value / amp / freq / shape)"));
+        assert!(text.contains("Shift + Enter: Reset all FX settings and LFOs"));
         assert!(text.contains("Space: Spawn polyhedra (hold to repeat)"));
         assert!(text.contains("Backspace: Stop camera rotation momentum"));
         assert!(text.contains("R: Reset to the selected polyhedron as root"));

@@ -1,3 +1,5 @@
+use std::f32::consts::TAU;
+
 use bevy::prelude::*;
 
 use crate::camera::SceneCamera;
@@ -7,6 +9,8 @@ use crate::effects::{CameraEffectsSettings, camera_effects_from_config};
 const OVERLAY_HOLD_SECS: f32 = 2.5;
 const HOLD_DELAY_SECS: f32 = 0.32;
 const REPEAT_INTERVAL_SECS: f32 = 0.08;
+const DEFAULT_LFO_FREQUENCY_HZ: f32 = 0.25;
+const LFO_FREQUENCY_STEP_HZ: f32 = 0.05;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum EffectGroup {
@@ -183,6 +187,10 @@ impl EffectNumericParameter {
         }
     }
 
+    fn default_lfo_amplitude(self) -> f32 {
+        self.base_step() * 5.0
+    }
+
     fn is_integer(self) -> bool {
         matches!(self, Self::GaussianBlurRadius | Self::BloomRadius)
     }
@@ -272,6 +280,108 @@ impl EffectNumericParameter {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LfoShape {
+    Sine,
+    Triangle,
+    Saw,
+    Square,
+}
+
+impl LfoShape {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Sine => "sine",
+            Self::Triangle => "triangle",
+            Self::Saw => "saw",
+            Self::Square => "square",
+        }
+    }
+
+    fn sample(self, phase_cycles: f32) -> f32 {
+        let phase = phase_cycles.rem_euclid(1.0);
+        match self {
+            Self::Sine => (phase * TAU).sin(),
+            Self::Triangle => {
+                if phase < 0.25 {
+                    phase * 4.0
+                } else if phase < 0.75 {
+                    2.0 - phase * 4.0
+                } else {
+                    phase * 4.0 - 4.0
+                }
+            }
+            Self::Saw => phase * 2.0 - 1.0,
+            Self::Square => {
+                if phase < 0.5 {
+                    1.0
+                } else {
+                    -1.0
+                }
+            }
+        }
+    }
+
+    fn cycle(self, direction: f32) -> Self {
+        let all = [Self::Sine, Self::Triangle, Self::Saw, Self::Square];
+        let index = all.iter().position(|shape| *shape == self).unwrap_or(0) as isize;
+        let delta = if direction < 0.0 { -1 } else { 1 };
+        let next_index = (index + delta).rem_euclid(all.len() as isize) as usize;
+        all[next_index]
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum EffectEditMode {
+    Value,
+    LfoAmplitude,
+    LfoFrequency,
+    LfoShape,
+}
+
+impl EffectEditMode {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Value => "value",
+            Self::LfoAmplitude => "lfo amp",
+            Self::LfoFrequency => "lfo freq",
+            Self::LfoShape => "lfo shape",
+        }
+    }
+
+    fn next(self) -> Self {
+        match self {
+            Self::Value => Self::LfoAmplitude,
+            Self::LfoAmplitude => Self::LfoFrequency,
+            Self::LfoFrequency => Self::LfoShape,
+            Self::LfoShape => Self::Value,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+struct ParameterLfo {
+    enabled: bool,
+    shape: LfoShape,
+    amplitude: f32,
+    frequency_hz: f32,
+}
+
+impl ParameterLfo {
+    fn default_for(parameter: EffectNumericParameter) -> Self {
+        Self {
+            enabled: false,
+            shape: LfoShape::Sine,
+            amplitude: parameter.default_lfo_amplitude(),
+            frequency_hz: DEFAULT_LFO_FREQUENCY_HZ,
+        }
+    }
+
+    fn is_active(self) -> bool {
+        self.enabled && self.amplitude > 0.0 && self.frequency_hz > 0.0
+    }
+}
+
 #[derive(Default, Clone)]
 struct RepeatHoldState {
     elapsed_secs: f32,
@@ -322,7 +432,9 @@ impl RepeatHoldState {
 pub(crate) struct EffectTunerState {
     pub(crate) defaults: EffectsConfig,
     pub(crate) current: EffectsConfig,
+    lfos: Vec<ParameterLfo>,
     selected_index: usize,
+    edit_mode: EffectEditMode,
     pinned: bool,
     visible_until_secs: f32,
     select_previous_hold: RepeatHoldState,
@@ -336,7 +448,9 @@ impl EffectTunerState {
         Self {
             defaults: effects_config.clone(),
             current: effects_config.clone(),
+            lfos: default_lfos(),
             selected_index: 0,
+            edit_mode: EffectEditMode::Value,
             pinned: false,
             visible_until_secs: 0.0,
             select_previous_hold: RepeatHoldState::default(),
@@ -358,14 +472,38 @@ impl EffectTunerState {
         self.pinned || now_secs <= self.visible_until_secs
     }
 
-    pub(crate) fn overlay_text(&self) -> String {
+    pub(crate) fn has_active_lfos(&self) -> bool {
+        self.lfos.iter().copied().any(ParameterLfo::is_active)
+    }
+
+    pub(crate) fn evaluated_effects(&self, now_secs: f32) -> EffectsConfig {
+        let mut effects = self.current.clone();
+
+        for (index, parameter) in EffectNumericParameter::all().iter().copied().enumerate() {
+            let lfo = self.lfos[index];
+            if !lfo.is_active() {
+                continue;
+            }
+
+            let base_value = parameter.value(&self.current);
+            let lfo_offset = lfo.amplitude * lfo.shape.sample(now_secs * lfo.frequency_hz);
+            parameter.set_value(&mut effects, base_value + lfo_offset);
+        }
+
+        effects
+    }
+
+    pub(crate) fn overlay_text(&self, now_secs: f32) -> String {
         let parameter = self.selected_parameter();
         let effect = self.selected_effect();
+        let lfo = self.selected_lfo();
+        let live_effects = self.evaluated_effects(now_secs);
         format!(
             concat!(
                 "FX Tuner{}  {} [{}]\n",
-                "{}: {}\n",
-                "default {}  tab toggle effect  ctrl+arrows adjust/select  shift coarse  alt fine  enter reset  shift+enter all"
+                "{} = {}  live {}  default {}\n",
+                "LFO {}  amp {:.3}  freq {:.3}Hz  shape {}  edit {}\n",
+                "tab effect  l lfo  m edit  ctrl+arrows adjust/select  shift coarse  alt fine  enter reset  shift+enter all"
             ),
             if self.pinned { " [Pinned]" } else { "" },
             effect.label(),
@@ -376,7 +514,13 @@ impl EffectTunerState {
             },
             parameter.label(),
             parameter.display_value(&self.current),
+            parameter.display_value(&live_effects),
             parameter.display_value(&self.defaults),
+            if lfo.enabled { "On" } else { "Off" },
+            lfo.amplitude,
+            lfo.frequency_hz,
+            lfo.shape.label(),
+            self.edit_mode.label(),
         )
     }
 
@@ -397,6 +541,11 @@ impl EffectTunerState {
         self.note_interaction(now_secs);
     }
 
+    fn cycle_edit_mode(&mut self, now_secs: f32) {
+        self.edit_mode = self.edit_mode.next();
+        self.note_interaction(now_secs);
+    }
+
     fn adjust_selected(
         &mut self,
         direction: f32,
@@ -405,10 +554,34 @@ impl EffectTunerState {
         now_secs: f32,
     ) {
         let parameter = self.selected_parameter();
-        let current_value = parameter.value(&self.current);
-        let next_value =
-            current_value + direction * parameter.adjustment_step(shift_pressed, alt_pressed);
-        parameter.set_value(&mut self.current, next_value);
+        match self.edit_mode {
+            EffectEditMode::Value => {
+                let current_value = parameter.value(&self.current);
+                let next_value = current_value
+                    + direction * parameter.adjustment_step(shift_pressed, alt_pressed);
+                parameter.set_value(&mut self.current, next_value);
+            }
+            EffectEditMode::LfoAmplitude => {
+                let step = parameter.adjustment_step(shift_pressed, alt_pressed);
+                let lfo = self.selected_lfo_mut();
+                lfo.amplitude = (lfo.amplitude + direction * step).max(0.0);
+            }
+            EffectEditMode::LfoFrequency => {
+                let mut step = LFO_FREQUENCY_STEP_HZ;
+                if shift_pressed {
+                    step *= 10.0;
+                }
+                if alt_pressed {
+                    step *= 0.1;
+                }
+                let lfo = self.selected_lfo_mut();
+                lfo.frequency_hz = (lfo.frequency_hz + direction * step).max(0.0);
+            }
+            EffectEditMode::LfoShape => {
+                let lfo = self.selected_lfo_mut();
+                lfo.shape = lfo.shape.cycle(direction);
+            }
+        }
         self.note_interaction(now_secs);
     }
 
@@ -420,15 +593,46 @@ impl EffectTunerState {
         next_enabled
     }
 
+    fn toggle_selected_lfo(&mut self, now_secs: f32) -> bool {
+        let lfo = self.selected_lfo_mut();
+        lfo.enabled = !lfo.enabled;
+        let enabled = lfo.enabled;
+        self.note_interaction(now_secs);
+        enabled
+    }
+
     fn reset_selected(&mut self, now_secs: f32) {
         let parameter = self.selected_parameter();
-        parameter.set_value(&mut self.current, parameter.value(&self.defaults));
+        match self.edit_mode {
+            EffectEditMode::Value => {
+                parameter.set_value(&mut self.current, parameter.value(&self.defaults));
+            }
+            EffectEditMode::LfoAmplitude => {
+                self.selected_lfo_mut().amplitude = parameter.default_lfo_amplitude();
+            }
+            EffectEditMode::LfoFrequency => {
+                self.selected_lfo_mut().frequency_hz = DEFAULT_LFO_FREQUENCY_HZ;
+            }
+            EffectEditMode::LfoShape => {
+                self.selected_lfo_mut().shape = LfoShape::Sine;
+            }
+        }
         self.note_interaction(now_secs);
     }
 
     fn reset_all(&mut self, now_secs: f32) {
         self.current = self.defaults.clone();
+        self.lfos = default_lfos();
+        self.edit_mode = EffectEditMode::Value;
         self.note_interaction(now_secs);
+    }
+
+    fn selected_lfo(&self) -> ParameterLfo {
+        self.lfos[self.selected_index]
+    }
+
+    fn selected_lfo_mut(&mut self) -> &mut ParameterLfo {
+        &mut self.lfos[self.selected_index]
     }
 }
 
@@ -458,6 +662,21 @@ pub(crate) fn effect_tuner_input_system(
             selected_effect.label(),
             if enabled { "enabled" } else { "disabled" }
         );
+    }
+
+    if keys.just_pressed(KeyCode::KeyL) {
+        let selected_parameter = effect_tuner.selected_parameter();
+        let enabled = effect_tuner.toggle_selected_lfo(now_secs);
+        println!(
+            "LFO for {} {}.",
+            selected_parameter.label(),
+            if enabled { "enabled" } else { "disabled" }
+        );
+    }
+
+    if keys.just_pressed(KeyCode::KeyM) {
+        effect_tuner.cycle_edit_mode(now_secs);
+        println!("FX tuner edit mode: {}.", effect_tuner.edit_mode.label());
     }
 
     let ctrl_pressed = modifier_pressed(&keys, &[KeyCode::ControlLeft, KeyCode::ControlRight]);
@@ -499,11 +718,8 @@ pub(crate) fn effect_tuner_input_system(
     ) {
         effect_tuner.adjust_selected(-1.0, shift_pressed, alt_pressed, now_secs);
         println!(
-            "{} = {}",
-            effect_tuner.selected_parameter().label(),
-            effect_tuner
-                .selected_parameter()
-                .display_value(&effect_tuner.current)
+            "{}",
+            selected_status_message(&effect_tuner, time.elapsed_secs())
         );
     }
 
@@ -515,35 +731,31 @@ pub(crate) fn effect_tuner_input_system(
     ) {
         effect_tuner.adjust_selected(1.0, shift_pressed, alt_pressed, now_secs);
         println!(
-            "{} = {}",
-            effect_tuner.selected_parameter().label(),
-            effect_tuner
-                .selected_parameter()
-                .display_value(&effect_tuner.current)
+            "{}",
+            selected_status_message(&effect_tuner, time.elapsed_secs())
         );
     }
 
     if keys.just_pressed(KeyCode::Enter) {
         if shift_pressed {
             effect_tuner.reset_all(now_secs);
-            println!("Reset all FX settings to config defaults.");
+            println!("Reset all FX settings and LFOs to defaults.");
         } else {
-            let selected_parameter = effect_tuner.selected_parameter();
             effect_tuner.reset_selected(now_secs);
             println!(
-                "Reset {} to {}.",
-                selected_parameter.label(),
-                selected_parameter.display_value(&effect_tuner.current)
+                "Reset {}.",
+                selected_status_message(&effect_tuner, time.elapsed_secs())
             );
         }
     }
 }
 
 pub(crate) fn apply_effect_tuner_system(
+    time: Res<Time>,
     effect_tuner: Res<EffectTunerState>,
     mut camera_effects: Query<&mut CameraEffectsSettings, With<SceneCamera>>,
 ) {
-    if !effect_tuner.is_changed() {
+    if !effect_tuner.is_changed() && !effect_tuner.has_active_lfos() {
         return;
     }
 
@@ -551,7 +763,43 @@ pub(crate) fn apply_effect_tuner_system(
         return;
     };
 
-    *camera_effects = camera_effects_from_config(&effect_tuner.current);
+    *camera_effects =
+        camera_effects_from_config(&effect_tuner.evaluated_effects(time.elapsed_secs()));
+}
+
+fn default_lfos() -> Vec<ParameterLfo> {
+    EffectNumericParameter::all()
+        .iter()
+        .copied()
+        .map(ParameterLfo::default_for)
+        .collect()
+}
+
+fn selected_status_message(effect_tuner: &EffectTunerState, now_secs: f32) -> String {
+    let parameter = effect_tuner.selected_parameter();
+    let lfo = effect_tuner.selected_lfo();
+    let live_effects = effect_tuner.evaluated_effects(now_secs);
+    match effect_tuner.edit_mode {
+        EffectEditMode::Value => format!(
+            "{} = {} (live {})",
+            parameter.label(),
+            parameter.display_value(&effect_tuner.current),
+            parameter.display_value(&live_effects)
+        ),
+        EffectEditMode::LfoAmplitude => {
+            format!("{} lfo amplitude = {:.3}", parameter.label(), lfo.amplitude)
+        }
+        EffectEditMode::LfoFrequency => {
+            format!(
+                "{} lfo frequency = {:.3}Hz",
+                parameter.label(),
+                lfo.frequency_hz
+            )
+        }
+        EffectEditMode::LfoShape => {
+            format!("{} lfo shape = {}", parameter.label(), lfo.shape.label())
+        }
+    }
 }
 
 fn modifier_pressed(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool {
@@ -563,7 +811,10 @@ fn modifier_pressed(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool 
 
 #[cfg(test)]
 mod tests {
-    use super::{EffectGroup, EffectNumericParameter, EffectTunerState};
+    use super::{
+        DEFAULT_LFO_FREQUENCY_HZ, EffectEditMode, EffectGroup, EffectNumericParameter,
+        EffectTunerState, LfoShape,
+    };
     use crate::config::EffectsConfig;
 
     #[test]
@@ -575,40 +826,62 @@ mod tests {
     }
 
     #[test]
-    fn toggle_selected_effect_updates_enabled_state() {
+    fn toggle_selected_lfo_updates_enabled_state() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
         effect_tuner.selected_index = 13;
 
-        let enabled = effect_tuner.toggle_selected_effect(1.0);
+        let enabled = effect_tuner.toggle_selected_lfo(1.0);
 
         assert!(enabled);
-        assert!(effect_tuner.current.gaussian_blur.enabled);
+        assert!(effect_tuner.selected_lfo().enabled);
     }
 
     #[test]
-    fn reset_selected_restores_config_default() {
+    fn evaluated_effects_apply_lfo_offset() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        effect_tuner.current.bloom.intensity = 2.5;
+        effect_tuner.selected_index = 0;
+        effect_tuner.current.color_wavefolder.gain = 2.0;
+        let lfo = effect_tuner.selected_lfo_mut();
+        lfo.enabled = true;
+        lfo.shape = LfoShape::Sine;
+        lfo.amplitude = 0.5;
+        lfo.frequency_hz = 1.0;
+
+        let evaluated = effect_tuner.evaluated_effects(0.25);
+
+        assert!((evaluated.color_wavefolder.gain - 2.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn reset_selected_restores_lfo_frequency_default() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
         effect_tuner.selected_index = 16;
+        effect_tuner.edit_mode = EffectEditMode::LfoFrequency;
+        effect_tuner.selected_lfo_mut().frequency_hz = 3.0;
 
         effect_tuner.reset_selected(1.0);
 
         assert_eq!(
-            effect_tuner.current.bloom.intensity,
-            effect_tuner.defaults.bloom.intensity
+            effect_tuner.selected_lfo().frequency_hz,
+            DEFAULT_LFO_FREQUENCY_HZ
         );
     }
 
     #[test]
-    fn reset_all_restores_effect_enable_defaults() {
+    fn reset_all_restores_effect_enable_defaults_and_disables_lfos() {
         let mut defaults = EffectsConfig::default();
         defaults.edge_detection.enabled = true;
         let mut effect_tuner = EffectTunerState::from_config(&defaults);
         effect_tuner.current.edge_detection.enabled = false;
+        effect_tuner.selected_index = 22;
+        effect_tuner.selected_lfo_mut().enabled = true;
+        effect_tuner.selected_lfo_mut().shape = LfoShape::Square;
 
         effect_tuner.reset_all(1.0);
 
         assert!(effect_tuner.current.edge_detection.enabled);
+        assert!(!effect_tuner.selected_lfo().enabled);
+        assert_eq!(effect_tuner.selected_lfo().shape, LfoShape::Sine);
     }
 
     #[test]
