@@ -2,8 +2,8 @@ use std::path::Path;
 
 use bevy::prelude::*;
 
-use crate::config::{UiConfig, srgb, srgba};
-use crate::effect_tuner::EffectTunerState;
+use crate::config::{AppConfig, UiConfig, srgb, srgba};
+use crate::effect_tuner::{EffectOverlayField, EffectTunerState};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum UiFontSource {
@@ -39,7 +39,27 @@ pub(crate) struct HelpOverlay;
 pub(crate) struct EffectTunerOverlay;
 
 #[derive(Component)]
-pub(crate) struct EffectTunerOverlayText;
+pub(crate) struct EffectTunerPinnedBadge;
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum EffectTunerTextKind {
+    Pin,
+    EffectLabel,
+    EffectState,
+    ParameterLabel,
+    Value,
+    LiveValue,
+    LfoState,
+    Amplitude,
+    Frequency,
+    Shape,
+}
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerEditableField(EffectOverlayField);
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerEditableFieldText(EffectOverlayField);
 
 pub(crate) fn toggle_help_overlay_system(
     keys: Res<ButtonInput<KeyCode>>,
@@ -65,23 +85,102 @@ pub(crate) fn toggle_help_overlay_system(
 
 pub(crate) fn update_effect_tuner_overlay_system(
     time: Res<Time>,
+    app_config: Res<AppConfig>,
     effect_tuner: Res<EffectTunerState>,
     mut overlay_query: Query<&mut Visibility, With<EffectTunerOverlay>>,
-    mut text_query: Query<&mut Text, With<EffectTunerOverlayText>>,
+    mut pinned_badge_query: Query<
+        &mut Visibility,
+        (With<EffectTunerPinnedBadge>, Without<EffectTunerOverlay>),
+    >,
+    mut text_query: Query<(
+        &EffectTunerTextKind,
+        Option<&EffectTunerEditableFieldText>,
+        &mut Text,
+        &mut TextColor,
+    )>,
+    mut field_query: Query<(&EffectTunerEditableField, &mut BackgroundColor)>,
 ) {
-    let Ok(mut visibility) = overlay_query.single_mut() else {
-        return;
-    };
-    let Ok(mut text) = text_query.single_mut() else {
-        return;
-    };
+    let now_secs = time.elapsed_secs();
+    let snapshot = effect_tuner.overlay_snapshot(now_secs);
+    let ui_config = &app_config.ui;
 
-    *visibility = if effect_tuner.is_visible(time.elapsed_secs()) {
+    let Ok(mut overlay_visibility) = overlay_query.single_mut() else {
+        return;
+    };
+    *overlay_visibility = if effect_tuner.is_visible(now_secs) {
         Visibility::Visible
     } else {
         Visibility::Hidden
     };
-    *text = Text::new(effect_tuner.overlay_text(time.elapsed_secs()));
+
+    let Ok(mut pinned_badge_visibility) = pinned_badge_query.single_mut() else {
+        return;
+    };
+    *pinned_badge_visibility = if snapshot.pinned {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+
+    for (field, mut background) in field_query.iter_mut() {
+        *background = if field.0 == snapshot.active_field {
+            BackgroundColor(srgba(ui_config.hint_background))
+        } else {
+            BackgroundColor(srgba(ui_config.overlay_background))
+        };
+    }
+
+    for (text_kind, editable_field, mut text, mut text_color) in text_query.iter_mut() {
+        let value = match text_kind {
+            EffectTunerTextKind::Pin => "PIN".to_string(),
+            EffectTunerTextKind::EffectLabel => snapshot.effect_label.to_string(),
+            EffectTunerTextKind::EffectState => {
+                if snapshot.effect_enabled { "ON" } else { "OFF" }.to_string()
+            }
+            EffectTunerTextKind::ParameterLabel => snapshot.parameter_label.to_string(),
+            EffectTunerTextKind::Value => snapshot.value_text.clone(),
+            EffectTunerTextKind::LiveValue => snapshot.live_value_text.clone(),
+            EffectTunerTextKind::LfoState => {
+                if snapshot.lfo_enabled { "ON" } else { "OFF" }.to_string()
+            }
+            EffectTunerTextKind::Amplitude => snapshot.amplitude_text.clone(),
+            EffectTunerTextKind::Frequency => snapshot.frequency_text.clone(),
+            EffectTunerTextKind::Shape => snapshot.shape_text.to_string(),
+        };
+        *text = Text::new(value);
+
+        let color = if let Some(editable_field) = editable_field {
+            if editable_field.0 == snapshot.active_field {
+                srgb(ui_config.hint_text)
+            } else {
+                srgb(ui_config.body_text)
+            }
+        } else {
+            match text_kind {
+                EffectTunerTextKind::Pin => srgb(ui_config.hint_text),
+                EffectTunerTextKind::EffectLabel | EffectTunerTextKind::ParameterLabel => {
+                    srgb(ui_config.title_text)
+                }
+                EffectTunerTextKind::EffectState => {
+                    if snapshot.effect_enabled {
+                        srgb(ui_config.title_text)
+                    } else {
+                        srgb(ui_config.body_text)
+                    }
+                }
+                EffectTunerTextKind::LfoState => {
+                    if snapshot.lfo_enabled {
+                        srgb(ui_config.title_text)
+                    } else {
+                        srgb(ui_config.body_text)
+                    }
+                }
+                EffectTunerTextKind::LiveValue => srgb(ui_config.title_text),
+                _ => srgb(ui_config.body_text),
+            }
+        };
+        *text_color = TextColor(color);
+    }
 }
 
 pub(crate) fn load_ui_theme(asset_server: &AssetServer, ui_config: &UiConfig) -> UiTheme {
@@ -111,6 +210,8 @@ pub(crate) fn spawn_help_ui(
     scene_camera: Entity,
     ui_config: &UiConfig,
 ) {
+    let strip_font_size = (ui_config.hint_font_size - 1.0).max(12.0);
+
     commands
         .spawn((
             Node {
@@ -133,37 +234,199 @@ pub(crate) fn spawn_help_ui(
             ));
         });
 
-    let tuner_top =
-        ui_config.hint_top + ui_config.hint_font_size + ui_config.hint_padding_y * 2.0 + 14.0;
     commands
         .spawn((
             Node {
                 position_type: PositionType::Absolute,
-                top: px(tuner_top),
                 left: px(ui_config.hint_left),
-                max_width: px(ui_config.body_max_width + 150.0),
-                padding: UiRect::axes(px(ui_config.hint_padding_x), px(ui_config.hint_padding_y)),
+                right: px(ui_config.hint_left),
+                bottom: px(ui_config.hint_top),
+                justify_content: JustifyContent::Center,
                 ..default()
             },
-            BackgroundColor(srgba(ui_config.panel_background)),
-            BorderRadius::all(px(16.0)),
             GlobalZIndex(21),
             Visibility::Hidden,
             EffectTunerOverlay,
             UiTargetCamera(scene_camera),
         ))
         .with_children(|parent| {
-            parent.spawn((
-                Text::new(""),
-                ui_theme.text_font((ui_config.body_font_size - 1.0).max(12.0)),
-                TextColor(srgb(ui_config.body_text)),
-                TextLayout::new_with_justify(Justify::Left),
-                Node {
-                    max_width: px(ui_config.body_max_width + 150.0),
-                    ..default()
-                },
-                EffectTunerOverlayText,
-            ));
+            parent
+                .spawn((
+                    Node {
+                        flex_direction: FlexDirection::Row,
+                        align_items: AlignItems::Center,
+                        column_gap: px(10.0),
+                        padding: UiRect::axes(
+                            px(ui_config.hint_padding_x),
+                            px((ui_config.hint_padding_y - 1.0).max(4.0)),
+                        ),
+                        ..default()
+                    },
+                    BackgroundColor(srgba(ui_config.panel_background)),
+                    BorderRadius::all(px(999.0)),
+                ))
+                .with_children(|strip| {
+                    strip.spawn((
+                        Text::new("FX"),
+                        ui_theme.text_font(strip_font_size),
+                        TextColor(srgb(ui_config.body_text)),
+                    ));
+                    strip
+                        .spawn((
+                            Node {
+                                padding: UiRect::axes(px(7.0), px(3.0)),
+                                ..default()
+                            },
+                            BackgroundColor(srgba(ui_config.hint_background)),
+                            BorderRadius::all(px(999.0)),
+                            Visibility::Hidden,
+                            EffectTunerPinnedBadge,
+                        ))
+                        .with_children(|badge| {
+                            badge.spawn((
+                                Text::new("PIN"),
+                                ui_theme.text_font(strip_font_size),
+                                TextColor(srgb(ui_config.hint_text)),
+                                EffectTunerTextKind::Pin,
+                            ));
+                        });
+                    strip.spawn((
+                        Text::new(""),
+                        ui_theme.text_font(strip_font_size),
+                        TextColor(srgb(ui_config.title_text)),
+                        EffectTunerTextKind::EffectLabel,
+                    ));
+                    strip.spawn((
+                        Text::new(""),
+                        ui_theme.text_font(strip_font_size),
+                        TextColor(srgb(ui_config.body_text)),
+                        EffectTunerTextKind::EffectState,
+                    ));
+                    strip.spawn((
+                        Text::new(""),
+                        ui_theme.text_font(strip_font_size),
+                        TextColor(srgb(ui_config.title_text)),
+                        EffectTunerTextKind::ParameterLabel,
+                    ));
+                    strip.spawn((
+                        Text::new("val"),
+                        ui_theme.text_font(strip_font_size),
+                        TextColor(srgb(ui_config.body_text)),
+                    ));
+                    strip
+                        .spawn((
+                            Node {
+                                padding: UiRect::axes(px(8.0), px(4.0)),
+                                ..default()
+                            },
+                            BackgroundColor(srgba(ui_config.overlay_background)),
+                            BorderRadius::all(px(999.0)),
+                            EffectTunerEditableField(EffectOverlayField::Value),
+                        ))
+                        .with_children(|field| {
+                            field.spawn((
+                                Text::new(""),
+                                ui_theme.text_font(strip_font_size),
+                                TextColor(srgb(ui_config.body_text)),
+                                EffectTunerTextKind::Value,
+                                EffectTunerEditableFieldText(EffectOverlayField::Value),
+                            ));
+                        });
+                    strip.spawn((
+                        Text::new("live"),
+                        ui_theme.text_font(strip_font_size),
+                        TextColor(srgb(ui_config.body_text)),
+                    ));
+                    strip.spawn((
+                        Text::new(""),
+                        ui_theme.text_font(strip_font_size),
+                        TextColor(srgb(ui_config.title_text)),
+                        EffectTunerTextKind::LiveValue,
+                    ));
+                    strip.spawn((
+                        Text::new("lfo"),
+                        ui_theme.text_font(strip_font_size),
+                        TextColor(srgb(ui_config.body_text)),
+                    ));
+                    strip.spawn((
+                        Text::new(""),
+                        ui_theme.text_font(strip_font_size),
+                        TextColor(srgb(ui_config.body_text)),
+                        EffectTunerTextKind::LfoState,
+                    ));
+                    strip.spawn((
+                        Text::new("amp"),
+                        ui_theme.text_font(strip_font_size),
+                        TextColor(srgb(ui_config.body_text)),
+                    ));
+                    strip
+                        .spawn((
+                            Node {
+                                padding: UiRect::axes(px(8.0), px(4.0)),
+                                ..default()
+                            },
+                            BackgroundColor(srgba(ui_config.overlay_background)),
+                            BorderRadius::all(px(999.0)),
+                            EffectTunerEditableField(EffectOverlayField::LfoAmplitude),
+                        ))
+                        .with_children(|field| {
+                            field.spawn((
+                                Text::new(""),
+                                ui_theme.text_font(strip_font_size),
+                                TextColor(srgb(ui_config.body_text)),
+                                EffectTunerTextKind::Amplitude,
+                                EffectTunerEditableFieldText(EffectOverlayField::LfoAmplitude),
+                            ));
+                        });
+                    strip.spawn((
+                        Text::new("freq"),
+                        ui_theme.text_font(strip_font_size),
+                        TextColor(srgb(ui_config.body_text)),
+                    ));
+                    strip
+                        .spawn((
+                            Node {
+                                padding: UiRect::axes(px(8.0), px(4.0)),
+                                ..default()
+                            },
+                            BackgroundColor(srgba(ui_config.overlay_background)),
+                            BorderRadius::all(px(999.0)),
+                            EffectTunerEditableField(EffectOverlayField::LfoFrequency),
+                        ))
+                        .with_children(|field| {
+                            field.spawn((
+                                Text::new(""),
+                                ui_theme.text_font(strip_font_size),
+                                TextColor(srgb(ui_config.body_text)),
+                                EffectTunerTextKind::Frequency,
+                                EffectTunerEditableFieldText(EffectOverlayField::LfoFrequency),
+                            ));
+                        });
+                    strip.spawn((
+                        Text::new("shape"),
+                        ui_theme.text_font(strip_font_size),
+                        TextColor(srgb(ui_config.body_text)),
+                    ));
+                    strip
+                        .spawn((
+                            Node {
+                                padding: UiRect::axes(px(8.0), px(4.0)),
+                                ..default()
+                            },
+                            BackgroundColor(srgba(ui_config.overlay_background)),
+                            BorderRadius::all(px(999.0)),
+                            EffectTunerEditableField(EffectOverlayField::LfoShape),
+                        ))
+                        .with_children(|field| {
+                            field.spawn((
+                                Text::new(""),
+                                ui_theme.text_font(strip_font_size),
+                                TextColor(srgb(ui_config.body_text)),
+                                EffectTunerTextKind::Shape,
+                                EffectTunerEditableFieldText(EffectOverlayField::LfoShape),
+                            ));
+                        });
+                });
         });
 
     commands
@@ -221,12 +484,12 @@ pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
     format!(
         concat!(
             "F1 / H: Toggle this overlay\n",
-            "F2: Pin or unpin the FX tuner\n",
+            "F2: Pin or unpin the bottom FX strip\n",
             "Ctrl + Up / Down: Select FX parameter\n",
             "Ctrl + Left / Right: Adjust the selected FX field\n",
             "Tab: Toggle the selected effect on or off\n",
             "L: Toggle the selected parameter LFO on or off\n",
-            "M: Cycle FX tuner edit mode (value / amp / freq / shape)\n",
+            "M: Cycle which FX value is editable (value / amp / freq / shape)\n",
             "Shift: Coarse FX adjustment\n",
             "Alt: Fine FX adjustment\n",
             "Enter: Reset the selected FX field\n",
@@ -275,12 +538,12 @@ mod tests {
         let text = controls_overlay_text(UiFontSource::CarbonPlus);
 
         assert!(text.contains("F1 / H: Toggle this overlay"));
-        assert!(text.contains("F2: Pin or unpin the FX tuner"));
+        assert!(text.contains("F2: Pin or unpin the bottom FX strip"));
         assert!(text.contains("Ctrl + Up / Down: Select FX parameter"));
         assert!(text.contains("Ctrl + Left / Right: Adjust the selected FX field"));
         assert!(text.contains("Tab: Toggle the selected effect on or off"));
         assert!(text.contains("L: Toggle the selected parameter LFO on or off"));
-        assert!(text.contains("M: Cycle FX tuner edit mode (value / amp / freq / shape)"));
+        assert!(text.contains("M: Cycle which FX value is editable (value / amp / freq / shape)"));
         assert!(text.contains("Shift + Enter: Reset all FX settings and LFOs"));
         assert!(text.contains("Space: Spawn polyhedra (hold to repeat)"));
         assert!(text.contains("Backspace: Stop camera rotation momentum"));

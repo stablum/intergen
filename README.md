@@ -11,7 +11,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - selectable child shape type
 - adjustable child scale ratio
 - toggleable in-app keybinding overlay
-- compact runtime FX tuner for effect toggles, per-parameter LFOs, and numeric effect parameters
+- compact bottom FX strip for effect toggles, per-parameter LFOs, and numeric effect parameters
 - built-in screenshot capture for manual and scripted verification
 - containment rejection so obviously hidden fully-inside spawns are skipped
 - camera-output shader stack with hard-wrap wavefolder, lens distortion, gaussian blur, bloom, and edge detection
@@ -214,3 +214,4 @@ Not implemented yet:
 - hardware ray tracing
 - more advanced visibility heuristics than simple containment rejection
 - export / save workflows
+

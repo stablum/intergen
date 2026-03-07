@@ -32,6 +32,16 @@ impl EffectGroup {
         }
     }
 
+    fn compact_label(self) -> &'static str {
+        match self {
+            Self::ColorWavefolder => "wavefolder",
+            Self::LensDistortion => "lens",
+            Self::GaussianBlur => "blur",
+            Self::Bloom => "bloom",
+            Self::EdgeDetection => "edge",
+        }
+    }
+
     fn is_enabled(self, effects: &EffectsConfig) -> bool {
         match self {
             Self::ColorWavefolder => effects.color_wavefolder.enabled,
@@ -139,6 +149,35 @@ impl EffectNumericParameter {
             Self::EdgeColorR => "edge_detection.color.r",
             Self::EdgeColorG => "edge_detection.color.g",
             Self::EdgeColorB => "edge_detection.color.b",
+        }
+    }
+
+    pub(crate) fn short_label(self) -> &'static str {
+        match self {
+            Self::WavefolderGain => "gain",
+            Self::WavefolderModulus => "mod",
+            Self::LensStrength => "strength",
+            Self::LensRadialK2 => "k2",
+            Self::LensRadialK3 => "k3",
+            Self::LensCenterX => "center.x",
+            Self::LensCenterY => "center.y",
+            Self::LensScaleX => "scale.x",
+            Self::LensScaleY => "scale.y",
+            Self::LensTangentialX => "tan.x",
+            Self::LensTangentialY => "tan.y",
+            Self::LensZoom => "zoom",
+            Self::LensChromaticAberration => "ca",
+            Self::GaussianBlurSigma => "sigma",
+            Self::GaussianBlurRadius => "radius",
+            Self::BloomThreshold => "threshold",
+            Self::BloomIntensity => "intensity",
+            Self::BloomRadius => "radius",
+            Self::EdgeStrength => "strength",
+            Self::EdgeThreshold => "threshold",
+            Self::EdgeMix => "mix",
+            Self::EdgeColorR => "color.r",
+            Self::EdgeColorG => "color.g",
+            Self::EdgeColorB => "color.b",
         }
     }
 
@@ -357,6 +396,38 @@ impl EffectEditMode {
             Self::LfoShape => Self::Value,
         }
     }
+
+    fn overlay_field(self) -> EffectOverlayField {
+        match self {
+            Self::Value => EffectOverlayField::Value,
+            Self::LfoAmplitude => EffectOverlayField::LfoAmplitude,
+            Self::LfoFrequency => EffectOverlayField::LfoFrequency,
+            Self::LfoShape => EffectOverlayField::LfoShape,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum EffectOverlayField {
+    Value,
+    LfoAmplitude,
+    LfoFrequency,
+    LfoShape,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerOverlaySnapshot {
+    pub(crate) pinned: bool,
+    pub(crate) effect_label: &'static str,
+    pub(crate) effect_enabled: bool,
+    pub(crate) parameter_label: &'static str,
+    pub(crate) value_text: String,
+    pub(crate) live_value_text: String,
+    pub(crate) lfo_enabled: bool,
+    pub(crate) amplitude_text: String,
+    pub(crate) frequency_text: String,
+    pub(crate) shape_text: &'static str,
+    pub(crate) active_field: EffectOverlayField,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -493,35 +564,25 @@ impl EffectTunerState {
         effects
     }
 
-    pub(crate) fn overlay_text(&self, now_secs: f32) -> String {
+    pub(crate) fn overlay_snapshot(&self, now_secs: f32) -> EffectTunerOverlaySnapshot {
         let parameter = self.selected_parameter();
         let effect = self.selected_effect();
         let lfo = self.selected_lfo();
         let live_effects = self.evaluated_effects(now_secs);
-        format!(
-            concat!(
-                "FX Tuner{}  {} [{}]\n",
-                "{} = {}  live {}  default {}\n",
-                "LFO {}  amp {:.3}  freq {:.3}Hz  shape {}  edit {}\n",
-                "tab effect  l lfo  m edit  ctrl+arrows adjust/select  shift coarse  alt fine  enter reset  shift+enter all"
-            ),
-            if self.pinned { " [Pinned]" } else { "" },
-            effect.label(),
-            if effect.is_enabled(&self.current) {
-                "On"
-            } else {
-                "Off"
-            },
-            parameter.label(),
-            parameter.display_value(&self.current),
-            parameter.display_value(&live_effects),
-            parameter.display_value(&self.defaults),
-            if lfo.enabled { "On" } else { "Off" },
-            lfo.amplitude,
-            lfo.frequency_hz,
-            lfo.shape.label(),
-            self.edit_mode.label(),
-        )
+
+        EffectTunerOverlaySnapshot {
+            pinned: self.pinned,
+            effect_label: effect.compact_label(),
+            effect_enabled: effect.is_enabled(&self.current),
+            parameter_label: parameter.short_label(),
+            value_text: parameter.display_value(&self.current),
+            live_value_text: parameter.display_value(&live_effects),
+            lfo_enabled: lfo.enabled,
+            amplitude_text: format!("{:.3}", lfo.amplitude),
+            frequency_text: format!("{:.3}Hz", lfo.frequency_hz),
+            shape_text: lfo.shape.label(),
+            active_field: self.edit_mode.overlay_field(),
+        }
     }
 
     fn note_interaction(&mut self, now_secs: f32) {
@@ -813,7 +874,7 @@ fn modifier_pressed(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool 
 mod tests {
     use super::{
         DEFAULT_LFO_FREQUENCY_HZ, EffectEditMode, EffectGroup, EffectNumericParameter,
-        EffectTunerState, LfoShape,
+        EffectOverlayField, EffectTunerState, LfoShape,
     };
     use crate::config::EffectsConfig;
 
@@ -850,6 +911,21 @@ mod tests {
         let evaluated = effect_tuner.evaluated_effects(0.25);
 
         assert!((evaluated.color_wavefolder.gain - 2.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn overlay_snapshot_uses_compact_labels_and_active_field() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        effect_tuner.selected_index = 3;
+        effect_tuner.edit_mode = EffectEditMode::LfoShape;
+        effect_tuner.pinned = true;
+
+        let snapshot = effect_tuner.overlay_snapshot(0.0);
+
+        assert_eq!(snapshot.effect_label, "lens");
+        assert_eq!(snapshot.parameter_label, "k2");
+        assert_eq!(snapshot.active_field, EffectOverlayField::LfoShape);
+        assert!(snapshot.pinned);
     }
 
     #[test]
