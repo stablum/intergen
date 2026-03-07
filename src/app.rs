@@ -1,6 +1,9 @@
 use bevy::prelude::*;
 use bevy::window::PresentMode;
 
+use crate::blender_export::{
+    AutomatedBlendExport, automated_blend_export_system, blender_export_input_system,
+};
 use crate::camera::{CameraRig, camera_input_system, camera_motion_system};
 use crate::capture::{
     AutomatedCapture, LaunchConfig, ScreenshotCounter, automated_capture_system,
@@ -64,6 +67,7 @@ pub fn run() {
             (
                 toggle_help_overlay_system,
                 preset_input_system,
+                blender_export_input_system,
                 effect_tuner_input_system,
                 camera_input_system,
                 camera_motion_system,
@@ -76,13 +80,24 @@ pub fn run() {
         )
         .add_systems(
             Update,
-            (manual_screenshot_input_system, automated_capture_system),
+            (
+                manual_screenshot_input_system,
+                automated_capture_system,
+                automated_blend_export_system,
+            ),
         );
 
     if let Some(path) = launch_config.capture_path {
         app.insert_resource(AutomatedCapture::new(
             path,
             launch_config.capture_delay_frames,
+        ));
+    }
+
+    if let Some(path) = launch_config.blend_export_path {
+        app.insert_resource(AutomatedBlendExport::new(
+            path,
+            launch_config.blend_export_delay_frames,
         ));
     }
 

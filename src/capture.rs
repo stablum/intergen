@@ -12,6 +12,8 @@ use crate::config::AppConfig;
 pub(crate) struct LaunchConfig {
     pub(crate) capture_path: Option<PathBuf>,
     pub(crate) capture_delay_frames: u32,
+    pub(crate) blend_export_path: Option<PathBuf>,
+    pub(crate) blend_export_delay_frames: u32,
 }
 
 impl LaunchConfig {
@@ -26,6 +28,8 @@ fn parse_launch_config(
 ) -> Result<LaunchConfig, String> {
     let mut capture_path = None;
     let mut capture_delay_frames = default_capture_delay_frames;
+    let mut blend_export_path = None;
+    let mut blend_export_delay_frames = default_capture_delay_frames;
     let mut args = args.into_iter();
 
     while let Some(arg) = args.next() {
@@ -45,9 +49,24 @@ fn parse_launch_config(
                     format!("Invalid frame count for --capture-delay-frames: {frame_count}")
                 })?;
             }
+            "--export-blend" => {
+                let Some(path) = args.next() else {
+                    return Err("Missing path after --export-blend".to_string());
+                };
+                blend_export_path = Some(PathBuf::from(path));
+            }
+            "--export-blend-delay-frames" => {
+                let Some(frame_count) = args.next() else {
+                    return Err("Missing frame count after --export-blend-delay-frames".to_string());
+                };
+                let frame_count = frame_count.to_string_lossy();
+                blend_export_delay_frames = frame_count.parse::<u32>().map_err(|_| {
+                    format!("Invalid frame count for --export-blend-delay-frames: {frame_count}")
+                })?;
+            }
             "--help" | "-h" => {
                 return Err(
-                    "Usage: cargo run -- [--capture <output.png>] [--capture-delay-frames <n>]\nF12 saves a screenshot during normal interactive runs."
+                    "Usage: cargo run -- [--capture <output.png>] [--capture-delay-frames <n>] [--export-blend <output.blend>] [--export-blend-delay-frames <n>]\nF12 saves a screenshot during normal interactive runs. F4 exports a Blender .blend during normal interactive runs."
                         .to_string(),
                 );
             }
@@ -60,6 +79,8 @@ fn parse_launch_config(
     Ok(LaunchConfig {
         capture_path,
         capture_delay_frames,
+        blend_export_path,
+        blend_export_delay_frames,
     })
 }
 
@@ -181,6 +202,11 @@ mod tests {
             config.capture_delay_frames,
             CaptureConfig::default().default_capture_delay_frames
         );
+        assert_eq!(config.blend_export_path, None);
+        assert_eq!(
+            config.blend_export_delay_frames,
+            CaptureConfig::default().default_capture_delay_frames
+        );
     }
 
     #[test]
@@ -195,6 +221,28 @@ mod tests {
         .expect("capture delay should parse");
 
         assert_eq!(config.capture_delay_frames, 64);
+        assert_eq!(config.capture_path, None);
+        assert_eq!(config.blend_export_path, None);
+    }
+
+    #[test]
+    fn launch_config_parses_blend_export_path_and_delay() {
+        let config = parse_launch_config(
+            [
+                OsString::from("--export-blend"),
+                OsString::from("blend-exports/test.blend"),
+                OsString::from("--export-blend-delay-frames"),
+                OsString::from("96"),
+            ],
+            CaptureConfig::default().default_capture_delay_frames,
+        )
+        .expect("blend export args should parse");
+
+        assert_eq!(
+            config.blend_export_path.as_deref(),
+            Some(Path::new("blend-exports/test.blend"))
+        );
+        assert_eq!(config.blend_export_delay_frames, 96);
         assert_eq!(config.capture_path, None);
     }
 }

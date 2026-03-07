@@ -170,7 +170,7 @@ pub(crate) fn setup_scene(
     });
 
     println!(
-        "Controls: F1/H help, F2 FX strip, F3 scene presets, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset"
+        "Controls: F1/H help, F2 FX strip, F3 scene presets, F4 export Blender .blend, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset"
     );
     println!(
         "FX strip: Ctrl+Up/Down selects a parameter, Ctrl+Left/Right adjusts the highlighted field, Tab toggles the effect, L toggles the selected parameter LFO, M cycles the highlighted value/amp/freq/shape field, Shift is coarse, Alt is fine, Enter resets the field, Shift+Enter resets all FX settings and LFOs."

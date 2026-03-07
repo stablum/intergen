@@ -610,6 +610,7 @@ pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
             "F1 / H: Toggle this overlay\n",
             "F2: Pin or unpin the bottom FX strip\n",
             "F3: Toggle scene preset mode\n",
+            "F4: Export the current scene as a Blender .blend\n",
             "Ctrl + Up / Down: Select FX parameter\n",
             "Ctrl + Left / Right: Adjust the selected FX field\n",
             "Tab: Toggle the selected effect on or off\n",
@@ -666,6 +667,7 @@ mod tests {
         assert!(text.contains("F1 / H: Toggle this overlay"));
         assert!(text.contains("F2: Pin or unpin the bottom FX strip"));
         assert!(text.contains("F3: Toggle scene preset mode"));
+        assert!(text.contains("F4: Export the current scene as a Blender .blend"));
         assert!(text.contains("Ctrl + Up / Down: Select FX parameter"));
         assert!(text.contains("Ctrl + Left / Right: Adjust the selected FX field"));
         assert!(text.contains("Tab: Toggle the selected effect on or off"));

@@ -13,6 +13,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - toggleable in-app keybinding overlay
 - compact bottom FX strip for effect toggles, per-parameter LFOs, and numeric effect parameters
 - built-in screenshot capture for manual and scripted verification
+- Blender `.blend` export with compositor reconstruction and embedded effect/LFO metadata
 - containment rejection so obviously hidden fully-inside spawns are skipped
 - camera-output shader stack with hard-wrap wavefolder, lens distortion, gaussian blur, bloom, and edge detection
 
@@ -21,6 +22,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - Windows
 - Rust stable MSVC toolchain
 - Visual Studio 2022 Build Tools with the C++ workload
+- Blender 5.x in `PATH` if you want `.blend` export (optional for normal app use)
 
 ## Font
 
@@ -146,6 +148,27 @@ Current scene preset contents:
 - camera position, distance, and momentum
 - current polyhedron tree, selected child shape, scale ratio, twist, and vertex offset
 - live camera-output effect values plus all per-parameter LFO settings
+## Blender Export
+
+Press `F4` during a normal interactive run to write a timestamped Blender scene under `blend-exports/`.
+
+What the `.blend` currently includes:
+- the full polyhedron scene as real Blender mesh objects
+- the current camera, directional light, point light, and world background
+- per-object materials with transparency, metallic, roughness, and reflectance-derived specular
+- compositor recreation for lens distortion, hard-wrap wavefolder, gaussian blur, bloom, and edge detection
+- embedded `Text` datablocks with the full Intergen export snapshot, evaluated effect values, and all effect/LFO runtime settings
+
+Current limitation:
+- LFOs are preserved inside the `.blend` as metadata, but they are not yet converted into native Blender animation drivers or node animation
+- Blender's built-in compositor does not expose every Intergen lens-distortion term directly, so the exported compositor is a best-effort approximation while the full original parameters remain in the embedded metadata
+
+For automated export-and-exit from the command line:
+
+```powershell
+cargo run -- --export-blend blend-exports\check.blend --export-blend-delay-frames 120
+```
+
 ## Run
 
 ```powershell
@@ -198,6 +221,7 @@ cargo test-plain
 - `Alt`: fine FX adjustment modifier
 - `Enter`: reset the active FX field
 - `Shift + Enter`: reset all FX settings and LFOs to their startup defaults
+- `F4`: export the current scene to `blend-exports/` as a Blender `.blend`
 - `F12`: save a screenshot to `screenshots/`
 - `R`: reset the scene with the currently selected polyhedron as the new root
 - `Space`: spawn child polyhedra, or hold to keep spawning
@@ -237,7 +261,8 @@ Not implemented yet:
 - mouse controls
 - hardware ray tracing
 - more advanced visibility heuristics than simple containment rejection
-- export workflows beyond the built-in scene preset system
+- automatic conversion of effect LFOs into native Blender animation/drivers
+
 
 
 

@@ -1,4 +1,5 @@
 mod app;
+mod blender_export;
 mod camera;
 mod capture;
 mod config;
