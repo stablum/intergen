@@ -449,16 +449,6 @@ pub(crate) struct EffectsConfig {
     pub(crate) edge_detection: EdgeDetectionConfig,
 }
 
-impl EffectsConfig {
-    pub(crate) fn any_enabled(&self) -> bool {
-        self.color_wavefolder.enabled
-            || self.lens_distortion.enabled
-            || self.gaussian_blur.enabled
-            || self.bloom.enabled
-            || self.edge_detection.enabled
-    }
-}
-
 impl Default for EffectsConfig {
     fn default() -> Self {
         Self {

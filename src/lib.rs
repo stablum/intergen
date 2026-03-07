@@ -2,6 +2,7 @@ mod app;
 mod camera;
 mod capture;
 mod config;
+mod effect_tuner;
 mod effects;
 mod generation;
 mod polyhedra;

@@ -3,6 +3,7 @@ use std::path::Path;
 use bevy::prelude::*;
 
 use crate::config::{UiConfig, srgb, srgba};
+use crate::effect_tuner::EffectTunerState;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum UiFontSource {
@@ -34,6 +35,12 @@ pub(crate) struct HelpOverlayState {
 #[derive(Component)]
 pub(crate) struct HelpOverlay;
 
+#[derive(Component)]
+pub(crate) struct EffectTunerOverlay;
+
+#[derive(Component)]
+pub(crate) struct EffectTunerOverlayText;
+
 pub(crate) fn toggle_help_overlay_system(
     keys: Res<ButtonInput<KeyCode>>,
     mut help_overlay: ResMut<HelpOverlayState>,
@@ -54,6 +61,27 @@ pub(crate) fn toggle_help_overlay_system(
     } else {
         Visibility::Hidden
     };
+}
+
+pub(crate) fn update_effect_tuner_overlay_system(
+    time: Res<Time>,
+    effect_tuner: Res<EffectTunerState>,
+    mut overlay_query: Query<&mut Visibility, With<EffectTunerOverlay>>,
+    mut text_query: Query<&mut Text, With<EffectTunerOverlayText>>,
+) {
+    let Ok(mut visibility) = overlay_query.single_mut() else {
+        return;
+    };
+    let Ok(mut text) = text_query.single_mut() else {
+        return;
+    };
+
+    *visibility = if effect_tuner.is_visible(time.elapsed_secs()) {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+    *text = Text::new(effect_tuner.overlay_text());
 }
 
 pub(crate) fn load_ui_theme(asset_server: &AssetServer, ui_config: &UiConfig) -> UiTheme {
@@ -102,6 +130,39 @@ pub(crate) fn spawn_help_ui(
                 Text::new("F1 / H: controls"),
                 ui_theme.text_font(ui_config.hint_font_size),
                 TextColor(srgb(ui_config.hint_text)),
+            ));
+        });
+
+    let tuner_top =
+        ui_config.hint_top + ui_config.hint_font_size + ui_config.hint_padding_y * 2.0 + 14.0;
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                top: px(tuner_top),
+                left: px(ui_config.hint_left),
+                max_width: px(ui_config.body_max_width + 110.0),
+                padding: UiRect::axes(px(ui_config.hint_padding_x), px(ui_config.hint_padding_y)),
+                ..default()
+            },
+            BackgroundColor(srgba(ui_config.panel_background)),
+            BorderRadius::all(px(16.0)),
+            GlobalZIndex(21),
+            Visibility::Hidden,
+            EffectTunerOverlay,
+            UiTargetCamera(scene_camera),
+        ))
+        .with_children(|parent| {
+            parent.spawn((
+                Text::new(""),
+                ui_theme.text_font((ui_config.body_font_size - 1.0).max(12.0)),
+                TextColor(srgb(ui_config.body_text)),
+                TextLayout::new_with_justify(Justify::Left),
+                Node {
+                    max_width: px(ui_config.body_max_width + 110.0),
+                    ..default()
+                },
+                EffectTunerOverlayText,
             ));
         });
 
@@ -160,6 +221,13 @@ pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
     format!(
         concat!(
             "F1 / H: Toggle this overlay\n",
+            "F2: Pin or unpin the FX tuner\n",
+            "Ctrl + Up / Down: Select FX parameter\n",
+            "Ctrl + Left / Right: Adjust selected FX parameter\n",
+            "Shift: Coarse FX adjustment\n",
+            "Alt: Fine FX adjustment\n",
+            "Enter: Reset selected FX parameter\n",
+            "Shift + Enter: Reset all FX parameters\n",
             "Arrow Up / Down: Pitch camera\n",
             "Arrow Left / Right: Yaw camera\n",
             "Q / E: Roll camera\n",
@@ -204,6 +272,10 @@ mod tests {
         let text = controls_overlay_text(UiFontSource::CarbonPlus);
 
         assert!(text.contains("F1 / H: Toggle this overlay"));
+        assert!(text.contains("F2: Pin or unpin the FX tuner"));
+        assert!(text.contains("Ctrl + Up / Down: Select FX parameter"));
+        assert!(text.contains("Ctrl + Left / Right: Adjust selected FX parameter"));
+        assert!(text.contains("Shift + Enter: Reset all FX parameters"));
         assert!(text.contains("Space: Spawn polyhedra (hold to repeat)"));
         assert!(text.contains("Backspace: Stop camera rotation momentum"));
         assert!(text.contains("R: Reset to the selected polyhedron as root"));

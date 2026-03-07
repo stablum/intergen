@@ -102,18 +102,17 @@ pub(crate) fn setup_scene(
     );
 
     let camera_translation = camera_rig.orientation * Vec3::new(0.0, 0.0, camera_rig.distance);
-    let mut scene_camera = commands.spawn((
-        Camera3d::default(),
-        Tonemapping::AcesFitted,
-        Transform::from_translation(camera_translation)
-            .looking_at(Vec3::ZERO, camera_rig.orientation * Vec3::Y),
-        SceneCamera,
-        IsDefaultUiCamera,
-    ));
-    if app_config.effects.any_enabled() {
-        scene_camera.insert(camera_effects_from_config(&app_config.effects));
-    }
-    let scene_camera = scene_camera.id();
+    let scene_camera = commands
+        .spawn((
+            Camera3d::default(),
+            Tonemapping::AcesFitted,
+            Transform::from_translation(camera_translation)
+                .looking_at(Vec3::ZERO, camera_rig.orientation * Vec3::Y),
+            SceneCamera,
+            IsDefaultUiCamera,
+            camera_effects_from_config(&app_config.effects),
+        ))
+        .id();
 
     commands.spawn((
         DirectionalLight {
@@ -163,7 +162,10 @@ pub(crate) fn setup_scene(
     });
 
     println!(
-        "Controls: F1/H help, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset"
+        "Controls: F1/H help, F2 FX tuner, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset"
+    );
+    println!(
+        "FX tuner: Ctrl+Up/Down selects a parameter, Ctrl+Left/Right adjusts it, Shift is coarse, Alt is fine, Enter resets the selection, Shift+Enter resets all effect values."
     );
     println!(
         "Selected child shape: {:?}, ratio: {:.2}",

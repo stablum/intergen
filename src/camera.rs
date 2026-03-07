@@ -37,17 +37,18 @@ pub(crate) fn camera_input_system(
 
     let dt = time.delta_secs();
     let torque_step = app_config.camera.rotation_accel * dt;
+    let ctrl_pressed = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
 
-    if keys.pressed(KeyCode::ArrowUp) {
+    if !ctrl_pressed && keys.pressed(KeyCode::ArrowUp) {
         camera_rig.angular_velocity.x += torque_step;
     }
-    if keys.pressed(KeyCode::ArrowDown) {
+    if !ctrl_pressed && keys.pressed(KeyCode::ArrowDown) {
         camera_rig.angular_velocity.x -= torque_step;
     }
-    if keys.pressed(KeyCode::ArrowLeft) {
+    if !ctrl_pressed && keys.pressed(KeyCode::ArrowLeft) {
         camera_rig.angular_velocity.y += torque_step;
     }
-    if keys.pressed(KeyCode::ArrowRight) {
+    if !ctrl_pressed && keys.pressed(KeyCode::ArrowRight) {
         camera_rig.angular_velocity.y -= torque_step;
     }
     if keys.pressed(KeyCode::KeyQ) {
