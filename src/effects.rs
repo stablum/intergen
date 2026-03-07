@@ -45,6 +45,7 @@ impl Plugin for EffectsPlugin {
         };
 
         render_app.add_systems(RenderStartup, init_camera_effects_pipeline);
+
         render_app
             .add_render_graph_node::<ViewNodeRunner<CameraEffectsNode>>(Core3d, CameraEffectsLabel)
             .add_render_graph_edges(
@@ -315,7 +316,7 @@ mod tests {
         });
 
         assert_eq!(settings.wavefolder, Vec4::new(1.0, 0.0, 0.0001, 0.0));
-        assert_eq!(settings.gaussian_blur, Vec4::new(1.0, 0.0001, 3.0, 0.0));
+        assert_eq!(settings.gaussian_blur, Vec4::new(1.0, 0.0001, 16.0, 0.0));
         assert_eq!(settings.edge_detection, Vec4::new(1.0, 0.0, 0.0, 1.0));
         assert_eq!(settings.edge_color, Vec4::new(1.0, 0.0, 0.4, 1.0));
     }

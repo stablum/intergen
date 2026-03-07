@@ -72,7 +72,7 @@ Camera-output color wavefolder uses these `effects.color_wavefolder` settings:
 Camera-output gaussian blur uses these `effects.gaussian_blur` settings:
 - `enabled`: turns blur on or off
 - `sigma`: controls the gaussian falloff
-- `radius_pixels`: blur radius in pixels, clamped to `3` in the current single-pass shader
+- `radius_pixels`: blur radius in pixels, clamped to `16` in the current single-pass shader
 
 Camera-output edge detection uses these `effects.edge_detection` settings:
 - `enabled`: turns the edge pass on or off

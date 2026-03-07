@@ -1,6 +1,6 @@
 #import bevy_core_pipeline::fullscreen_vertex_shader::FullscreenVertexOutput
 
-const MAX_BLUR_RADIUS_PIXELS: i32 = 3;
+const MAX_BLUR_RADIUS_PIXELS: i32 = 16;
 
 @group(0) @binding(0) var screen_texture: texture_2d<f32>;
 @group(0) @binding(1) var screen_sampler: sampler;
@@ -35,8 +35,8 @@ fn processed_source_color(uv: vec2<f32>) -> vec4<f32> {
     return vec4(hard_wrap_wavefold_color(source.rgb), source.a);
 }
 
-fn gaussian_weight(offset: vec2<f32>, sigma: f32) -> f32 {
-    let sigma = max(sigma, 0.0001);
+fn gaussian_weight(offset: vec2<f32>, sigma_value: f32) -> f32 {
+    let sigma = max(sigma_value, 0.0001);
     let sigma_sq = sigma * sigma;
     return exp(-dot(offset, offset) / (2.0 * sigma_sq));
 }

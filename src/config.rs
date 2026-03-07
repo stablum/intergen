@@ -475,7 +475,7 @@ impl GaussianBlurConfig {
     }
 
     pub(crate) fn radius_pixels_clamped(&self) -> u32 {
-        self.radius_pixels.min(3)
+        self.radius_pixels.min(16)
     }
 }
 
@@ -687,7 +687,7 @@ mod tests {
 
         assert!(config.effects.gaussian_blur.enabled);
         assert_eq!(config.effects.gaussian_blur.sigma_clamped(), 2.75);
-        assert_eq!(config.effects.gaussian_blur.radius_pixels_clamped(), 3);
+        assert_eq!(config.effects.gaussian_blur.radius_pixels_clamped(), 7);
     }
 
     #[test]
