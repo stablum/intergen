@@ -23,7 +23,7 @@ pub(crate) fn generation_input_system(
     control_page: Res<ControlPageState>,
     mut scene: GenerationSceneAccess,
 ) {
-    if control_page.blocks_scene_input() {
+    if control_page.captures_scene_input() {
         return;
     }
 

@@ -7,6 +7,13 @@ pub(crate) enum EffectEditMode {
 }
 
 impl EffectEditMode {
+    const ALL: [Self; 4] = [
+        Self::Value,
+        Self::LfoAmplitude,
+        Self::LfoFrequency,
+        Self::LfoShape,
+    ];
+
     pub(crate) fn label(self) -> &'static str {
         match self {
             Self::Value => "value",
@@ -16,13 +23,10 @@ impl EffectEditMode {
         }
     }
 
-    pub(crate) fn next(self) -> Self {
-        match self {
-            Self::Value => Self::LfoAmplitude,
-            Self::LfoAmplitude => Self::LfoFrequency,
-            Self::LfoFrequency => Self::LfoShape,
-            Self::LfoShape => Self::Value,
-        }
+    pub(crate) fn step(self, direction: isize) -> Self {
+        let current_index = Self::ALL.iter().position(|mode| *mode == self).unwrap_or(0) as isize;
+        let next_index = (current_index + direction).rem_euclid(Self::ALL.len() as isize) as usize;
+        Self::ALL[next_index]
     }
 
     pub(crate) fn overlay_field(self) -> EffectOverlayField {
@@ -41,4 +45,10 @@ pub(crate) enum EffectOverlayField {
     LfoAmplitude,
     LfoFrequency,
     LfoShape,
+}
+
+impl EffectOverlayField {
+    pub(crate) fn accepts_numeric_entry(self) -> bool {
+        !matches!(self, Self::LfoShape)
+    }
 }

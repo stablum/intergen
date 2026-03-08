@@ -337,7 +337,7 @@ pub(crate) fn setup_scene(
         "Controls: F1/H help, F2 FX page, F3 scene preset page, Esc closes the active control page, F4 export Blender .blend, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to spawn, G cycles spawn mode, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset, hold V/B to adjust spawn exclusion probability, N reset spawn exclusion"
     );
     println!(
-        "FX strip: Ctrl+Up/Down selects a parameter, Ctrl+Left/Right adjusts the highlighted field, Tab toggles the effect, L toggles the selected parameter LFO, M cycles the highlighted value/amp/freq/shape field, Shift is coarse, Alt is fine, Enter resets the field, Shift+Enter resets all FX settings and LFOs."
+        "FX page: Ctrl+Up/Down selects a parameter, Left/Right or Tab/Shift+Tab switch the active field, Up/Down adjust the active field, Space toggles the effect, L toggles the selected parameter LFO, typing a number sets the active numeric field, Backspace erases typed FX input, Shift is coarse, Alt is fine, Enter resets the field, Shift+Enter resets all FX settings and LFOs."
     );
     println!(
         "Selected child shape: {:?}, ratio: {:.2}",

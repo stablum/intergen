@@ -10,8 +10,8 @@ pub(crate) enum ControlPage {
 }
 
 impl ControlPage {
-    fn blocks_scene_input(self) -> bool {
-        matches!(self, Self::ScenePresets)
+    fn captures_keyboard_focus(self) -> bool {
+        true
     }
 
     fn closed_message(self) -> &'static str {
@@ -28,17 +28,25 @@ pub(crate) struct ControlPageState {
 }
 
 impl ControlPageState {
-    pub(crate) fn is_active(&self, page: ControlPage) -> bool {
-        self.active_page == Some(page)
-    }
-
-    pub(crate) fn allows_effect_tuner_input(&self) -> bool {
-        self.active_page.is_none() || self.is_active(ControlPage::EffectTuner)
-    }
-
-    pub(crate) fn blocks_scene_input(&self) -> bool {
+    pub(crate) fn active_page(&self) -> Option<ControlPage> {
         self.active_page
-            .is_some_and(ControlPage::blocks_scene_input)
+    }
+
+    pub(crate) fn is_active(&self, page: ControlPage) -> bool {
+        self.active_page() == Some(page)
+    }
+
+    pub(crate) fn focused_page(&self) -> Option<ControlPage> {
+        self.active_page()
+            .filter(|page| page.captures_keyboard_focus())
+    }
+
+    pub(crate) fn page_has_focus(&self, page: ControlPage) -> bool {
+        self.focused_page() == Some(page)
+    }
+
+    pub(crate) fn captures_scene_input(&self) -> bool {
+        self.focused_page().is_some()
     }
 
     fn open_page(&mut self, page: ControlPage) -> Option<ControlPage> {
@@ -137,15 +145,21 @@ mod tests {
     }
 
     #[test]
-    fn preset_page_blocks_scene_input_but_effect_tuner_page_does_not() {
+    fn active_page_is_the_focused_page() {
         let mut state = ControlPageState::default();
 
+        assert_eq!(state.active_page(), None);
+        assert_eq!(state.focused_page(), None);
+        assert!(!state.captures_scene_input());
+
         state.open_page(ControlPage::EffectTuner);
-        assert!(state.allows_effect_tuner_input());
-        assert!(!state.blocks_scene_input());
+        assert_eq!(state.active_page(), Some(ControlPage::EffectTuner));
+        assert!(state.page_has_focus(ControlPage::EffectTuner));
+        assert!(state.captures_scene_input());
 
         state.open_page(ControlPage::ScenePresets);
-        assert!(!state.allows_effect_tuner_input());
-        assert!(state.blocks_scene_input());
+        assert_eq!(state.focused_page(), Some(ControlPage::ScenePresets));
+        assert!(state.page_has_focus(ControlPage::ScenePresets));
+        assert!(state.captures_scene_input());
     }
 }

@@ -409,7 +409,7 @@ pub(crate) fn blender_export_input_system(
     control_page: Res<ControlPageState>,
     scene: SceneSnapshotAccess,
 ) {
-    if control_page.blocks_scene_input() || !keys.just_pressed(KeyCode::F4) {
+    if control_page.captures_scene_input() || !keys.just_pressed(KeyCode::F4) {
         return;
     }
 

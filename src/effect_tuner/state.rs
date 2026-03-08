@@ -85,6 +85,62 @@ impl RepeatHoldState {
     }
 }
 
+#[derive(Default, Clone)]
+struct NumericEntryBuffer {
+    buffer: String,
+}
+
+impl NumericEntryBuffer {
+    fn displayed_text(&self) -> Option<&str> {
+        (!self.buffer.is_empty()).then_some(self.buffer.as_str())
+    }
+
+    fn push(&mut self, character: char) -> bool {
+        match character {
+            '0'..='9' => {
+                self.buffer.push(character);
+                true
+            }
+            '.' => {
+                if self.buffer.contains('.') {
+                    return false;
+                }
+                if self.buffer.is_empty() {
+                    self.buffer.push('0');
+                } else if matches!(self.buffer.as_str(), "-" | "+") {
+                    self.buffer.push('0');
+                }
+                self.buffer.push('.');
+                true
+            }
+            '-' | '+' => {
+                if self.buffer.is_empty() {
+                    self.buffer.push(character);
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    }
+
+    fn backspace(&mut self) -> bool {
+        self.buffer.pop().is_some()
+    }
+
+    fn parsed_value(&self) -> Option<f32> {
+        match self.buffer.as_str() {
+            "" | "-" | "+" | "." | "-." | "+." => None,
+            value => value.parse::<f32>().ok(),
+        }
+    }
+
+    fn clear(&mut self) {
+        self.buffer.clear();
+    }
+}
+
 #[derive(Resource, Clone)]
 pub(crate) struct EffectTunerState {
     defaults: EffectsConfig,
@@ -92,6 +148,7 @@ pub(crate) struct EffectTunerState {
     lfos: Vec<ParameterLfo>,
     selected_index: usize,
     edit_mode: EffectEditMode,
+    numeric_entry: NumericEntryBuffer,
     pinned: bool,
     visible_until_secs: f32,
     select_previous_hold: RepeatHoldState,
@@ -108,6 +165,7 @@ impl EffectTunerState {
             lfos: default_lfos(),
             selected_index: 0,
             edit_mode: EffectEditMode::Value,
+            numeric_entry: NumericEntryBuffer::default(),
             pinned: false,
             visible_until_secs: 0.0,
             select_previous_hold: RepeatHoldState::default(),
@@ -123,6 +181,10 @@ impl EffectTunerState {
 
     pub(crate) fn selected_effect(&self) -> EffectGroup {
         self.selected_parameter().effect_group()
+    }
+
+    pub(crate) fn active_field(&self) -> EffectOverlayField {
+        self.edit_mode.overlay_field()
     }
 
     pub(crate) fn is_visible(&self, now_secs: f32) -> bool {
@@ -148,6 +210,7 @@ impl EffectTunerState {
         }
         self.selected_index = 0;
         self.edit_mode = EffectEditMode::Value;
+        self.clear_numeric_entry();
         self.reset_hold_states();
     }
 
@@ -182,13 +245,22 @@ impl EffectTunerState {
             effect_label: effect.compact_label(),
             effect_enabled: effect.is_enabled(&self.current),
             parameter_label: parameter.short_label(),
-            value_text: parameter.display_value(&self.current),
+            value_text: self.overlay_numeric_text(
+                EffectOverlayField::Value,
+                parameter.display_value(&self.current),
+            ),
             live_value_text: parameter.display_value(&live_effects),
             lfo_enabled: lfo.enabled,
-            amplitude_text: format!("{:.3}", lfo.amplitude),
-            frequency_text: format!("{:.3}Hz", lfo.frequency_hz),
+            amplitude_text: self.overlay_numeric_text(
+                EffectOverlayField::LfoAmplitude,
+                format!("{:.3}", lfo.amplitude),
+            ),
+            frequency_text: self.overlay_numeric_text(
+                EffectOverlayField::LfoFrequency,
+                format!("{:.3}", lfo.frequency_hz),
+            ),
             shape_text: lfo.shape.label(),
-            active_field: self.edit_mode.overlay_field(),
+            active_field: self.active_field(),
         }
     }
 
@@ -204,10 +276,12 @@ impl EffectTunerState {
     pub(crate) fn close_page(&mut self) {
         self.pinned = false;
         self.visible_until_secs = 0.0;
+        self.clear_numeric_entry();
         self.reset_hold_states();
     }
 
     pub(crate) fn toggle_selected_effect(&mut self, now_secs: f32) -> bool {
+        self.clear_numeric_entry();
         let effect = self.selected_effect();
         let next_enabled = !effect.is_enabled(&self.current);
         effect.set_enabled(&mut self.current, next_enabled);
@@ -216,6 +290,7 @@ impl EffectTunerState {
     }
 
     pub(crate) fn toggle_selected_lfo(&mut self, now_secs: f32) -> bool {
+        self.clear_numeric_entry();
         let lfo = self.selected_lfo_mut();
         lfo.enabled = !lfo.enabled;
         let enabled = lfo.enabled;
@@ -223,8 +298,9 @@ impl EffectTunerState {
         enabled
     }
 
-    pub(crate) fn cycle_edit_mode(&mut self, now_secs: f32) {
-        self.edit_mode = self.edit_mode.next();
+    pub(crate) fn step_edit_mode(&mut self, direction: isize, now_secs: f32) {
+        self.clear_numeric_entry();
+        self.edit_mode = self.edit_mode.step(direction);
         self.note_interaction(now_secs);
     }
 
@@ -269,7 +345,32 @@ impl EffectTunerState {
         }
     }
 
+    pub(crate) fn append_numeric_input(&mut self, character: char, now_secs: f32) -> bool {
+        if !self.active_field().accepts_numeric_entry() {
+            return false;
+        }
+
+        if !self.numeric_entry.push(character) {
+            return false;
+        }
+
+        self.apply_numeric_entry_to_selected();
+        self.note_interaction(now_secs);
+        true
+    }
+
+    pub(crate) fn backspace_numeric_input(&mut self, now_secs: f32) -> bool {
+        if !self.numeric_entry.backspace() {
+            return false;
+        }
+
+        self.apply_numeric_entry_to_selected();
+        self.note_interaction(now_secs);
+        true
+    }
+
     pub(crate) fn reset_selected(&mut self, now_secs: f32) {
+        self.clear_numeric_entry();
         let parameter = self.selected_parameter();
         match self.edit_mode {
             EffectEditMode::Value => {
@@ -292,6 +393,7 @@ impl EffectTunerState {
         self.current = self.defaults.clone();
         self.lfos = default_lfos();
         self.edit_mode = EffectEditMode::Value;
+        self.clear_numeric_entry();
         self.note_interaction(now_secs);
     }
 
@@ -327,6 +429,7 @@ impl EffectTunerState {
     }
 
     fn cycle_selection(&mut self, direction: isize, now_secs: f32) {
+        self.clear_numeric_entry();
         let parameter_count = EffectNumericParameter::all().len() as isize;
         let next_index =
             (self.selected_index as isize + direction).rem_euclid(parameter_count) as usize;
@@ -335,6 +438,7 @@ impl EffectTunerState {
     }
 
     fn adjust_selected(&mut self, direction: f32, modifiers: AdjustmentModifiers, now_secs: f32) {
+        self.clear_numeric_entry();
         let parameter = self.selected_parameter();
         match self.edit_mode {
             EffectEditMode::Value => {
@@ -377,6 +481,36 @@ impl EffectTunerState {
         &mut self.lfos[self.selected_index]
     }
 
+    fn overlay_numeric_text(&self, field: EffectOverlayField, fallback: String) -> String {
+        if self.active_field() == field {
+            if let Some(buffer) = self.numeric_entry.displayed_text() {
+                return buffer.to_string();
+            }
+        }
+
+        fallback
+    }
+
+    fn apply_numeric_entry_to_selected(&mut self) -> bool {
+        let Some(value) = self.numeric_entry.parsed_value() else {
+            return false;
+        };
+
+        let parameter = self.selected_parameter();
+        match self.edit_mode {
+            EffectEditMode::Value => parameter.set_value(&mut self.current, value),
+            EffectEditMode::LfoAmplitude => self.selected_lfo_mut().amplitude = value.max(0.0),
+            EffectEditMode::LfoFrequency => self.selected_lfo_mut().frequency_hz = value.max(0.0),
+            EffectEditMode::LfoShape => return false,
+        }
+
+        true
+    }
+
+    fn clear_numeric_entry(&mut self) {
+        self.numeric_entry.clear();
+    }
+
     fn reset_hold_states(&mut self) {
         self.select_previous_hold.reset();
         self.select_next_hold.reset();
@@ -397,7 +531,7 @@ fn default_lfos() -> Vec<ParameterLfo> {
 mod tests {
     use crate::config::{EffectGroup, EffectsConfig};
 
-    use super::EffectTunerState;
+    use super::{EffectTunerState, HoldInput};
     use crate::effect_tuner::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LfoShape};
     use crate::effect_tuner::metadata::{EffectEditMode, EffectOverlayField};
 
@@ -503,5 +637,85 @@ mod tests {
         );
         assert!(restored_snapshot.lfos[0].enabled);
         assert_eq!(restored_snapshot.lfos[0].shape, LfoShape::Triangle);
+    }
+
+    #[test]
+    fn numeric_entry_updates_selected_value() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+
+        for character in ['0', '.', '1', '5', '7'] {
+            assert!(effect_tuner.append_numeric_input(character, 1.0));
+        }
+
+        let snapshot = effect_tuner.overlay_snapshot(1.0);
+        assert_eq!(snapshot.value_text, "0.157");
+        assert!((effect_tuner.current.color_wavefolder.gain - 0.157).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn numeric_entry_updates_lfo_frequency_and_backspace_reparses() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        effect_tuner.edit_mode = EffectEditMode::LfoFrequency;
+
+        for character in ['0', '.', '1', '5', '7'] {
+            assert!(effect_tuner.append_numeric_input(character, 1.0));
+        }
+        assert!(effect_tuner.backspace_numeric_input(1.2));
+
+        let snapshot = effect_tuner.overlay_snapshot(1.2);
+        assert_eq!(snapshot.frequency_text, "0.15");
+        assert!((effect_tuner.selected_lfo().frequency_hz - 0.15).abs() < 1.0e-6);
+    }
+
+    #[test]
+    fn switching_field_clears_numeric_entry_highlight_text() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        assert!(effect_tuner.append_numeric_input('0', 1.0));
+
+        effect_tuner.step_edit_mode(1, 1.1);
+
+        let snapshot = effect_tuner.overlay_snapshot(1.1);
+        assert_eq!(snapshot.active_field, EffectOverlayField::LfoAmplitude);
+        assert_eq!(
+            snapshot.value_text,
+            effect_tuner
+                .selected_parameter()
+                .display_value(&effect_tuner.current)
+        );
+    }
+
+    #[test]
+    fn selecting_another_parameter_clears_numeric_entry() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        assert!(effect_tuner.append_numeric_input('0', 1.0));
+
+        assert!(effect_tuner.step_selection(
+            1,
+            HoldInput {
+                just_pressed: true,
+                pressed: true,
+                just_released: false,
+                delta_secs: 0.0,
+            },
+            1.1,
+        ));
+
+        let snapshot = effect_tuner.overlay_snapshot(1.1);
+        assert_eq!(snapshot.parameter_label, "mod");
+        assert_eq!(
+            snapshot.value_text,
+            effect_tuner
+                .selected_parameter()
+                .display_value(&effect_tuner.current)
+        );
+    }
+
+    #[test]
+    fn shape_field_ignores_numeric_entry() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        effect_tuner.edit_mode = EffectEditMode::LfoShape;
+
+        assert!(!effect_tuner.append_numeric_input('1', 1.0));
+        assert_eq!(effect_tuner.selected_lfo().shape, LfoShape::Sine);
     }
 }

@@ -32,7 +32,7 @@ pub(crate) fn camera_input_system(
     control_page: Res<ControlPageState>,
     mut camera_rig: ResMut<CameraRig>,
 ) {
-    if control_page.blocks_scene_input() {
+    if control_page.captures_scene_input() {
         return;
     }
 
