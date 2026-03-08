@@ -12,6 +12,7 @@ pub(crate) struct SpawnTuning {
     pub(crate) containment_epsilon: f32,
     pub(crate) twist_per_vertex_radians: f32,
     pub(crate) vertex_offset_ratio: f32,
+    pub(crate) vertex_spawn_exclusion_probability: f32,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
@@ -100,6 +101,13 @@ pub(crate) fn next_spawn(
 
             for vertex_index in 0..parent_geometry.vertices.len() {
                 if parent.occupied_vertices[vertex_index] {
+                    continue;
+                }
+                if vertex_is_excluded(
+                    parent_index,
+                    vertex_index,
+                    tuning.vertex_spawn_exclusion_probability,
+                ) {
                     continue;
                 }
 
@@ -206,6 +214,31 @@ fn spawn_candidate(input: SpawnCandidateInput<'_>) -> PolyhedronNode {
     }
 }
 
+fn vertex_is_excluded(parent_index: usize, vertex_index: usize, probability: f32) -> bool {
+    let probability = probability.clamp(0.0, 1.0);
+    if probability <= 0.0 {
+        return false;
+    }
+    if probability >= 1.0 {
+        return true;
+    }
+
+    vertex_exclusion_sample(parent_index, vertex_index) < probability
+}
+
+fn vertex_exclusion_sample(parent_index: usize, vertex_index: usize) -> f32 {
+    let mut state = (parent_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
+        ^ (vertex_index as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F)
+        ^ 0xD6E8_FEB8_6659_FD93;
+    state ^= state >> 33;
+    state = state.wrapping_mul(0xFF51_AFD7_ED55_8CCD);
+    state ^= state >> 33;
+    state = state.wrapping_mul(0xC4CE_B9FE_1A85_EC53);
+    state ^= state >> 33;
+
+    (state as f64 / u64::MAX as f64) as f32
+}
+
 fn child_transform(
     parent: &PolyhedronNode,
     parent_geometry: &ShapeGeometry,
@@ -272,6 +305,7 @@ mod tests {
             containment_epsilon: 0.02,
             twist_per_vertex_radians: PI / 5.0,
             vertex_offset_ratio: 0.0,
+            vertex_spawn_exclusion_probability: 0.0,
         }
     }
 
@@ -395,6 +429,26 @@ mod tests {
             + parent_geometry.vertices[0].normalize() * child_radius * vertex_offset_ratio;
 
         assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
+    }
+
+    #[test]
+    fn full_vertex_exclusion_probability_blocks_spawns() {
+        let shapes = ShapeCatalog::new();
+        let mut nodes = vec![root_node(PolyhedronKind::Cube, 1.4, &shapes)];
+
+        let spawn = next_spawn(
+            &mut nodes,
+            &shapes,
+            PolyhedronKind::Cube,
+            0.35,
+            SpawnTuning {
+                vertex_spawn_exclusion_probability: 1.0,
+                ..test_tuning()
+            },
+        );
+
+        assert!(spawn.is_none());
+        assert_eq!(nodes.len(), 1);
     }
 
     #[test]

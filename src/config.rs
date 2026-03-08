@@ -200,6 +200,12 @@ pub(crate) struct GenerationConfig {
     pub(crate) vertex_offset_repeat_interval_secs: f32,
     pub(crate) min_vertex_offset_ratio: f32,
     pub(crate) max_vertex_offset_ratio: f32,
+    pub(crate) default_vertex_spawn_exclusion_probability: f32,
+    pub(crate) vertex_spawn_exclusion_adjust_step: f32,
+    pub(crate) vertex_spawn_exclusion_hold_delay_secs: f32,
+    pub(crate) vertex_spawn_exclusion_repeat_interval_secs: f32,
+    pub(crate) min_vertex_spawn_exclusion_probability: f32,
+    pub(crate) max_vertex_spawn_exclusion_probability: f32,
 }
 
 impl GenerationConfig {
@@ -234,14 +240,29 @@ impl GenerationConfig {
         self.default_vertex_offset_ratio.clamp(min, max)
     }
 
+    pub(crate) fn vertex_spawn_exclusion_bounds(&self) -> (f32, f32) {
+        let min = self.min_vertex_spawn_exclusion_probability.clamp(0.0, 1.0);
+        let max = self.max_vertex_spawn_exclusion_probability.clamp(min, 1.0);
+        (min, max)
+    }
+
+    pub(crate) fn default_vertex_spawn_exclusion_probability_clamped(&self) -> f32 {
+        let (min, max) = self.vertex_spawn_exclusion_bounds();
+        self.default_vertex_spawn_exclusion_probability
+            .clamp(min, max)
+    }
+
     pub(crate) fn spawn_tuning(
         &self,
         twist_per_vertex_radians: f32,
         vertex_offset_ratio: f32,
+        vertex_spawn_exclusion_probability: f32,
     ) -> SpawnTuning {
         let (min_scale_ratio, max_scale_ratio) = self.scale_bounds();
         let (min_twist_per_vertex_radians, max_twist_per_vertex_radians) = self.twist_bounds();
         let (min_vertex_offset_ratio, max_vertex_offset_ratio) = self.vertex_offset_bounds();
+        let (min_vertex_spawn_exclusion_probability, max_vertex_spawn_exclusion_probability) =
+            self.vertex_spawn_exclusion_bounds();
         SpawnTuning {
             min_scale_ratio,
             max_scale_ratio,
@@ -250,6 +271,10 @@ impl GenerationConfig {
                 .clamp(min_twist_per_vertex_radians, max_twist_per_vertex_radians),
             vertex_offset_ratio: vertex_offset_ratio
                 .clamp(min_vertex_offset_ratio, max_vertex_offset_ratio),
+            vertex_spawn_exclusion_probability: vertex_spawn_exclusion_probability.clamp(
+                min_vertex_spawn_exclusion_probability,
+                max_vertex_spawn_exclusion_probability,
+            ),
         }
     }
 }
@@ -279,6 +304,12 @@ impl Default for GenerationConfig {
             vertex_offset_repeat_interval_secs: 0.07,
             min_vertex_offset_ratio: 0.0,
             max_vertex_offset_ratio: 6.0,
+            default_vertex_spawn_exclusion_probability: 0.0,
+            vertex_spawn_exclusion_adjust_step: 0.05,
+            vertex_spawn_exclusion_hold_delay_secs: 0.24,
+            vertex_spawn_exclusion_repeat_interval_secs: 0.07,
+            min_vertex_spawn_exclusion_probability: 0.0,
+            max_vertex_spawn_exclusion_probability: 1.0,
         }
     }
 }
@@ -743,6 +774,43 @@ mod tests {
 
         assert_eq!(config.generation.vertex_offset_hold_delay_secs, 0.11);
         assert_eq!(config.generation.vertex_offset_repeat_interval_secs, 0.02);
+    }
+
+    #[test]
+    fn vertex_spawn_exclusion_default_is_clamped_to_bounds() {
+        let config = parse_config(
+            r#"
+            [generation]
+            default_vertex_spawn_exclusion_probability = 2.0
+            min_vertex_spawn_exclusion_probability = 0.0
+            max_vertex_spawn_exclusion_probability = 0.4
+            "#,
+        )
+        .expect("vertex exclusion config should parse");
+
+        assert_eq!(
+            config
+                .generation
+                .default_vertex_spawn_exclusion_probability_clamped(),
+            0.4
+        );
+    }
+
+    #[test]
+    fn vertex_spawn_exclusion_bounds_stay_within_probability_range() {
+        let config = parse_config(
+            r#"
+            [generation]
+            min_vertex_spawn_exclusion_probability = -1.0
+            max_vertex_spawn_exclusion_probability = 2.0
+            "#,
+        )
+        .expect("vertex exclusion config should parse");
+
+        assert_eq!(
+            config.generation.vertex_spawn_exclusion_bounds(),
+            (0.0, 1.0)
+        );
     }
 
     #[test]

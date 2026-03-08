@@ -4,7 +4,10 @@ use bevy::prelude::*;
 use crate::camera::{CameraRig, SceneCamera};
 use crate::config::{AppConfig, GenerationConfig, MaterialConfig};
 use crate::effects::{camera_effects_from_config, effects_status_messages};
-use crate::generation::{SpawnHoldState, twist_status_message, vertex_offset_status_message};
+use crate::generation::{
+    SpawnHoldState, twist_status_message, vertex_exclusion_status_message,
+    vertex_offset_status_message,
+};
 use crate::polyhedra::{
     PolyhedronKind, PolyhedronNode, ShapeCatalog, ShapeGeometry, build_mesh, root_node,
 };
@@ -61,11 +64,14 @@ pub(crate) struct GenerationState {
     pub(crate) scale_ratio: f32,
     pub(crate) twist_per_vertex_radians: f32,
     pub(crate) vertex_offset_ratio: f32,
+    pub(crate) vertex_spawn_exclusion_probability: f32,
     pub(crate) spawn_hold: SpawnHoldState,
     pub(crate) twist_decrease_hold: SpawnHoldState,
     pub(crate) twist_increase_hold: SpawnHoldState,
     pub(crate) vertex_offset_decrease_hold: SpawnHoldState,
     pub(crate) vertex_offset_increase_hold: SpawnHoldState,
+    pub(crate) vertex_exclusion_decrease_hold: SpawnHoldState,
+    pub(crate) vertex_exclusion_increase_hold: SpawnHoldState,
 }
 
 #[derive(Resource)]
@@ -151,6 +157,9 @@ pub(crate) fn setup_scene(
         .generation
         .default_twist_per_vertex_radians_clamped();
     let initial_vertex_offset = app_config.generation.default_vertex_offset_ratio_clamped();
+    let initial_vertex_spawn_exclusion = app_config
+        .generation
+        .default_vertex_spawn_exclusion_probability_clamped();
     commands.insert_resource(ui_theme.clone());
     commands.insert_resource(shape_assets);
     commands.insert_resource(GenerationState {
@@ -159,18 +168,21 @@ pub(crate) fn setup_scene(
         scale_ratio: initial_scale_ratio,
         twist_per_vertex_radians: initial_twist,
         vertex_offset_ratio: initial_vertex_offset,
+        vertex_spawn_exclusion_probability: initial_vertex_spawn_exclusion,
         spawn_hold: SpawnHoldState::default(),
         twist_decrease_hold: SpawnHoldState::default(),
         twist_increase_hold: SpawnHoldState::default(),
         vertex_offset_decrease_hold: SpawnHoldState::default(),
         vertex_offset_increase_hold: SpawnHoldState::default(),
+        vertex_exclusion_decrease_hold: SpawnHoldState::default(),
+        vertex_exclusion_increase_hold: SpawnHoldState::default(),
     });
     commands.insert_resource(MaterialState {
         opacity: initial_opacity,
     });
 
     println!(
-        "Controls: F1/H help, F2 FX strip, F3 scene presets, F4 export Blender .blend, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset"
+        "Controls: F1/H help, F2 FX strip, F3 scene presets, F4 export Blender .blend, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset, hold V/B to adjust vertex exclusion probability, N reset vertex exclusion"
     );
     println!(
         "FX strip: Ctrl+Up/Down selects a parameter, Ctrl+Left/Right adjusts the highlighted field, Tab toggles the effect, L toggles the selected parameter LFO, M cycles the highlighted value/amp/freq/shape field, Shift is coarse, Alt is fine, Enter resets the field, Shift+Enter resets all FX settings and LFOs."
@@ -181,6 +193,10 @@ pub(crate) fn setup_scene(
     );
     println!("{}", twist_status_message(initial_twist));
     println!("{}", vertex_offset_status_message(initial_vertex_offset));
+    println!(
+        "{}",
+        vertex_exclusion_status_message(initial_vertex_spawn_exclusion)
+    );
     println!("{}", opacity_status_message(initial_opacity));
     for message in effects_status_messages(&app_config.effects) {
         println!("{message}");
@@ -219,6 +235,8 @@ pub(crate) fn reset_generation_state(
     generation_state.twist_increase_hold.reset();
     generation_state.vertex_offset_decrease_hold.reset();
     generation_state.vertex_offset_increase_hold.reset();
+    generation_state.vertex_exclusion_decrease_hold.reset();
+    generation_state.vertex_exclusion_increase_hold.reset();
     root
 }
 
@@ -336,6 +354,7 @@ mod tests {
             scale_ratio: 0.42,
             twist_per_vertex_radians: 0.3,
             vertex_offset_ratio: 0.6,
+            vertex_spawn_exclusion_probability: 0.2,
             spawn_hold: SpawnHoldState {
                 elapsed_secs: 1.0,
                 repeating: true,
@@ -344,6 +363,8 @@ mod tests {
             twist_increase_hold: SpawnHoldState::default(),
             vertex_offset_decrease_hold: SpawnHoldState::default(),
             vertex_offset_increase_hold: SpawnHoldState::default(),
+            vertex_exclusion_decrease_hold: SpawnHoldState::default(),
+            vertex_exclusion_increase_hold: SpawnHoldState::default(),
         };
 
         let reset_root =
@@ -357,6 +378,7 @@ mod tests {
         assert_eq!(generation_state.scale_ratio, 0.42);
         assert_eq!(generation_state.twist_per_vertex_radians, 0.3);
         assert_eq!(generation_state.vertex_offset_ratio, 0.6);
+        assert_eq!(generation_state.vertex_spawn_exclusion_probability, 0.2);
         assert!(
             generation_state.nodes[0]
                 .occupied_vertices
@@ -381,6 +403,16 @@ mod tests {
             0.0
         );
         assert!(!generation_state.vertex_offset_increase_hold.repeating);
+        assert_eq!(
+            generation_state.vertex_exclusion_decrease_hold.elapsed_secs,
+            0.0
+        );
+        assert!(!generation_state.vertex_exclusion_decrease_hold.repeating);
+        assert_eq!(
+            generation_state.vertex_exclusion_increase_hold.elapsed_secs,
+            0.0
+        );
+        assert!(!generation_state.vertex_exclusion_increase_hold.repeating);
     }
 
     #[test]

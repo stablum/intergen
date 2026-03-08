@@ -638,7 +638,9 @@ pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
             "I: Reset global opacity\n",
             "[ / ] or , / .: Adjust child twist angle (hold to repeat)\n",
             "Z / X: Adjust child vertex offset (hold to repeat)\n",
+            "V / B: Adjust vertex exclusion probability (hold to repeat)\n",
             "C: Reset child vertex offset\n",
+            "N: Reset vertex exclusion probability\n",
             "T: Reset child twist angle\n",
             "\n",
             "{}"
@@ -686,7 +688,9 @@ mod tests {
         assert!(text.contains("I: Reset global opacity"));
         assert!(text.contains("[ / ] or , / .: Adjust child twist angle (hold to repeat)"));
         assert!(text.contains("Z / X: Adjust child vertex offset (hold to repeat)"));
+        assert!(text.contains("V / B: Adjust vertex exclusion probability (hold to repeat)"));
         assert!(text.contains("C: Reset child vertex offset"));
+        assert!(text.contains("N: Reset vertex exclusion probability"));
         assert!(text.contains("T: Reset child twist angle"));
     }
 

@@ -13,6 +13,8 @@ const TWIST_DECREASE_KEYS: [KeyCode; 2] = [KeyCode::BracketLeft, KeyCode::Comma]
 const TWIST_INCREASE_KEYS: [KeyCode; 2] = [KeyCode::BracketRight, KeyCode::Period];
 const VERTEX_OFFSET_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyZ];
 const VERTEX_OFFSET_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyX];
+const VERTEX_EXCLUSION_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyV];
+const VERTEX_EXCLUSION_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyB];
 
 #[derive(Default)]
 pub(crate) struct SpawnHoldState {
@@ -161,6 +163,8 @@ pub(crate) fn generation_input_system(
 
     let (min_twist, max_twist) = scene.app_config.generation.twist_bounds();
     let (min_vertex_offset, max_vertex_offset) = scene.app_config.generation.vertex_offset_bounds();
+    let (min_vertex_exclusion, max_vertex_exclusion) =
+        scene.app_config.generation.vertex_spawn_exclusion_bounds();
     let mut transform_changed = false;
     let twist_decrease_requested = scene.generation_state.twist_decrease_hold.update(
         key_group_just_pressed(&keys, &TWIST_DECREASE_KEYS),
@@ -282,6 +286,98 @@ pub(crate) fn generation_input_system(
         );
     }
 
+    let vertex_exclusion_decrease_requested = scene
+        .generation_state
+        .vertex_exclusion_decrease_hold
+        .update(
+            key_group_just_pressed(&keys, &VERTEX_EXCLUSION_DECREASE_KEYS),
+            key_group_pressed(&keys, &VERTEX_EXCLUSION_DECREASE_KEYS),
+            key_group_just_released(&keys, &VERTEX_EXCLUSION_DECREASE_KEYS),
+            time.delta_secs(),
+            scene
+                .app_config
+                .generation
+                .vertex_spawn_exclusion_hold_delay_secs,
+            scene
+                .app_config
+                .generation
+                .vertex_spawn_exclusion_repeat_interval_secs,
+        );
+    if vertex_exclusion_decrease_requested {
+        scene.generation_state.vertex_spawn_exclusion_probability = adjust_clamped_value(
+            scene.generation_state.vertex_spawn_exclusion_probability,
+            -scene
+                .app_config
+                .generation
+                .vertex_spawn_exclusion_adjust_step,
+            min_vertex_exclusion,
+            max_vertex_exclusion,
+        );
+        println!(
+            "{}",
+            vertex_exclusion_status_message(
+                scene.generation_state.vertex_spawn_exclusion_probability,
+            )
+        );
+    }
+
+    let vertex_exclusion_increase_requested = scene
+        .generation_state
+        .vertex_exclusion_increase_hold
+        .update(
+            key_group_just_pressed(&keys, &VERTEX_EXCLUSION_INCREASE_KEYS),
+            key_group_pressed(&keys, &VERTEX_EXCLUSION_INCREASE_KEYS),
+            key_group_just_released(&keys, &VERTEX_EXCLUSION_INCREASE_KEYS),
+            time.delta_secs(),
+            scene
+                .app_config
+                .generation
+                .vertex_spawn_exclusion_hold_delay_secs,
+            scene
+                .app_config
+                .generation
+                .vertex_spawn_exclusion_repeat_interval_secs,
+        );
+    if vertex_exclusion_increase_requested {
+        scene.generation_state.vertex_spawn_exclusion_probability = adjust_clamped_value(
+            scene.generation_state.vertex_spawn_exclusion_probability,
+            scene
+                .app_config
+                .generation
+                .vertex_spawn_exclusion_adjust_step,
+            min_vertex_exclusion,
+            max_vertex_exclusion,
+        );
+        println!(
+            "{}",
+            vertex_exclusion_status_message(
+                scene.generation_state.vertex_spawn_exclusion_probability,
+            )
+        );
+    }
+
+    if keys.just_pressed(KeyCode::KeyN) {
+        scene.generation_state.vertex_spawn_exclusion_probability = scene
+            .app_config
+            .generation
+            .default_vertex_spawn_exclusion_probability_clamped();
+        scene
+            .generation_state
+            .vertex_exclusion_decrease_hold
+            .reset();
+        scene
+            .generation_state
+            .vertex_exclusion_increase_hold
+            .reset();
+        println!(
+            "Reset {}",
+            vertex_exclusion_status_message(
+                scene.generation_state.vertex_spawn_exclusion_probability,
+            )
+            .to_lowercase()
+        );
+    }
+
     if transform_changed {
         let twist_per_vertex_radians = scene.generation_state.twist_per_vertex_radians;
         let vertex_offset_ratio = scene.generation_state.vertex_offset_ratio;
@@ -336,15 +432,18 @@ pub(crate) fn generation_input_system(
     let scale_ratio = scene.generation_state.scale_ratio;
     let twist_per_vertex_radians = scene.generation_state.twist_per_vertex_radians;
     let vertex_offset_ratio = scene.generation_state.vertex_offset_ratio;
+    let vertex_spawn_exclusion_probability =
+        scene.generation_state.vertex_spawn_exclusion_probability;
     let Some(spawn) = next_spawn(
         &mut scene.generation_state.nodes,
         &scene.shape_assets.catalog,
         selected_kind,
         scale_ratio,
-        scene
-            .app_config
-            .generation
-            .spawn_tuning(twist_per_vertex_radians, vertex_offset_ratio),
+        scene.app_config.generation.spawn_tuning(
+            twist_per_vertex_radians,
+            vertex_offset_ratio,
+            vertex_spawn_exclusion_probability,
+        ),
     ) else {
         eprintln!("No valid spawn position is currently available.");
         return;
@@ -420,10 +519,18 @@ pub(crate) fn vertex_offset_status_message(offset_ratio: f32) -> String {
     )
 }
 
+pub(crate) fn vertex_exclusion_status_message(probability: f32) -> String {
+    format!(
+        "Global vertex exclusion probability: {:.0}%",
+        probability.clamp(0.0, 1.0) * 100.0
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        SpawnHoldState, adjust_clamped_value, twist_status_message, vertex_offset_status_message,
+        SpawnHoldState, adjust_clamped_value, twist_status_message,
+        vertex_exclusion_status_message, vertex_offset_status_message,
     };
     use crate::config::GenerationConfig;
 
@@ -524,5 +631,12 @@ mod tests {
         let status = vertex_offset_status_message(0.75);
 
         assert!(status.contains("0.75x child radius"));
+    }
+
+    #[test]
+    fn vertex_exclusion_status_message_uses_percentage() {
+        let status = vertex_exclusion_status_message(0.35);
+
+        assert!(status.contains("35%"));
     }
 }

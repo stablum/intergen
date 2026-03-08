@@ -72,6 +72,13 @@ Live child-offset controls use these `generation` settings:
 - `vertex_offset_repeat_interval_secs`: time between repeated offset updates while held
 - `min_vertex_offset_ratio` / `max_vertex_offset_ratio`: live clamp range, with `0.0` as the minimum allowed floor
 
+Live vertex-exclusion controls use these `generation` settings:
+- `default_vertex_spawn_exclusion_probability`: startup default for the chance that a given vertex is skipped during spawning
+- `vertex_spawn_exclusion_adjust_step`: per-keypress probability change
+- `vertex_spawn_exclusion_hold_delay_secs`: how long to hold before repeat starts
+- `vertex_spawn_exclusion_repeat_interval_secs`: time between repeated probability updates while held
+- `min_vertex_spawn_exclusion_probability` / `max_vertex_spawn_exclusion_probability`: live clamp range, limited internally to `[0.0, 1.0]`
+
 Camera-output effects run in this order:
 - `effects.lens_distortion`: warp the camera image with radial, tangential, and chromatic lens terms
 - `effects.color_wavefolder`: hard-wrap the distorted camera color by amplification plus remainder
@@ -146,7 +153,7 @@ Current scene preset contents:
 - directional and point light settings
 - material palette/PBR settings and current global opacity
 - camera position, distance, and momentum
-- current polyhedron tree, selected child shape, scale ratio, twist, and vertex offset
+- current polyhedron tree, selected child shape, scale ratio, twist, vertex offset, and global vertex-exclusion probability
 - live camera-output effect values plus all per-parameter LFO settings
 ## Blender Export
 
@@ -236,6 +243,9 @@ cargo test-plain
 - `Z`: decrease the child vertex offset, or hold to keep decreasing
 - `X`: increase the child vertex offset, or hold to keep increasing
 - `C`: reset the child vertex offset to the configured default
+- `V`: decrease the global vertex-exclusion probability, or hold to keep decreasing
+- `B`: increase the global vertex-exclusion probability, or hold to keep increasing
+- `N`: reset the global vertex-exclusion probability to the configured default
 - `O`: decrease global object opacity
 - `P`: increase global object opacity
 - `I`: reset global object opacity to the configured default
@@ -270,9 +280,4 @@ Not implemented yet:
 Copyright (C) 2026 Francesco Stablum.
 
 See [LICENSE](LICENSE) for the project notice and [COPYING](COPYING) for the full GNU General Public License text.
-
-
-
-
-
 

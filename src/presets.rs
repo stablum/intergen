@@ -103,6 +103,8 @@ struct GenerationSnapshot {
     scale_ratio: f32,
     twist_per_vertex_radians: f32,
     vertex_offset_ratio: f32,
+    #[serde(default)]
+    vertex_spawn_exclusion_probability: f32,
     nodes: Vec<PolyhedronNodeSnapshot>,
 }
 
@@ -335,6 +337,7 @@ impl GenerationSnapshot {
             scale_ratio: generation_state.scale_ratio,
             twist_per_vertex_radians: generation_state.twist_per_vertex_radians,
             vertex_offset_ratio: generation_state.vertex_offset_ratio,
+            vertex_spawn_exclusion_probability: generation_state.vertex_spawn_exclusion_probability,
             nodes: generation_state
                 .nodes
                 .iter()
@@ -358,11 +361,14 @@ impl GenerationSnapshot {
             scale_ratio: self.scale_ratio,
             twist_per_vertex_radians: self.twist_per_vertex_radians,
             vertex_offset_ratio: self.vertex_offset_ratio,
+            vertex_spawn_exclusion_probability: self.vertex_spawn_exclusion_probability,
             spawn_hold: default(),
             twist_decrease_hold: default(),
             twist_increase_hold: default(),
             vertex_offset_decrease_hold: default(),
             vertex_offset_increase_hold: default(),
+            vertex_exclusion_decrease_hold: default(),
+            vertex_exclusion_increase_hold: default(),
         })
     }
 }
@@ -945,6 +951,7 @@ mod tests {
                 scale_ratio: 0.5,
                 twist_per_vertex_radians: 0.0,
                 vertex_offset_ratio: 0.0,
+                vertex_spawn_exclusion_probability: 0.0,
                 nodes: vec![super::PolyhedronNodeSnapshot {
                     kind: crate::polyhedra::PolyhedronKind::Cube,
                     level: 0,

@@ -141,6 +141,7 @@ struct BlendGenerationMetadata {
     scale_ratio: f32,
     twist_per_vertex_radians: f32,
     vertex_offset_ratio: f32,
+    vertex_spawn_exclusion_probability: f32,
     nodes: Vec<BlendNodeMetadata>,
 }
 
@@ -343,6 +344,7 @@ impl BlendGenerationMetadata {
             scale_ratio: generation_state.scale_ratio,
             twist_per_vertex_radians: generation_state.twist_per_vertex_radians,
             vertex_offset_ratio: generation_state.vertex_offset_ratio,
+            vertex_spawn_exclusion_probability: generation_state.vertex_spawn_exclusion_probability,
             nodes: generation_state
                 .nodes
                 .iter()
