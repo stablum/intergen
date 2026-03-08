@@ -245,6 +245,14 @@ pub(crate) fn update_preset_overlay_system(
     *chooser_text = Text::new(preset_browser.chooser_text().unwrap_or_default());
 }
 
+fn control_page_bottom(ui_config: &UiConfig) -> f32 {
+    ui_config.hint_top
+}
+
+fn control_page_secondary_bottom(ui_config: &UiConfig) -> f32 {
+    control_page_bottom(ui_config) + ui_config.hint_padding_y * 2.0 + ui_config.hint_font_size + 8.0
+}
+
 fn spawn_preset_ui(
     commands: &mut Commands,
     ui_theme: &UiTheme,
@@ -258,7 +266,7 @@ fn spawn_preset_ui(
                 position_type: PositionType::Absolute,
                 left: px(ui_config.hint_left),
                 right: px(ui_config.hint_left),
-                bottom: px(ui_config.hint_top + 34.0),
+                bottom: px(control_page_bottom(ui_config)),
                 justify_content: JustifyContent::Center,
                 ..default()
             },
@@ -296,7 +304,7 @@ fn spawn_preset_ui(
                 position_type: PositionType::Absolute,
                 left: px(ui_config.hint_left),
                 right: px(ui_config.hint_left),
-                bottom: px(ui_config.hint_top + 72.0),
+                bottom: px(control_page_secondary_bottom(ui_config)),
                 justify_content: JustifyContent::Center,
                 ..default()
             },
@@ -371,7 +379,7 @@ pub(crate) fn spawn_help_ui(
                 position_type: PositionType::Absolute,
                 left: px(ui_config.hint_left),
                 right: px(ui_config.hint_left),
-                bottom: px(ui_config.hint_top),
+                bottom: px(control_page_bottom(ui_config)),
                 justify_content: JustifyContent::Center,
                 ..default()
             },
@@ -669,7 +677,10 @@ pub(crate) fn font_status_line(font_source: UiFontSource) -> &'static str {
 
 #[cfg(test)]
 mod tests {
-    use super::{UiFontSource, controls_overlay_text, font_status_line};
+    use super::{
+        UiFontSource, control_page_bottom, control_page_secondary_bottom, controls_overlay_text,
+        font_status_line,
+    };
 
     #[test]
     fn overlay_text_lists_help_and_spawn_controls() {
@@ -703,6 +714,17 @@ mod tests {
         assert!(text.contains("C: Reset child outward offset"));
         assert!(text.contains("N: Reset spawn exclusion probability"));
         assert!(text.contains("T: Reset child twist angle"));
+    }
+
+    #[test]
+    fn control_pages_share_the_same_bottom_anchor() {
+        let ui_config = crate::config::UiConfig::default();
+
+        assert_eq!(control_page_bottom(&ui_config), ui_config.hint_top);
+        assert_eq!(
+            control_page_secondary_bottom(&ui_config),
+            ui_config.hint_top + 38.0
+        );
     }
 
     #[test]
