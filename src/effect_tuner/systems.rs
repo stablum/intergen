@@ -1,34 +1,22 @@
 use bevy::prelude::*;
 
 use crate::camera::SceneCamera;
+use crate::control_page::ControlPageState;
 use crate::effects::{CameraEffectsSettings, camera_effects_from_config};
-use crate::presets::PresetBrowserState;
 
 use super::state::{AdjustmentModifiers, EffectTunerState, HoldInput};
 
 pub(crate) fn effect_tuner_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    preset_browser: Res<PresetBrowserState>,
+    control_page: Res<ControlPageState>,
     mut effect_tuner: ResMut<EffectTunerState>,
 ) {
-    if preset_browser.blocks_input() {
+    if !control_page.allows_effect_tuner_input() {
         return;
     }
 
     let now_secs = time.elapsed_secs();
-    if keys.just_pressed(KeyCode::F2) {
-        effect_tuner.toggle_pinned(now_secs);
-        println!(
-            "FX tuner {}.",
-            if effect_tuner.is_pinned() {
-                "pinned open"
-            } else {
-                "unpinned"
-            }
-        );
-    }
-
     if keys.just_pressed(KeyCode::Tab) {
         let selected_effect = effect_tuner.selected_effect();
         let enabled = effect_tuner.toggle_selected_effect(now_secs);

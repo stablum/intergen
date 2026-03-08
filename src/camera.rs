@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::config::{AppConfig, CameraConfig};
-use crate::presets::PresetBrowserState;
+use crate::control_page::ControlPageState;
 
 #[derive(Resource)]
 pub(crate) struct CameraRig {
@@ -29,10 +29,10 @@ pub(crate) fn camera_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     app_config: Res<AppConfig>,
-    preset_browser: Res<PresetBrowserState>,
+    control_page: Res<ControlPageState>,
     mut camera_rig: ResMut<CameraRig>,
 ) {
-    if preset_browser.blocks_input() {
+    if control_page.blocks_scene_input() {
         return;
     }
 

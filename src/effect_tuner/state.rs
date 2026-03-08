@@ -125,10 +125,6 @@ impl EffectTunerState {
         self.selected_parameter().effect_group()
     }
 
-    pub(crate) fn is_pinned(&self) -> bool {
-        self.pinned
-    }
-
     pub(crate) fn is_visible(&self, now_secs: f32) -> bool {
         self.pinned || now_secs <= self.visible_until_secs
     }
@@ -152,10 +148,7 @@ impl EffectTunerState {
         }
         self.selected_index = 0;
         self.edit_mode = EffectEditMode::Value;
-        self.select_previous_hold.reset();
-        self.select_next_hold.reset();
-        self.decrease_hold.reset();
-        self.increase_hold.reset();
+        self.reset_hold_states();
     }
 
     pub(crate) fn evaluated_effects(&self, now_secs: f32) -> EffectsConfig {
@@ -203,9 +196,15 @@ impl EffectTunerState {
         self.edit_mode.label()
     }
 
-    pub(crate) fn toggle_pinned(&mut self, now_secs: f32) {
-        self.pinned = !self.pinned;
+    pub(crate) fn open_page(&mut self, now_secs: f32) {
+        self.pinned = true;
         self.note_interaction(now_secs);
+    }
+
+    pub(crate) fn close_page(&mut self) {
+        self.pinned = false;
+        self.visible_until_secs = 0.0;
+        self.reset_hold_states();
     }
 
     pub(crate) fn toggle_selected_effect(&mut self, now_secs: f32) -> bool {
@@ -376,6 +375,13 @@ impl EffectTunerState {
 
     fn selected_lfo_mut(&mut self) -> &mut ParameterLfo {
         &mut self.lfos[self.selected_index]
+    }
+
+    fn reset_hold_states(&mut self) {
+        self.select_previous_hold.reset();
+        self.select_next_hold.reset();
+        self.decrease_hold.reset();
+        self.increase_hold.reset();
     }
 }
 

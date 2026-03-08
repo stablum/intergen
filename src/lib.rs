@@ -3,6 +3,7 @@ mod blender_export;
 mod camera;
 mod capture;
 mod config;
+mod control_page;
 mod effect_tuner;
 mod effects;
 mod generation;

@@ -3,6 +3,7 @@ use std::path::Path;
 use bevy::prelude::*;
 
 use crate::config::{AppConfig, UiConfig, srgb, srgba};
+use crate::control_page::{ControlPage, ControlPageState};
 use crate::effect_tuner::{EffectOverlayField, EffectTunerState};
 use crate::presets::PresetBrowserState;
 
@@ -99,6 +100,7 @@ pub(crate) fn toggle_help_overlay_system(
 pub(crate) fn update_effect_tuner_overlay_system(
     time: Res<Time>,
     app_config: Res<AppConfig>,
+    control_page: Res<ControlPageState>,
     effect_tuner: Res<EffectTunerState>,
     mut overlay_query: Query<&mut Visibility, With<EffectTunerOverlay>>,
     mut pinned_badge_query: Query<
@@ -120,20 +122,22 @@ pub(crate) fn update_effect_tuner_overlay_system(
     let Ok(mut overlay_visibility) = overlay_query.single_mut() else {
         return;
     };
-    *overlay_visibility = if effect_tuner.is_visible(now_secs) {
-        Visibility::Visible
-    } else {
-        Visibility::Hidden
-    };
+    *overlay_visibility =
+        if control_page.allows_effect_tuner_input() && effect_tuner.is_visible(now_secs) {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
 
     let Ok(mut pinned_badge_visibility) = pinned_badge_query.single_mut() else {
         return;
     };
-    *pinned_badge_visibility = if snapshot.pinned {
-        Visibility::Visible
-    } else {
-        Visibility::Hidden
-    };
+    *pinned_badge_visibility =
+        if control_page.is_active(ControlPage::EffectTuner) && snapshot.pinned {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
 
     for (field, mut background) in field_query.iter_mut() {
         *background = if field.0 == snapshot.active_field {
@@ -197,6 +201,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
 }
 
 pub(crate) fn update_preset_overlay_system(
+    control_page: Res<ControlPageState>,
     preset_browser: Res<PresetBrowserState>,
     mut strip_visibility: Query<
         &mut Visibility,
@@ -209,10 +214,12 @@ pub(crate) fn update_preset_overlay_system(
     >,
     mut chooser_text: Query<&mut Text, (With<PresetChooserText>, Without<PresetStripText>)>,
 ) {
+    let preset_page_visible = control_page.is_active(ControlPage::ScenePresets);
+
     let Ok(mut strip_visibility) = strip_visibility.single_mut() else {
         return;
     };
-    *strip_visibility = if preset_browser.is_visible() {
+    *strip_visibility = if preset_page_visible {
         Visibility::Visible
     } else {
         Visibility::Hidden
@@ -226,7 +233,7 @@ pub(crate) fn update_preset_overlay_system(
     let Ok(mut chooser_visibility) = chooser_visibility.single_mut() else {
         return;
     };
-    *chooser_visibility = if preset_browser.chooser_visible() {
+    *chooser_visibility = if preset_page_visible && preset_browser.chooser_visible() {
         Visibility::Visible
     } else {
         Visibility::Hidden
@@ -608,8 +615,9 @@ pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
     format!(
         concat!(
             "F1 / H: Toggle this overlay\n",
-            "F2: Pin or unpin the bottom FX strip\n",
-            "F3: Toggle scene preset mode\n",
+            "F2: Toggle the FX control page\n",
+            "F3: Toggle the scene preset page\n",
+            "Esc: Close the current control page\n",
             "F4: Export the current scene as a Blender .blend\n",
             "Ctrl + Up / Down: Select FX parameter\n",
             "Ctrl + Left / Right: Adjust the selected FX field\n",
@@ -620,7 +628,7 @@ pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
             "Alt: Fine FX adjustment\n",
             "Enter: Reset the selected FX field\n",
             "Shift + Enter: Reset all FX settings and LFOs\n",
-            "In preset mode: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions\n",
+            "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions\n",
             "Arrow Up / Down: Pitch camera\n",
             "Arrow Left / Right: Yaw camera\n",
             "Q / E: Roll camera\n",
@@ -668,8 +676,9 @@ mod tests {
         let text = controls_overlay_text(UiFontSource::CarbonPlus);
 
         assert!(text.contains("F1 / H: Toggle this overlay"));
-        assert!(text.contains("F2: Pin or unpin the bottom FX strip"));
-        assert!(text.contains("F3: Toggle scene preset mode"));
+        assert!(text.contains("F2: Toggle the FX control page"));
+        assert!(text.contains("F3: Toggle the scene preset page"));
+        assert!(text.contains("Esc: Close the current control page"));
         assert!(text.contains("F4: Export the current scene as a Blender .blend"));
         assert!(text.contains("Ctrl + Up / Down: Select FX parameter"));
         assert!(text.contains("Ctrl + Left / Right: Adjust the selected FX field"));
@@ -678,7 +687,7 @@ mod tests {
         assert!(text.contains("M: Cycle which FX value is editable (value / amp / freq / shape)"));
         assert!(text.contains("Shift + Enter: Reset all FX settings and LFOs"));
         assert!(text.contains(
-            "In preset mode: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions"
+            "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions"
         ));
         assert!(text.contains("Space: Spawn polyhedra (hold to repeat)"));
         assert!(text.contains("G: Cycle spawn placement mode (vertex / edge / face)"));

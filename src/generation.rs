@@ -1,8 +1,8 @@
 use bevy::prelude::*;
 
+use crate::control_page::ControlPageState;
 use crate::parameters::GenerationParameter;
 use crate::polyhedra::{PolyhedronKind, SpawnPlacementMode, next_spawn, recompute_spawn_tree};
-use crate::presets::PresetBrowserState;
 use crate::runtime_scene::GenerationSceneAccess;
 use crate::scene::{
     PolyhedronEntity, alpha_mode_for_opacity, opacity_status_message, reset_generation_state,
@@ -20,10 +20,10 @@ const VERTEX_EXCLUSION_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyB];
 pub(crate) fn generation_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    preset_browser: Res<PresetBrowserState>,
+    control_page: Res<ControlPageState>,
     mut scene: GenerationSceneAccess,
 ) {
-    if preset_browser.blocks_input() {
+    if control_page.blocks_scene_input() {
         return;
     }
 

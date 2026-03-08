@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::camera::CameraRig;
 use crate::config::{AppConfig, LightingConfig, MaterialConfig, RenderingConfig};
+use crate::control_page::{ControlPage, ControlPageState};
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
 use crate::polyhedra::{
     AttachmentOccupancy, NodeOrigin, PolyhedronKind, PolyhedronNode, SpawnAttachment,
@@ -148,7 +149,6 @@ enum NodeOriginSnapshot {
 
 #[derive(Resource)]
 pub(crate) struct PresetBrowserState {
-    active: bool,
     command: PresetCommand,
     first_digit: Option<u8>,
     status_message: String,
@@ -159,7 +159,6 @@ pub(crate) struct PresetBrowserState {
 impl Default for PresetBrowserState {
     fn default() -> Self {
         Self {
-            active: false,
             command: PresetCommand::Load,
             first_digit: None,
             status_message: String::new(),
@@ -178,16 +177,8 @@ impl PresetBrowserState {
         state
     }
 
-    pub(crate) fn blocks_input(&self) -> bool {
-        self.active
-    }
-
-    pub(crate) fn is_visible(&self) -> bool {
-        self.active
-    }
-
     pub(crate) fn chooser_visible(&self) -> bool {
-        self.active && self.chooser.is_some()
+        self.chooser.is_some()
     }
 
     pub(crate) fn strip_text(&self) -> String {
@@ -223,7 +214,7 @@ impl PresetBrowserState {
                 marker, candidate.file.saved_at_unix_ms, candidate.file.summary
             ));
         }
-        lines.push("Up/Down choose  Enter keep  Esc cancel".to_string());
+        lines.push("Up/Down choose  Enter keep  Esc close".to_string());
         Some(lines.join("\n"))
     }
 }
@@ -246,8 +237,7 @@ impl PresetBrowserState {
         occupancy
     }
 
-    fn activate(&mut self) -> Result<(), String> {
-        self.active = true;
+    pub(crate) fn open_page(&mut self) -> Result<(), String> {
         self.command = PresetCommand::Load;
         self.first_digit = None;
         self.chooser = None;
@@ -255,8 +245,7 @@ impl PresetBrowserState {
         self.refresh()
     }
 
-    fn deactivate(&mut self) {
-        self.active = false;
+    pub(crate) fn close_page(&mut self) {
         self.command = PresetCommand::Load;
         self.first_digit = None;
         self.chooser = None;
@@ -275,13 +264,6 @@ impl PresetBrowserState {
         self.first_digit = None;
         self.chooser = None;
         self.status_message = "type bank+slot".to_string();
-    }
-
-    fn cancel_pending(&mut self) {
-        self.command = PresetCommand::Load;
-        self.first_digit = None;
-        self.chooser = None;
-        self.status_message = "cancelled".to_string();
     }
 
     fn push_digit(&mut self, digit: u8) -> Option<PresetIndex> {
@@ -547,31 +529,15 @@ impl ScenePresetFile {
 
 pub(crate) fn preset_input_system(
     keys: Res<ButtonInput<KeyCode>>,
+    control_page: Res<ControlPageState>,
     mut preset_browser: ResMut<PresetBrowserState>,
     mut scene: SceneMutationAccess,
 ) {
-    if keys.just_pressed(KeyCode::F3) {
-        if preset_browser.active {
-            preset_browser.deactivate();
-            println!("Scene preset mode closed.");
-        } else {
-            match preset_browser.activate() {
-                Ok(()) => println!("Scene preset mode open. Type two digits to recall a slot."),
-                Err(error) => eprintln!("{error}"),
-            }
-        }
-        return;
-    }
-
-    if !preset_browser.active {
+    if !control_page.is_active(ControlPage::ScenePresets) {
         return;
     }
 
     if let Some(chooser) = preset_browser.chooser.as_mut() {
-        if keys.just_pressed(KeyCode::Escape) {
-            preset_browser.cancel_pending();
-            return;
-        }
         if keys.just_pressed(KeyCode::ArrowUp) && chooser.selected > 0 {
             chooser.selected -= 1;
         }
@@ -586,11 +552,6 @@ pub(crate) fn preset_input_system(
                 Err(error) => eprintln!("{error}"),
             }
         }
-        return;
-    }
-
-    if keys.just_pressed(KeyCode::Escape) {
-        preset_browser.cancel_pending();
         return;
     }
 
