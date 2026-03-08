@@ -7,6 +7,15 @@ use serde::{Deserialize, Serialize};
 
 use crate::polyhedra::{PolyhedronKind, SpawnTuning};
 
+#[path = "config_effects.rs"]
+mod effects;
+#[cfg(test)]
+pub(crate) use effects::{
+    BloomConfig, ColorWavefolderConfig, EdgeDetectionConfig, GaussianBlurConfig,
+    LensDistortionConfig,
+};
+pub(crate) use effects::{EffectGroup, EffectNumericParameter, EffectsConfig};
+
 const DEFAULT_CONFIG_PATH: &str = "config.toml";
 
 #[derive(Clone, Default, Resource, Deserialize, Serialize)]
@@ -405,212 +414,6 @@ impl Default for MaterialConfig {
             tetrahedron_hue_bias: 110.0,
             octahedron_hue_bias: 205.0,
             dodecahedron_hue_bias: 290.0,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default, Deserialize, Serialize)]
-#[serde(default)]
-pub(crate) struct EffectsConfig {
-    pub(crate) color_wavefolder: ColorWavefolderConfig,
-    pub(crate) lens_distortion: LensDistortionConfig,
-    pub(crate) gaussian_blur: GaussianBlurConfig,
-    pub(crate) bloom: BloomConfig,
-    pub(crate) edge_detection: EdgeDetectionConfig,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(default)]
-pub(crate) struct ColorWavefolderConfig {
-    pub(crate) enabled: bool,
-    pub(crate) gain: f32,
-    pub(crate) modulus: f32,
-}
-
-impl ColorWavefolderConfig {
-    pub(crate) fn gain_clamped(&self) -> f32 {
-        self.gain.max(0.0)
-    }
-
-    pub(crate) fn modulus_clamped(&self) -> f32 {
-        self.modulus.max(0.0001)
-    }
-}
-
-impl Default for ColorWavefolderConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            gain: 2.4,
-            modulus: 1.0,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(default)]
-pub(crate) struct LensDistortionConfig {
-    pub(crate) enabled: bool,
-    pub(crate) strength: f32,
-    pub(crate) radial_k2: f32,
-    pub(crate) radial_k3: f32,
-    pub(crate) zoom: f32,
-    pub(crate) center: [f32; 2],
-    pub(crate) scale: [f32; 2],
-    pub(crate) tangential: [f32; 2],
-    pub(crate) chromatic_aberration: f32,
-}
-
-impl LensDistortionConfig {
-    pub(crate) fn strength_clamped(&self) -> f32 {
-        self.strength.clamp(-4.0, 4.0)
-    }
-
-    pub(crate) fn radial_k2_clamped(&self) -> f32 {
-        self.radial_k2.clamp(-4.0, 4.0)
-    }
-
-    pub(crate) fn radial_k3_clamped(&self) -> f32 {
-        self.radial_k3.clamp(-4.0, 4.0)
-    }
-
-    pub(crate) fn zoom_clamped(&self) -> f32 {
-        self.zoom.max(0.1)
-    }
-
-    pub(crate) fn center_clamped(&self) -> [f32; 2] {
-        [
-            self.center[0].clamp(0.0, 1.0),
-            self.center[1].clamp(0.0, 1.0),
-        ]
-    }
-
-    pub(crate) fn scale_clamped(&self) -> [f32; 2] {
-        [self.scale[0].clamp(0.1, 4.0), self.scale[1].clamp(0.1, 4.0)]
-    }
-
-    pub(crate) fn tangential_clamped(&self) -> [f32; 2] {
-        [
-            self.tangential[0].clamp(-2.0, 2.0),
-            self.tangential[1].clamp(-2.0, 2.0),
-        ]
-    }
-
-    pub(crate) fn chromatic_aberration_clamped(&self) -> f32 {
-        self.chromatic_aberration.clamp(0.0, 0.5)
-    }
-}
-
-impl Default for LensDistortionConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            strength: 0.18,
-            radial_k2: 0.0,
-            radial_k3: 0.0,
-            zoom: 1.0,
-            center: [0.5, 0.5],
-            scale: [1.0, 1.0],
-            tangential: [0.0, 0.0],
-            chromatic_aberration: 0.0,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(default)]
-pub(crate) struct GaussianBlurConfig {
-    pub(crate) enabled: bool,
-    pub(crate) sigma: f32,
-    pub(crate) radius_pixels: u32,
-}
-
-impl GaussianBlurConfig {
-    pub(crate) fn sigma_clamped(&self) -> f32 {
-        self.sigma.max(0.0001)
-    }
-
-    pub(crate) fn radius_pixels_clamped(&self) -> u32 {
-        self.radius_pixels.min(16)
-    }
-}
-
-impl Default for GaussianBlurConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            sigma: 1.2,
-            radius_pixels: 2,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(default)]
-pub(crate) struct BloomConfig {
-    pub(crate) enabled: bool,
-    pub(crate) threshold: f32,
-    pub(crate) intensity: f32,
-    pub(crate) radius_pixels: u32,
-}
-
-impl BloomConfig {
-    pub(crate) fn threshold_clamped(&self) -> f32 {
-        self.threshold.max(0.0)
-    }
-
-    pub(crate) fn intensity_clamped(&self) -> f32 {
-        self.intensity.max(0.0)
-    }
-
-    pub(crate) fn radius_pixels_clamped(&self) -> u32 {
-        self.radius_pixels.min(16)
-    }
-}
-
-impl Default for BloomConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            threshold: 0.8,
-            intensity: 0.65,
-            radius_pixels: 8,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-#[serde(default)]
-pub(crate) struct EdgeDetectionConfig {
-    pub(crate) enabled: bool,
-    pub(crate) strength: f32,
-    pub(crate) threshold: f32,
-    pub(crate) mix: f32,
-    pub(crate) color: [f32; 3],
-}
-
-impl EdgeDetectionConfig {
-    pub(crate) fn strength_clamped(&self) -> f32 {
-        self.strength.max(0.0)
-    }
-
-    pub(crate) fn threshold_clamped(&self) -> f32 {
-        self.threshold.max(0.0)
-    }
-
-    pub(crate) fn mix_clamped(&self) -> f32 {
-        self.mix.clamp(0.0, 1.0)
-    }
-}
-
-impl Default for EdgeDetectionConfig {
-    fn default() -> Self {
-        Self {
-            enabled: false,
-            strength: 3.0,
-            threshold: 0.2,
-            mix: 0.85,
-            color: [1.0, 1.0, 1.0],
         }
     }
 }

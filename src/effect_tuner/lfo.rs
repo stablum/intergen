@@ -2,7 +2,7 @@ use std::f32::consts::TAU;
 
 use serde::{Deserialize, Serialize};
 
-use super::metadata::EffectNumericParameter;
+use crate::config::EffectNumericParameter;
 
 pub(crate) const DEFAULT_LFO_FREQUENCY_HZ: f32 = 0.25;
 pub(crate) const LFO_FREQUENCY_STEP_HZ: f32 = 0.05;

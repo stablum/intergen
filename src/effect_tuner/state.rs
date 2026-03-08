@@ -1,10 +1,10 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::config::EffectsConfig;
+use crate::config::{EffectGroup, EffectNumericParameter, EffectsConfig};
 
 use super::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LFO_FREQUENCY_STEP_HZ, LfoShape, ParameterLfo};
-use super::metadata::{EffectEditMode, EffectGroup, EffectNumericParameter, EffectOverlayField};
+use super::metadata::{EffectEditMode, EffectOverlayField};
 
 const OVERLAY_HOLD_SECS: f32 = 2.5;
 const HOLD_DELAY_SECS: f32 = 0.32;
@@ -389,11 +389,11 @@ fn default_lfos() -> Vec<ParameterLfo> {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::EffectsConfig;
+    use crate::config::{EffectGroup, EffectsConfig};
 
     use super::EffectTunerState;
     use crate::effect_tuner::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LfoShape};
-    use crate::effect_tuner::metadata::{EffectEditMode, EffectGroup, EffectOverlayField};
+    use crate::effect_tuner::metadata::{EffectEditMode, EffectOverlayField};
 
     #[test]
     fn selected_effect_matches_parameter_group() {
