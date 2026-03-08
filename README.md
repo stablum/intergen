@@ -4,10 +4,19 @@ Interactive 3D polyhedron generation tool built with Rust and Bevy.
 
 Runtime tuning lives in `config.toml` at the repository root.
 
+## Gallery
+
+| View 1 | View 2 |
+| --- | --- |
+| ![Intergen screenshot 0000](screenshots/intergen-0000.png) | ![Intergen screenshot 0001](screenshots/intergen-0001.png) |
+| ![Intergen screenshot 0002](screenshots/intergen-0002.png) | ![Intergen screenshot 0003](screenshots/intergen-0003.png) |
+| ![Intergen screenshot 0004](screenshots/intergen-0004.png) | ![Intergen screenshot 0005](screenshots/intergen-0005.png) |
+| ![Intergen screenshot 0006](screenshots/intergen-0006.png) | ![Intergen screenshot 0007](screenshots/intergen-0007.png) |
+
 The current prototype focuses on a fast local development loop and a usable vertical slice:
 - inertial camera rotation on all 3 axes with preserved angular momentum
 - keyboard zoom
-- recursive polyhedron spawning from parent vertices
+- recursive polyhedron spawning from parent vertices, edges, or faces
 - selectable child shape type
 - adjustable child scale ratio
 - toggleable in-app keybinding overlay
@@ -49,7 +58,7 @@ Current configuration sections:
 - `window`: title, resolution, and present mode
 - `rendering`: clear color and ambient light
 - `camera`: initial orbit, motion tuning, and angular-momentum preservation
-- `generation`: root shape, default child shape, scale limits, twist defaults and bounds, spawn cadence, and spawn heuristics
+- `generation`: root shape, default child shape, default spawn placement mode, scale limits, twist defaults and bounds, spawn cadence, and spawn heuristics
 - `lighting`: directional and point light colors, positions, and intensities
 - `effects`: camera-output shader effects
 - `materials`: color progression, PBR tuning, and live opacity defaults
@@ -66,14 +75,14 @@ Live twist controls use these `generation` settings:
 - `min_twist_per_vertex_radians` / `max_twist_per_vertex_radians`: live clamp range, with `0.0` as the minimum allowed floor
 
 Live child-offset controls use these `generation` settings:
-- `default_vertex_offset_ratio`: startup default for the center offset from a parent vertex, measured in child-radius units
+- `default_vertex_offset_ratio`: startup default for the center offset from the selected parent attachment point, measured in child-radius units
 - `vertex_offset_adjust_step`: per-keypress offset change
 - `vertex_offset_hold_delay_secs`: how long to hold before offset repeat starts
 - `vertex_offset_repeat_interval_secs`: time between repeated offset updates while held
 - `min_vertex_offset_ratio` / `max_vertex_offset_ratio`: live clamp range, with `0.0` as the minimum allowed floor
 
-Live vertex-exclusion controls use these `generation` settings:
-- `default_vertex_spawn_exclusion_probability`: startup default for the chance that a given vertex is skipped during spawning
+Live spawn-exclusion controls use these `generation` settings:
+- `default_vertex_spawn_exclusion_probability`: startup default for the chance that a given attachment in the current spawn mode is skipped during spawning
 - `vertex_spawn_exclusion_adjust_step`: per-keypress probability change
 - `vertex_spawn_exclusion_hold_delay_secs`: how long to hold before repeat starts
 - `vertex_spawn_exclusion_repeat_interval_secs`: time between repeated probability updates while held
@@ -153,7 +162,7 @@ Current scene preset contents:
 - directional and point light settings
 - material palette/PBR settings and current global opacity
 - camera position, distance, and momentum
-- current polyhedron tree, selected child shape, scale ratio, twist, vertex offset, and global vertex-exclusion probability
+- current polyhedron tree, selected child shape, spawn placement mode, scale ratio, twist, outward offset, and global spawn-exclusion probability
 - live camera-output effect values plus all per-parameter LFO settings
 ## Blender Export
 
@@ -231,7 +240,8 @@ cargo test-plain
 - `F4`: export the current scene to `blend-exports/` as a Blender `.blend`
 - `F12`: save a screenshot to `screenshots/`
 - `R`: reset the scene with the currently selected polyhedron as the new root
-- `Space`: spawn child polyhedra, or hold to keep spawning
+- `Space`: spawn child polyhedra with the current placement mode, or hold to keep spawning
+- `G`: cycle the spawn placement mode between vertices, edges, and faces
 - `1`: select cube
 - `2`: select tetrahedron
 - `3`: select octahedron
@@ -240,12 +250,12 @@ cargo test-plain
 - `+`: increase child scale ratio
 - `[` or `,`: decrease child twist angle, or hold to keep decreasing
 - `]` or `.`: increase child twist angle, or hold to keep increasing
-- `Z`: decrease the child vertex offset, or hold to keep decreasing
-- `X`: increase the child vertex offset, or hold to keep increasing
-- `C`: reset the child vertex offset to the configured default
-- `V`: decrease the global vertex-exclusion probability, or hold to keep decreasing
-- `B`: increase the global vertex-exclusion probability, or hold to keep increasing
-- `N`: reset the global vertex-exclusion probability to the configured default
+- `Z`: decrease the child outward offset, or hold to keep decreasing
+- `X`: increase the child outward offset, or hold to keep increasing
+- `C`: reset the child outward offset to the configured default
+- `V`: decrease the global spawn-exclusion probability, or hold to keep decreasing
+- `B`: increase the global spawn-exclusion probability, or hold to keep increasing
+- `N`: reset the global spawn-exclusion probability to the configured default
 - `O`: decrease global object opacity
 - `P`: increase global object opacity
 - `I`: reset global object opacity to the configured default
