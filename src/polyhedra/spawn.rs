@@ -51,6 +51,17 @@ pub(crate) struct SpawnedNode {
     pub(crate) node: PolyhedronNode,
 }
 
+struct SpawnCandidateInput<'a> {
+    parent: &'a PolyhedronNode,
+    parent_geometry: &'a ShapeGeometry,
+    child_kind: PolyhedronKind,
+    child_geometry: &'a ShapeGeometry,
+    parent_index: usize,
+    vertex_index: usize,
+    scale_ratio: f32,
+    tuning: SpawnTuning,
+}
+
 pub(crate) fn root_node(kind: PolyhedronKind, scale: f32, shapes: &ShapeCatalog) -> PolyhedronNode {
     let geometry = shapes.geometry(kind);
     PolyhedronNode {
@@ -92,17 +103,16 @@ pub(crate) fn next_spawn(
                     continue;
                 }
 
-                let candidate = spawn_candidate(
-                    &parent,
+                let candidate = spawn_candidate(SpawnCandidateInput {
+                    parent: &parent,
                     parent_geometry,
                     child_kind,
                     child_geometry,
                     parent_index,
                     vertex_index,
                     scale_ratio,
-                    tuning.twist_per_vertex_radians,
-                    tuning.vertex_offset_ratio,
-                );
+                    tuning,
+                });
 
                 if is_fully_contained(
                     candidate.center,
@@ -169,39 +179,29 @@ pub(crate) fn recompute_spawn_tree(
     }
 }
 
-fn spawn_candidate(
-    parent: &PolyhedronNode,
-    parent_geometry: &ShapeGeometry,
-    child_kind: PolyhedronKind,
-    child_geometry: &ShapeGeometry,
-    parent_index: usize,
-    vertex_index: usize,
-    scale_ratio: f32,
-    twist_per_vertex_radians: f32,
-    vertex_offset_ratio: f32,
-) -> PolyhedronNode {
-    let scale = parent.scale * scale_ratio;
-    let radius = child_geometry.radius * scale;
+fn spawn_candidate(input: SpawnCandidateInput<'_>) -> PolyhedronNode {
+    let scale = input.parent.scale * input.scale_ratio;
+    let radius = input.child_geometry.radius * scale;
     let (center, rotation) = child_transform(
-        parent,
-        parent_geometry,
-        vertex_index,
+        input.parent,
+        input.parent_geometry,
+        input.vertex_index,
         radius,
-        twist_per_vertex_radians,
-        vertex_offset_ratio,
+        input.tuning.twist_per_vertex_radians,
+        input.tuning.vertex_offset_ratio,
     );
 
     PolyhedronNode {
-        kind: child_kind,
-        level: parent.level + 1,
+        kind: input.child_kind,
+        level: input.parent.level + 1,
         center,
         rotation,
         scale,
         radius,
-        occupied_vertices: vec![false; child_geometry.vertices.len()],
+        occupied_vertices: vec![false; input.child_geometry.vertices.len()],
         origin: NodeOrigin::Child {
-            parent_index,
-            vertex_index,
+            parent_index: input.parent_index,
+            vertex_index: input.vertex_index,
         },
     }
 }

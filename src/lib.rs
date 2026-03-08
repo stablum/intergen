@@ -8,6 +8,7 @@ mod effects;
 mod generation;
 mod polyhedra;
 mod presets;
+mod runtime_scene;
 mod scene;
 mod ui;
 

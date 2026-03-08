@@ -16,6 +16,7 @@ use crate::config::{
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
 use crate::polyhedra::{PolyhedronKind, PolyhedronNode};
 use crate::presets::PresetBrowserState;
+use crate::runtime_scene::SceneSnapshotAccess;
 use crate::scene::{GenerationState, MaterialState, ShapeAssets};
 
 const BLEND_EXPORT_DIR: &str = "blend-exports";
@@ -385,18 +386,13 @@ pub(crate) fn blender_export_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     preset_browser: Res<PresetBrowserState>,
-    app_config: Res<AppConfig>,
-    camera_rig: Res<CameraRig>,
-    effect_tuner: Res<EffectTunerState>,
-    shape_assets: Res<ShapeAssets>,
-    generation_state: Res<GenerationState>,
-    material_state: Res<MaterialState>,
+    scene: SceneSnapshotAccess,
 ) {
     if preset_browser.blocks_input() || !keys.just_pressed(KeyCode::F4) {
         return;
     }
 
-    let path = match default_blend_export_path(&generation_state) {
+    let path = match default_blend_export_path(&scene.generation_state) {
         Ok(path) => path,
         Err(error) => {
             eprintln!("{error}");
@@ -404,32 +400,17 @@ pub(crate) fn blender_export_input_system(
         }
     };
 
-    match export_current_scene(
-        &path,
-        &app_config,
-        &camera_rig,
-        &effect_tuner,
-        &shape_assets,
-        &generation_state,
-        &material_state,
-        time.elapsed_secs(),
-    ) {
+    match export_current_scene(&path, &scene, time.elapsed_secs()) {
         Ok(message) => println!("{message}"),
         Err(error) => eprintln!("{error}"),
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn automated_blend_export_system(
     time: Res<Time>,
     frame_count: Res<FrameCount>,
     automated_blend_export: Option<ResMut<AutomatedBlendExport>>,
-    app_config: Res<AppConfig>,
-    camera_rig: Res<CameraRig>,
-    effect_tuner: Res<EffectTunerState>,
-    shape_assets: Res<ShapeAssets>,
-    generation_state: Res<GenerationState>,
-    material_state: Res<MaterialState>,
+    scene: SceneSnapshotAccess,
     mut app_exit: MessageWriter<AppExit>,
 ) {
     let Some(mut automated_blend_export) = automated_blend_export else {
@@ -441,41 +422,26 @@ pub(crate) fn automated_blend_export_system(
     }
 
     automated_blend_export.requested = true;
-    match export_current_scene(
-        &automated_blend_export.path,
-        &app_config,
-        &camera_rig,
-        &effect_tuner,
-        &shape_assets,
-        &generation_state,
-        &material_state,
-        time.elapsed_secs(),
-    ) {
+    match export_current_scene(&automated_blend_export.path, &scene, time.elapsed_secs()) {
         Ok(message) => println!("{message}"),
         Err(error) => eprintln!("{error}"),
     }
     app_exit.write(AppExit::Success);
 }
 
-#[allow(clippy::too_many_arguments)]
 fn export_current_scene(
     output_path: &Path,
-    app_config: &AppConfig,
-    camera_rig: &CameraRig,
-    effect_tuner: &EffectTunerState,
-    shape_assets: &ShapeAssets,
-    generation_state: &GenerationState,
-    material_state: &MaterialState,
+    scene: &SceneSnapshotAccess<'_, '_>,
     now_secs: f32,
 ) -> Result<String, String> {
     ensure_parent_dir(output_path)?;
     let snapshot = BlendExportFile::capture(
-        app_config,
-        camera_rig,
-        effect_tuner,
-        shape_assets,
-        generation_state,
-        material_state,
+        scene.app_config.as_ref(),
+        scene.camera_rig.as_ref(),
+        scene.effect_tuner.as_ref(),
+        scene.shape_assets.as_ref(),
+        scene.generation_state.as_ref(),
+        scene.material_state.as_ref(),
         now_secs,
     );
     let snapshot_path = snapshot_sidecar_path(output_path);

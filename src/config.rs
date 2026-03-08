@@ -9,7 +9,7 @@ use crate::polyhedra::{PolyhedronKind, SpawnTuning};
 
 const DEFAULT_CONFIG_PATH: &str = "config.toml";
 
-#[derive(Clone, Resource, Deserialize, Serialize)]
+#[derive(Clone, Default, Resource, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct AppConfig {
     pub(crate) window: WindowConfig,
@@ -40,22 +40,6 @@ impl AppConfig {
     }
 }
 
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            window: WindowConfig::default(),
-            rendering: RenderingConfig::default(),
-            camera: CameraConfig::default(),
-            generation: GenerationConfig::default(),
-            lighting: LightingConfig::default(),
-            effects: EffectsConfig::default(),
-            materials: MaterialConfig::default(),
-            capture: CaptureConfig::default(),
-            ui: UiConfig::default(),
-        }
-    }
-}
-
 fn parse_config(contents: &str) -> Result<AppConfig, toml::de::Error> {
     toml::from_str(contents)
 }
@@ -80,21 +64,16 @@ impl Default for WindowConfig {
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum PresentModeSetting {
+    #[default]
     AutoVsync,
     AutoNoVsync,
     Immediate,
     Mailbox,
     Fifo,
     FifoRelaxed,
-}
-
-impl Default for PresentModeSetting {
-    fn default() -> Self {
-        Self::AutoVsync
-    }
 }
 
 impl From<PresentModeSetting> for PresentMode {
@@ -295,20 +274,11 @@ impl Default for GenerationConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct LightingConfig {
     pub(crate) directional: DirectionalLightConfig,
     pub(crate) point: PointLightConfig,
-}
-
-impl Default for LightingConfig {
-    fn default() -> Self {
-        Self {
-            directional: DirectionalLightConfig::default(),
-            point: PointLightConfig::default(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -439,7 +409,7 @@ impl Default for MaterialConfig {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct EffectsConfig {
     pub(crate) color_wavefolder: ColorWavefolderConfig,
@@ -447,18 +417,6 @@ pub(crate) struct EffectsConfig {
     pub(crate) gaussian_blur: GaussianBlurConfig,
     pub(crate) bloom: BloomConfig,
     pub(crate) edge_detection: EdgeDetectionConfig,
-}
-
-impl Default for EffectsConfig {
-    fn default() -> Self {
-        Self {
-            color_wavefolder: ColorWavefolderConfig::default(),
-            lens_distortion: LensDistortionConfig::default(),
-            gaussian_blur: GaussianBlurConfig::default(),
-            bloom: BloomConfig::default(),
-            edge_detection: EdgeDetectionConfig::default(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]

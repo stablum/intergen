@@ -9,10 +9,8 @@ use crate::camera::CameraRig;
 use crate::config::{AppConfig, LightingConfig, MaterialConfig, RenderingConfig};
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
 use crate::polyhedra::{NodeOrigin, PolyhedronKind, PolyhedronNode};
-use crate::scene::{
-    GenerationState, MaterialState, PolyhedronEntity, SceneDirectionalLight, ScenePointLight,
-    ShapeAssets, spawn_polyhedron_entity,
-};
+use crate::runtime_scene::SceneMutationAccess;
+use crate::scene::{GenerationState, MaterialState, spawn_polyhedron_entity};
 
 const PRESET_DIR: &str = "scene-presets";
 const PRESET_FORMAT_VERSION: u32 = 1;
@@ -78,6 +76,16 @@ struct ScenePresetSnapshot {
     camera: CameraRigSnapshot,
     generation: GenerationSnapshot,
     material_state: MaterialRuntimeSnapshot,
+    effects: EffectRuntimeSnapshot,
+}
+
+struct PreparedScenePreset {
+    rendering: RenderingConfig,
+    lighting: LightingConfig,
+    materials: MaterialConfig,
+    camera_rig: CameraRig,
+    generation: GenerationState,
+    material_opacity: f32,
     effects: EffectRuntimeSnapshot,
 }
 
@@ -451,6 +459,18 @@ impl ScenePresetSnapshot {
             .unwrap_or_else(|| "Unknown".to_string());
         format!("{} root, {} nodes", root_kind, self.generation.nodes.len())
     }
+
+    fn prepare_runtime(&self) -> Result<PreparedScenePreset, String> {
+        Ok(PreparedScenePreset {
+            rendering: self.rendering.clone(),
+            lighting: self.lighting.clone(),
+            materials: self.materials.clone(),
+            camera_rig: self.camera.to_runtime(),
+            generation: self.generation.to_runtime()?,
+            material_opacity: self.material_state.opacity.clamp(0.0, 1.0),
+            effects: self.effects.clone(),
+        })
+    }
 }
 
 fn vec3_to_array(vector: Vec3) -> [f32; 3] {
@@ -484,29 +504,10 @@ impl ScenePresetFile {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn preset_input_system(
-    mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
     mut preset_browser: ResMut<PresetBrowserState>,
-    mut app_config: ResMut<AppConfig>,
-    mut clear_color: ResMut<ClearColor>,
-    mut ambient_light: ResMut<AmbientLight>,
-    mut camera_rig: ResMut<CameraRig>,
-    mut effect_tuner: ResMut<EffectTunerState>,
-    shape_assets: Res<ShapeAssets>,
-    mut generation_state: ResMut<GenerationState>,
-    mut material_state: ResMut<MaterialState>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-    polyhedron_entities: Query<Entity, With<PolyhedronEntity>>,
-    mut directional_lights: Query<
-        (&mut DirectionalLight, &mut Transform),
-        (With<SceneDirectionalLight>, Without<ScenePointLight>),
-    >,
-    mut point_lights: Query<
-        (&mut PointLight, &mut Transform),
-        (With<ScenePointLight>, Without<SceneDirectionalLight>),
-    >,
+    mut scene: SceneMutationAccess,
 ) {
     if keys.just_pressed(KeyCode::F3) {
         if preset_browser.active {
@@ -538,22 +539,7 @@ pub(crate) fn preset_input_system(
             chooser.selected += 1;
         }
         if keys.just_pressed(KeyCode::Enter) {
-            match resolve_collision(
-                &mut preset_browser,
-                &mut commands,
-                &mut app_config,
-                &mut clear_color,
-                &mut ambient_light,
-                &mut camera_rig,
-                &mut effect_tuner,
-                &shape_assets,
-                &mut generation_state,
-                &mut material_state,
-                &mut materials,
-                &polyhedron_entities,
-                &mut directional_lights,
-                &mut point_lights,
-            ) {
+            match resolve_collision(&mut preset_browser, &mut scene) {
                 Ok(Some(message)) => println!("{message}"),
                 Ok(None) => {}
                 Err(error) => eprintln!("{error}"),
@@ -585,31 +571,15 @@ pub(crate) fn preset_input_system(
     };
 
     let result = match preset_browser.command {
-        PresetCommand::Load => load_assigned_preset(
-            &mut preset_browser,
-            index,
-            &mut commands,
-            &mut app_config,
-            &mut clear_color,
-            &mut ambient_light,
-            &mut camera_rig,
-            &mut effect_tuner,
-            &shape_assets,
-            &mut generation_state,
-            &mut material_state,
-            &mut materials,
-            &polyhedron_entities,
-            &mut directional_lights,
-            &mut point_lights,
-        ),
+        PresetCommand::Load => load_assigned_preset(&mut preset_browser, index, &mut scene),
         PresetCommand::Save => save_scene_preset(
             &mut preset_browser,
             index,
-            &app_config,
-            &camera_rig,
-            &generation_state,
-            &material_state,
-            &effect_tuner,
+            &scene.app_config,
+            &scene.camera_rig,
+            &scene.generation_state,
+            &scene.material_state,
+            &scene.effect_tuner,
         ),
         PresetCommand::Free => free_assigned_slot(&mut preset_browser, index),
     };
@@ -621,29 +591,10 @@ pub(crate) fn preset_input_system(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn load_assigned_preset(
     preset_browser: &mut PresetBrowserState,
     index: PresetIndex,
-    commands: &mut Commands,
-    app_config: &mut AppConfig,
-    clear_color: &mut ClearColor,
-    ambient_light: &mut AmbientLight,
-    camera_rig: &mut CameraRig,
-    effect_tuner: &mut EffectTunerState,
-    shape_assets: &ShapeAssets,
-    generation_state: &mut GenerationState,
-    material_state: &mut MaterialState,
-    materials: &mut Assets<StandardMaterial>,
-    polyhedron_entities: &Query<Entity, With<PolyhedronEntity>>,
-    directional_lights: &mut Query<
-        (&mut DirectionalLight, &mut Transform),
-        (With<SceneDirectionalLight>, Without<ScenePointLight>),
-    >,
-    point_lights: &mut Query<
-        (&mut PointLight, &mut Transform),
-        (With<ScenePointLight>, Without<SceneDirectionalLight>),
-    >,
+    scene: &mut SceneMutationAccess<'_, '_>,
 ) -> Result<Option<String>, String> {
     let records = preset_browser.records_for_index(index);
     if records.is_empty() {
@@ -664,22 +615,7 @@ fn load_assigned_preset(
     }
 
     let record = &records[0];
-    apply_scene_preset(
-        &record.file.scene,
-        commands,
-        app_config,
-        clear_color,
-        ambient_light,
-        camera_rig,
-        effect_tuner,
-        shape_assets,
-        generation_state,
-        material_state,
-        materials,
-        polyhedron_entities,
-        directional_lights,
-        point_lights,
-    )?;
+    apply_scene_preset(&record.file.scene, scene)?;
     let message = format!(
         "Loaded scene preset {}: {}",
         index.code(),
@@ -754,28 +690,9 @@ fn free_assigned_slot(
     Ok(Some(message))
 }
 
-#[allow(clippy::too_many_arguments)]
 fn resolve_collision(
     preset_browser: &mut PresetBrowserState,
-    commands: &mut Commands,
-    app_config: &mut AppConfig,
-    clear_color: &mut ClearColor,
-    ambient_light: &mut AmbientLight,
-    camera_rig: &mut CameraRig,
-    effect_tuner: &mut EffectTunerState,
-    shape_assets: &ShapeAssets,
-    generation_state: &mut GenerationState,
-    material_state: &mut MaterialState,
-    materials: &mut Assets<StandardMaterial>,
-    polyhedron_entities: &Query<Entity, With<PolyhedronEntity>>,
-    directional_lights: &mut Query<
-        (&mut DirectionalLight, &mut Transform),
-        (With<SceneDirectionalLight>, Without<ScenePointLight>),
-    >,
-    point_lights: &mut Query<
-        (&mut PointLight, &mut Transform),
-        (With<ScenePointLight>, Without<SceneDirectionalLight>),
-    >,
+    scene: &mut SceneMutationAccess<'_, '_>,
 ) -> Result<Option<String>, String> {
     let Some(chooser) = preset_browser.chooser.take() else {
         return Ok(None);
@@ -797,22 +714,7 @@ fn resolve_collision(
     preset_browser.refresh()?;
 
     if chooser.load_after_resolution {
-        apply_scene_preset(
-            &chosen.file.scene,
-            commands,
-            app_config,
-            clear_color,
-            ambient_light,
-            camera_rig,
-            effect_tuner,
-            shape_assets,
-            generation_state,
-            material_state,
-            materials,
-            polyhedron_entities,
-            directional_lights,
-            point_lights,
-        )?;
+        apply_scene_preset(&chosen.file.scene, scene)?;
     }
 
     let message = format!(
@@ -826,70 +728,56 @@ fn resolve_collision(
     Ok(Some(message))
 }
 
-#[allow(clippy::too_many_arguments)]
 fn apply_scene_preset(
     scene: &ScenePresetSnapshot,
-    commands: &mut Commands,
-    app_config: &mut AppConfig,
-    clear_color: &mut ClearColor,
-    ambient_light: &mut AmbientLight,
-    camera_rig: &mut CameraRig,
-    effect_tuner: &mut EffectTunerState,
-    shape_assets: &ShapeAssets,
-    generation_state: &mut GenerationState,
-    material_state: &mut MaterialState,
-    materials: &mut Assets<StandardMaterial>,
-    polyhedron_entities: &Query<Entity, With<PolyhedronEntity>>,
-    directional_lights: &mut Query<
-        (&mut DirectionalLight, &mut Transform),
-        (With<SceneDirectionalLight>, Without<ScenePointLight>),
-    >,
-    point_lights: &mut Query<
-        (&mut PointLight, &mut Transform),
-        (With<ScenePointLight>, Without<SceneDirectionalLight>),
-    >,
+    runtime: &mut SceneMutationAccess<'_, '_>,
 ) -> Result<(), String> {
-    app_config.rendering = scene.rendering.clone();
-    app_config.lighting = scene.lighting.clone();
-    app_config.materials = scene.materials.clone();
+    let prepared = scene.prepare_runtime()?;
 
-    clear_color.0 = app_config.rendering.clear_color();
-    ambient_light.color = app_config.rendering.ambient_light_color();
-    ambient_light.brightness = app_config.rendering.ambient_light_brightness;
+    runtime.app_config.rendering = prepared.rendering;
+    runtime.app_config.lighting = prepared.lighting;
+    runtime.app_config.materials = prepared.materials;
 
-    for (mut light, mut transform) in directional_lights.iter_mut() {
-        light.color = app_config.lighting.directional.color();
-        light.illuminance = app_config.lighting.directional.illuminance;
-        light.shadows_enabled = app_config.lighting.directional.shadows_enabled;
-        *transform = Transform::from_translation(app_config.lighting.directional.translation())
-            .looking_at(app_config.lighting.directional.look_at(), Vec3::Y);
+    runtime.clear_color.0 = runtime.app_config.rendering.clear_color();
+    runtime.ambient_light.color = runtime.app_config.rendering.ambient_light_color();
+    runtime.ambient_light.brightness = runtime.app_config.rendering.ambient_light_brightness;
+
+    for (mut light, mut transform) in runtime.directional_lights.iter_mut() {
+        light.color = runtime.app_config.lighting.directional.color();
+        light.illuminance = runtime.app_config.lighting.directional.illuminance;
+        light.shadows_enabled = runtime.app_config.lighting.directional.shadows_enabled;
+        *transform =
+            Transform::from_translation(runtime.app_config.lighting.directional.translation())
+                .looking_at(runtime.app_config.lighting.directional.look_at(), Vec3::Y);
     }
 
-    for (mut light, mut transform) in point_lights.iter_mut() {
-        light.color = app_config.lighting.point.color();
-        light.intensity = app_config.lighting.point.intensity;
-        light.range = app_config.lighting.point.range;
-        light.shadows_enabled = app_config.lighting.point.shadows_enabled;
-        *transform = Transform::from_translation(app_config.lighting.point.translation());
+    for (mut light, mut transform) in runtime.point_lights.iter_mut() {
+        light.color = runtime.app_config.lighting.point.color();
+        light.intensity = runtime.app_config.lighting.point.intensity;
+        light.range = runtime.app_config.lighting.point.range;
+        light.shadows_enabled = runtime.app_config.lighting.point.shadows_enabled;
+        *transform = Transform::from_translation(runtime.app_config.lighting.point.translation());
     }
 
-    *camera_rig = scene.camera.to_runtime();
-    effect_tuner.apply_runtime_snapshot(&scene.effects);
-    *generation_state = scene.generation.to_runtime()?;
-    material_state.opacity = scene.material_state.opacity.clamp(0.0, 1.0);
+    *runtime.camera_rig = prepared.camera_rig;
+    runtime
+        .effect_tuner
+        .apply_runtime_snapshot(&prepared.effects);
+    *runtime.generation_state = prepared.generation;
+    runtime.material_state.opacity = prepared.material_opacity;
 
-    for entity in polyhedron_entities.iter() {
-        commands.entity(entity).despawn();
+    for entity in runtime.polyhedron_entities.iter() {
+        runtime.commands.entity(entity).despawn();
     }
 
-    for (node_index, node) in generation_state.nodes.iter().enumerate() {
+    for (node_index, node) in runtime.generation_state.nodes.iter().enumerate() {
         spawn_polyhedron_entity(
-            commands,
-            materials,
-            shape_assets.mesh(node.kind),
+            &mut runtime.commands,
+            &mut runtime.materials,
+            runtime.shape_assets.mesh(node.kind),
             node,
-            &app_config.materials,
-            material_state.opacity,
+            &runtime.app_config.materials,
+            runtime.material_state.opacity,
             node_index,
         );
     }
