@@ -14,7 +14,7 @@ use crate::config::{
     AppConfig, EffectsConfig, LightingConfig, MaterialConfig, RenderingConfig, WindowConfig,
 };
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
-use crate::polyhedra::{PolyhedronKind, PolyhedronNode};
+use crate::polyhedra::{PolyhedronKind, PolyhedronNode, SpawnPlacementMode};
 use crate::presets::PresetBrowserState;
 use crate::runtime_scene::SceneSnapshotAccess;
 use crate::scene::{GenerationState, MaterialState, ShapeAssets};
@@ -104,6 +104,8 @@ struct BlendObject {
     faces: Vec<Vec<usize>>,
     material: BlendMaterial,
     parent_index: Option<usize>,
+    parent_attachment_mode: Option<SpawnPlacementMode>,
+    parent_attachment_index: Option<usize>,
     parent_vertex_index: Option<usize>,
 }
 
@@ -138,6 +140,7 @@ struct BlendCameraRigMetadata {
 #[derive(Debug, Serialize)]
 struct BlendGenerationMetadata {
     selected_kind: PolyhedronKind,
+    spawn_placement_mode: SpawnPlacementMode,
     scale_ratio: f32,
     twist_per_vertex_radians: f32,
     vertex_offset_ratio: f32,
@@ -159,6 +162,8 @@ struct BlendNodeMetadata {
     scale: f32,
     radius: f32,
     occupied_vertices: Vec<bool>,
+    occupied_edges: Vec<bool>,
+    occupied_faces: Vec<bool>,
     origin: BlendNodeOrigin,
 }
 
@@ -168,7 +173,8 @@ enum BlendNodeOrigin {
     Root,
     Child {
         parent_index: usize,
-        vertex_index: usize,
+        attachment_mode: SpawnPlacementMode,
+        attachment_index: usize,
     },
 }
 
@@ -277,13 +283,19 @@ impl BlendObject {
             .map(|vertex| node.center + node.rotation * (*vertex * node.scale))
             .map(bevy_point_to_blender_array)
             .collect();
-        let (parent_index, parent_vertex_index) = match node.origin {
-            crate::polyhedra::NodeOrigin::Root => (None, None),
-            crate::polyhedra::NodeOrigin::Child {
-                parent_index,
-                vertex_index,
-            } => (Some(parent_index), Some(vertex_index)),
-        };
+        let (parent_index, parent_attachment_mode, parent_attachment_index, parent_vertex_index) =
+            match node.origin {
+                crate::polyhedra::NodeOrigin::Root => (None, None, None, None),
+                crate::polyhedra::NodeOrigin::Child {
+                    parent_index,
+                    attachment,
+                } => (
+                    Some(parent_index),
+                    Some(attachment.mode),
+                    Some(attachment.index),
+                    (attachment.mode == SpawnPlacementMode::Vertex).then_some(attachment.index),
+                ),
+            };
 
         Self {
             name: format!(
@@ -299,6 +311,8 @@ impl BlendObject {
             faces: geometry.faces.clone(),
             material: BlendMaterial::capture(node, material_config, opacity),
             parent_index,
+            parent_attachment_mode,
+            parent_attachment_index,
             parent_vertex_index,
         }
     }
@@ -341,6 +355,7 @@ impl BlendGenerationMetadata {
     fn capture(generation_state: &GenerationState) -> Self {
         Self {
             selected_kind: generation_state.selected_kind,
+            spawn_placement_mode: generation_state.spawn_placement_mode,
             scale_ratio: generation_state.scale_ratio,
             twist_per_vertex_radians: generation_state.twist_per_vertex_radians,
             vertex_offset_ratio: generation_state.vertex_offset_ratio,
@@ -363,7 +378,9 @@ impl BlendNodeMetadata {
             rotation: quat_to_array(node.rotation),
             scale: node.scale,
             radius: node.radius,
-            occupied_vertices: node.occupied_vertices.clone(),
+            occupied_vertices: node.occupied_attachments.vertices.clone(),
+            occupied_edges: node.occupied_attachments.edges.clone(),
+            occupied_faces: node.occupied_attachments.faces.clone(),
             origin: BlendNodeOrigin::capture(node.origin),
         }
     }
@@ -375,10 +392,11 @@ impl BlendNodeOrigin {
             crate::polyhedra::NodeOrigin::Root => Self::Root,
             crate::polyhedra::NodeOrigin::Child {
                 parent_index,
-                vertex_index,
+                attachment,
             } => Self::Child {
                 parent_index,
-                vertex_index,
+                attachment_mode: attachment.mode,
+                attachment_index: attachment.index,
             },
         }
     }

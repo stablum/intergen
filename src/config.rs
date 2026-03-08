@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use bevy::window::PresentMode;
 use serde::{Deserialize, Serialize};
 
-use crate::polyhedra::{PolyhedronKind, SpawnTuning};
+use crate::polyhedra::{PolyhedronKind, SpawnPlacementMode, SpawnTuning};
 
 #[path = "config_effects.rs"]
 mod effects;
@@ -181,6 +181,7 @@ pub(crate) struct GenerationConfig {
     pub(crate) root_kind: PolyhedronKind,
     pub(crate) root_scale: f32,
     pub(crate) default_child_kind: PolyhedronKind,
+    pub(crate) default_spawn_placement_mode: SpawnPlacementMode,
     pub(crate) default_scale_ratio: f32,
     pub(crate) scale_adjust_step: f32,
     pub(crate) min_scale_ratio: f32,
@@ -257,6 +258,7 @@ impl GenerationConfig {
         twist_per_vertex_radians: f32,
         vertex_offset_ratio: f32,
         vertex_spawn_exclusion_probability: f32,
+        spawn_placement_mode: SpawnPlacementMode,
     ) -> SpawnTuning {
         let (min_scale_ratio, max_scale_ratio) = self.scale_bounds();
         let (min_twist_per_vertex_radians, max_twist_per_vertex_radians) = self.twist_bounds();
@@ -275,6 +277,7 @@ impl GenerationConfig {
                 min_vertex_spawn_exclusion_probability,
                 max_vertex_spawn_exclusion_probability,
             ),
+            spawn_placement_mode,
         }
     }
 }
@@ -285,6 +288,7 @@ impl Default for GenerationConfig {
             root_kind: PolyhedronKind::Cube,
             root_scale: 1.9,
             default_child_kind: PolyhedronKind::Dodecahedron,
+            default_spawn_placement_mode: SpawnPlacementMode::Vertex,
             default_scale_ratio: 0.58,
             scale_adjust_step: 0.05,
             min_scale_ratio: 0.15,

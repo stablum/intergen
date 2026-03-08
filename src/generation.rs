@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::polyhedra::{PolyhedronKind, next_spawn, recompute_spawn_tree};
+use crate::polyhedra::{PolyhedronKind, SpawnPlacementMode, next_spawn, recompute_spawn_tree};
 use crate::presets::PresetBrowserState;
 use crate::runtime_scene::GenerationSceneAccess;
 use crate::scene::{
@@ -100,6 +100,14 @@ pub(crate) fn generation_input_system(
         println!(
             "Selected child shape: {:?}",
             scene.generation_state.selected_kind
+        );
+    }
+    if keys.just_pressed(KeyCode::KeyG) {
+        scene.generation_state.spawn_placement_mode =
+            scene.generation_state.spawn_placement_mode.next();
+        println!(
+            "{}",
+            spawn_placement_mode_status_message(scene.generation_state.spawn_placement_mode)
         );
     }
 
@@ -430,6 +438,7 @@ pub(crate) fn generation_input_system(
 
     let selected_kind = scene.generation_state.selected_kind;
     let scale_ratio = scene.generation_state.scale_ratio;
+    let spawn_placement_mode = scene.generation_state.spawn_placement_mode;
     let twist_per_vertex_radians = scene.generation_state.twist_per_vertex_radians;
     let vertex_offset_ratio = scene.generation_state.vertex_offset_ratio;
     let vertex_spawn_exclusion_probability =
@@ -443,6 +452,7 @@ pub(crate) fn generation_input_system(
             twist_per_vertex_radians,
             vertex_offset_ratio,
             vertex_spawn_exclusion_probability,
+            spawn_placement_mode,
         ),
     ) else {
         eprintln!("No valid spawn position is currently available.");
@@ -514,16 +524,20 @@ pub(crate) fn twist_status_message(radians: f32) -> String {
 
 pub(crate) fn vertex_offset_status_message(offset_ratio: f32) -> String {
     format!(
-        "Child vertex offset: {:.2}x child radius",
+        "Child outward offset: {:.2}x child radius",
         offset_ratio.max(0.0)
     )
 }
 
 pub(crate) fn vertex_exclusion_status_message(probability: f32) -> String {
     format!(
-        "Global vertex exclusion probability: {:.0}%",
+        "Global spawn exclusion probability: {:.0}%",
         probability.clamp(0.0, 1.0) * 100.0
     )
+}
+
+pub(crate) fn spawn_placement_mode_status_message(mode: SpawnPlacementMode) -> String {
+    format!("Spawn placement mode: {}", mode.plural_label())
 }
 
 #[cfg(test)]

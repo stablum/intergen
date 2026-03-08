@@ -124,6 +124,10 @@ def create_mesh_object(
     obj["intergen_level"] = int(object_data["level"])
     if object_data.get("parent_index") is not None:
         obj["intergen_parent_index"] = int(object_data["parent_index"])
+    if object_data.get("parent_attachment_mode") is not None:
+        obj["intergen_parent_attachment_mode"] = object_data["parent_attachment_mode"]
+    if object_data.get("parent_attachment_index") is not None:
+        obj["intergen_parent_attachment_index"] = int(object_data["parent_attachment_index"])
     if object_data.get("parent_vertex_index") is not None:
         obj["intergen_parent_vertex_index"] = int(object_data["parent_vertex_index"])
 

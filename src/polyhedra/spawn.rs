@@ -13,6 +13,34 @@ pub(crate) struct SpawnTuning {
     pub(crate) twist_per_vertex_radians: f32,
     pub(crate) vertex_offset_ratio: f32,
     pub(crate) vertex_spawn_exclusion_probability: f32,
+    pub(crate) spawn_placement_mode: SpawnPlacementMode,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum SpawnPlacementMode {
+    #[default]
+    Vertex,
+    Edge,
+    Face,
+}
+
+impl SpawnPlacementMode {
+    pub(crate) fn next(self) -> Self {
+        match self {
+            Self::Vertex => Self::Edge,
+            Self::Edge => Self::Face,
+            Self::Face => Self::Vertex,
+        }
+    }
+
+    pub(crate) fn plural_label(self) -> &'static str {
+        match self {
+            Self::Vertex => "vertices",
+            Self::Edge => "edges",
+            Self::Face => "faces",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
@@ -24,12 +52,59 @@ pub(crate) enum PolyhedronKind {
     Dodecahedron,
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
+pub(crate) struct SpawnAttachment {
+    pub(crate) mode: SpawnPlacementMode,
+    pub(crate) index: usize,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct AttachmentOccupancy {
+    pub(crate) vertices: Vec<bool>,
+    pub(crate) edges: Vec<bool>,
+    pub(crate) faces: Vec<bool>,
+}
+
+impl AttachmentOccupancy {
+    pub(crate) fn new(geometry: &ShapeGeometry) -> Self {
+        Self {
+            vertices: vec![false; geometry.vertices.len()],
+            edges: vec![false; geometry.edges.len()],
+            faces: vec![false; geometry.faces.len()],
+        }
+    }
+
+    pub(crate) fn is_occupied(&self, attachment: SpawnAttachment) -> bool {
+        self.occupied(attachment.mode)[attachment.index]
+    }
+
+    pub(crate) fn mark_occupied(&mut self, attachment: SpawnAttachment) {
+        self.occupied_mut(attachment.mode)[attachment.index] = true;
+    }
+
+    fn occupied(&self, mode: SpawnPlacementMode) -> &[bool] {
+        match mode {
+            SpawnPlacementMode::Vertex => &self.vertices,
+            SpawnPlacementMode::Edge => &self.edges,
+            SpawnPlacementMode::Face => &self.faces,
+        }
+    }
+
+    fn occupied_mut(&mut self, mode: SpawnPlacementMode) -> &mut [bool] {
+        match mode {
+            SpawnPlacementMode::Vertex => &mut self.vertices,
+            SpawnPlacementMode::Edge => &mut self.edges,
+            SpawnPlacementMode::Face => &mut self.faces,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum NodeOrigin {
     Root,
     Child {
         parent_index: usize,
-        vertex_index: usize,
+        attachment: SpawnAttachment,
     },
 }
 
@@ -41,7 +116,7 @@ pub(crate) struct PolyhedronNode {
     pub(crate) rotation: Quat,
     pub(crate) scale: f32,
     pub(crate) radius: f32,
-    pub(crate) occupied_vertices: Vec<bool>,
+    pub(crate) occupied_attachments: AttachmentOccupancy,
     pub(crate) origin: NodeOrigin,
 }
 
@@ -58,7 +133,7 @@ struct SpawnCandidateInput<'a> {
     child_kind: PolyhedronKind,
     child_geometry: &'a ShapeGeometry,
     parent_index: usize,
-    vertex_index: usize,
+    attachment: SpawnAttachment,
     scale_ratio: f32,
     tuning: SpawnTuning,
 }
@@ -72,7 +147,7 @@ pub(crate) fn root_node(kind: PolyhedronKind, scale: f32, shapes: &ShapeCatalog)
         rotation: Quat::IDENTITY,
         scale,
         radius: geometry.radius * scale,
-        occupied_vertices: vec![false; geometry.vertices.len()],
+        occupied_attachments: AttachmentOccupancy::new(geometry),
         origin: NodeOrigin::Root,
     }
 }
@@ -99,13 +174,18 @@ pub(crate) fn next_spawn(
             let parent_geometry = shapes.geometry(parent.kind);
             let child_geometry = shapes.geometry(child_kind);
 
-            for vertex_index in 0..parent_geometry.vertices.len() {
-                if parent.occupied_vertices[vertex_index] {
+            for attachment_index in 0..parent_geometry.attachment_count(tuning.spawn_placement_mode)
+            {
+                let attachment = SpawnAttachment {
+                    mode: tuning.spawn_placement_mode,
+                    index: attachment_index,
+                };
+                if parent.occupied_attachments.is_occupied(attachment) {
                     continue;
                 }
-                if vertex_is_excluded(
+                if attachment_is_excluded(
                     parent_index,
-                    vertex_index,
+                    attachment,
                     tuning.vertex_spawn_exclusion_probability,
                 ) {
                     continue;
@@ -117,7 +197,7 @@ pub(crate) fn next_spawn(
                     child_kind,
                     child_geometry,
                     parent_index,
-                    vertex_index,
+                    attachment,
                     scale_ratio,
                     tuning,
                 });
@@ -136,7 +216,9 @@ pub(crate) fn next_spawn(
                     continue;
                 }
 
-                nodes[parent_index].occupied_vertices[vertex_index] = true;
+                nodes[parent_index]
+                    .occupied_attachments
+                    .mark_occupied(attachment);
                 nodes.push(candidate.clone());
 
                 return Some(SpawnedNode {
@@ -162,7 +244,7 @@ pub(crate) fn recompute_spawn_tree(
         let node = &mut current_and_rest[0];
         let NodeOrigin::Child {
             parent_index,
-            vertex_index,
+            attachment,
         } = node.origin
         else {
             continue;
@@ -175,7 +257,7 @@ pub(crate) fn recompute_spawn_tree(
         let (center, rotation) = child_transform(
             parent,
             parent_geometry,
-            vertex_index,
+            attachment,
             child_radius,
             twist_per_vertex_radians,
             vertex_offset_ratio,
@@ -193,7 +275,7 @@ fn spawn_candidate(input: SpawnCandidateInput<'_>) -> PolyhedronNode {
     let (center, rotation) = child_transform(
         input.parent,
         input.parent_geometry,
-        input.vertex_index,
+        input.attachment,
         radius,
         input.tuning.twist_per_vertex_radians,
         input.tuning.vertex_offset_ratio,
@@ -206,15 +288,19 @@ fn spawn_candidate(input: SpawnCandidateInput<'_>) -> PolyhedronNode {
         rotation,
         scale,
         radius,
-        occupied_vertices: vec![false; input.child_geometry.vertices.len()],
+        occupied_attachments: AttachmentOccupancy::new(input.child_geometry),
         origin: NodeOrigin::Child {
             parent_index: input.parent_index,
-            vertex_index: input.vertex_index,
+            attachment: input.attachment,
         },
     }
 }
 
-fn vertex_is_excluded(parent_index: usize, vertex_index: usize, probability: f32) -> bool {
+fn attachment_is_excluded(
+    parent_index: usize,
+    attachment: SpawnAttachment,
+    probability: f32,
+) -> bool {
     let probability = probability.clamp(0.0, 1.0);
     if probability <= 0.0 {
         return false;
@@ -223,13 +309,18 @@ fn vertex_is_excluded(parent_index: usize, vertex_index: usize, probability: f32
         return true;
     }
 
-    vertex_exclusion_sample(parent_index, vertex_index) < probability
+    attachment_exclusion_sample(parent_index, attachment) < probability
 }
 
-fn vertex_exclusion_sample(parent_index: usize, vertex_index: usize) -> f32 {
+fn attachment_exclusion_sample(parent_index: usize, attachment: SpawnAttachment) -> f32 {
+    let mode_bits = match attachment.mode {
+        SpawnPlacementMode::Vertex => 0xD6E8_FEB8_6659_FD93,
+        SpawnPlacementMode::Edge => 0xA076_1D64_78BD_642F,
+        SpawnPlacementMode::Face => 0xE703_7ED1_A0B4_28DB,
+    };
     let mut state = (parent_index as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15)
-        ^ (vertex_index as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F)
-        ^ 0xD6E8_FEB8_6659_FD93;
+        ^ (attachment.index as u64).wrapping_mul(0xC2B2_AE3D_27D4_EB4F)
+        ^ mode_bits;
     state ^= state >> 33;
     state = state.wrapping_mul(0xFF51_AFD7_ED55_8CCD);
     state ^= state >> 33;
@@ -242,30 +333,25 @@ fn vertex_exclusion_sample(parent_index: usize, vertex_index: usize) -> f32 {
 fn child_transform(
     parent: &PolyhedronNode,
     parent_geometry: &ShapeGeometry,
-    vertex_index: usize,
+    attachment: SpawnAttachment,
     child_radius: f32,
     twist_per_vertex_radians: f32,
     vertex_offset_ratio: f32,
 ) -> (Vec3, Quat) {
-    let local_vertex = parent_geometry.vertices[vertex_index] * parent.scale;
-    let world_vertex = parent.center + parent.rotation * local_vertex;
-    let direction = parent.rotation * parent_geometry.vertices[vertex_index];
-    let outward = if direction.length_squared() > 0.0 {
-        direction.normalize()
-    } else {
-        Vec3::Y
-    };
+    let outward_local = parent_geometry.attachment_direction(attachment.mode, attachment.index);
+    let outward = parent.rotation * outward_local;
+    let world_anchor = parent.center + outward * parent.radius;
 
     let twist_step = if twist_per_vertex_radians.is_finite() {
         twist_per_vertex_radians
     } else {
         PI / 5.0
     };
-    let twist = Quat::from_axis_angle(outward, vertex_index as f32 * twist_step);
+    let twist = Quat::from_axis_angle(outward, attachment.index as f32 * twist_step);
     let vertex_offset = child_radius * vertex_offset_ratio.max(0.0);
 
     (
-        world_vertex + outward * vertex_offset,
+        world_anchor + outward * vertex_offset,
         twist * parent.rotation,
     )
 }
@@ -306,6 +392,7 @@ mod tests {
             twist_per_vertex_radians: PI / 5.0,
             vertex_offset_ratio: 0.0,
             vertex_spawn_exclusion_probability: 0.0,
+            spawn_placement_mode: SpawnPlacementMode::Vertex,
         }
     }
 
@@ -340,7 +427,7 @@ mod tests {
             rotation: Quat::IDENTITY,
             scale: 1.0,
             radius: 5.0,
-            occupied_vertices: vec![false; 8],
+            occupied_attachments: AttachmentOccupancy::default(),
             origin: NodeOrigin::Root,
         }];
 
@@ -373,7 +460,7 @@ mod tests {
             rotation: parent_rotation,
             scale: parent_scale,
             radius: parent_geometry.radius * parent_scale,
-            occupied_vertices: vec![false; parent_geometry.vertices.len()],
+            occupied_attachments: AttachmentOccupancy::new(parent_geometry),
             origin: NodeOrigin::Root,
         }];
 
@@ -385,8 +472,75 @@ mod tests {
             test_tuning(),
         )
         .expect("spawn should succeed");
-        let expected_center =
-            parent_center + parent_rotation * (parent_geometry.vertices[0] * parent_scale);
+        let expected_center = parent_center
+            + parent_rotation
+                * (parent_geometry.attachment_direction(SpawnPlacementMode::Vertex, 0)
+                    * parent_geometry.radius
+                    * parent_scale);
+
+        assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
+    }
+
+    #[test]
+    fn spawned_child_center_matches_parent_edge_direction() {
+        let shapes = ShapeCatalog::new();
+        let parent_geometry = shapes.geometry(PolyhedronKind::Cube);
+        let mut nodes = vec![PolyhedronNode {
+            kind: PolyhedronKind::Cube,
+            level: 0,
+            center: Vec3::new(1.5, -0.75, 2.25),
+            rotation: Quat::IDENTITY,
+            scale: 1.4,
+            radius: parent_geometry.radius * 1.4,
+            occupied_attachments: AttachmentOccupancy::new(parent_geometry),
+            origin: NodeOrigin::Root,
+        }];
+
+        let spawn = next_spawn(
+            &mut nodes,
+            &shapes,
+            PolyhedronKind::Tetrahedron,
+            0.35,
+            SpawnTuning {
+                spawn_placement_mode: SpawnPlacementMode::Edge,
+                ..test_tuning()
+            },
+        )
+        .expect("spawn should succeed");
+        let expected_center = nodes[0].center
+            + parent_geometry.attachment_direction(SpawnPlacementMode::Edge, 0) * nodes[0].radius;
+
+        assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
+    }
+
+    #[test]
+    fn spawned_child_center_matches_parent_face_direction() {
+        let shapes = ShapeCatalog::new();
+        let parent_geometry = shapes.geometry(PolyhedronKind::Cube);
+        let mut nodes = vec![PolyhedronNode {
+            kind: PolyhedronKind::Cube,
+            level: 0,
+            center: Vec3::new(1.5, -0.75, 2.25),
+            rotation: Quat::IDENTITY,
+            scale: 1.4,
+            radius: parent_geometry.radius * 1.4,
+            occupied_attachments: AttachmentOccupancy::new(parent_geometry),
+            origin: NodeOrigin::Root,
+        }];
+
+        let spawn = next_spawn(
+            &mut nodes,
+            &shapes,
+            PolyhedronKind::Tetrahedron,
+            0.35,
+            SpawnTuning {
+                spawn_placement_mode: SpawnPlacementMode::Face,
+                ..test_tuning()
+            },
+        )
+        .expect("spawn should succeed");
+        let expected_center = nodes[0].center
+            + parent_geometry.attachment_direction(SpawnPlacementMode::Face, 0) * nodes[0].radius;
 
         assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
     }
@@ -408,7 +562,7 @@ mod tests {
             rotation: Quat::IDENTITY,
             scale: parent_scale,
             radius: parent_geometry.radius * parent_scale,
-            occupied_vertices: vec![false; parent_geometry.vertices.len()],
+            occupied_attachments: AttachmentOccupancy::new(parent_geometry),
             origin: NodeOrigin::Root,
         }];
 
@@ -423,10 +577,10 @@ mod tests {
             },
         )
         .expect("spawn should succeed");
-        let parent_vertex = nodes[0].center + parent_geometry.vertices[0] * parent_scale;
+        let outward = parent_geometry.attachment_direction(SpawnPlacementMode::Vertex, 0);
+        let world_anchor = nodes[0].center + outward * nodes[0].radius;
         let child_radius = child_geometry.radius * parent_scale * scale_ratio;
-        let expected_center = parent_vertex
-            + parent_geometry.vertices[0].normalize() * child_radius * vertex_offset_ratio;
+        let expected_center = world_anchor + outward * child_radius * vertex_offset_ratio;
 
         assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
     }
@@ -452,6 +606,27 @@ mod tests {
     }
 
     #[test]
+    fn switching_spawn_modes_uses_separate_attachment_occupancy() {
+        let shapes = ShapeCatalog::new();
+        let mut root = root_node(PolyhedronKind::Cube, 1.4, &shapes);
+        root.occupied_attachments.vertices.fill(true);
+        let mut nodes = vec![root];
+
+        let spawn = next_spawn(
+            &mut nodes,
+            &shapes,
+            PolyhedronKind::Cube,
+            0.35,
+            SpawnTuning {
+                spawn_placement_mode: SpawnPlacementMode::Edge,
+                ..test_tuning()
+            },
+        );
+
+        assert!(spawn.is_some());
+    }
+
+    #[test]
     fn zero_twist_keeps_child_orientation_aligned_with_parent() {
         let shapes = ShapeCatalog::new();
         let parent_rotation = Quat::from_euler(EulerRot::YXZ, 0.45, -0.3, 0.2);
@@ -464,7 +639,7 @@ mod tests {
             rotation: parent_rotation,
             scale: 1.4,
             radius: parent_geometry.radius * 1.4,
-            occupied_vertices: vec![false; parent_geometry.vertices.len()],
+            occupied_attachments: AttachmentOccupancy::new(parent_geometry),
             origin: NodeOrigin::Root,
         }];
 

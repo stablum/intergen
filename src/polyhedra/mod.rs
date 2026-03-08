@@ -7,5 +7,6 @@ pub(crate) use shapes::{ShapeCatalog, ShapeGeometry};
 #[allow(unused_imports)]
 pub(crate) use spawn::NodeOrigin;
 pub(crate) use spawn::{
-    PolyhedronKind, PolyhedronNode, SpawnTuning, next_spawn, recompute_spawn_tree, root_node,
+    AttachmentOccupancy, PolyhedronKind, PolyhedronNode, SpawnAttachment, SpawnPlacementMode,
+    SpawnTuning, next_spawn, recompute_spawn_tree, root_node,
 };

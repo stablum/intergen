@@ -8,7 +8,10 @@ use serde::{Deserialize, Serialize};
 use crate::camera::CameraRig;
 use crate::config::{AppConfig, LightingConfig, MaterialConfig, RenderingConfig};
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
-use crate::polyhedra::{NodeOrigin, PolyhedronKind, PolyhedronNode};
+use crate::polyhedra::{
+    AttachmentOccupancy, NodeOrigin, PolyhedronKind, PolyhedronNode, SpawnAttachment,
+    SpawnPlacementMode,
+};
 use crate::runtime_scene::SceneMutationAccess;
 use crate::scene::{GenerationState, MaterialState, spawn_polyhedron_entity};
 
@@ -100,6 +103,8 @@ struct CameraRigSnapshot {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 struct GenerationSnapshot {
     selected_kind: PolyhedronKind,
+    #[serde(default)]
+    spawn_placement_mode: SpawnPlacementMode,
     scale_ratio: f32,
     twist_per_vertex_radians: f32,
     vertex_offset_ratio: f32,
@@ -122,6 +127,10 @@ struct PolyhedronNodeSnapshot {
     scale: f32,
     radius: f32,
     occupied_vertices: Vec<bool>,
+    #[serde(default)]
+    occupied_edges: Vec<bool>,
+    #[serde(default)]
+    occupied_faces: Vec<bool>,
     origin: NodeOriginSnapshot,
 }
 
@@ -130,7 +139,10 @@ enum NodeOriginSnapshot {
     Root,
     Child {
         parent_index: usize,
-        vertex_index: usize,
+        #[serde(default)]
+        attachment_mode: SpawnPlacementMode,
+        #[serde(alias = "vertex_index")]
+        attachment_index: usize,
     },
 }
 
@@ -334,6 +346,7 @@ impl GenerationSnapshot {
     fn capture(generation_state: &GenerationState) -> Self {
         Self {
             selected_kind: generation_state.selected_kind,
+            spawn_placement_mode: generation_state.spawn_placement_mode,
             scale_ratio: generation_state.scale_ratio,
             twist_per_vertex_radians: generation_state.twist_per_vertex_radians,
             vertex_offset_ratio: generation_state.vertex_offset_ratio,
@@ -347,10 +360,11 @@ impl GenerationSnapshot {
     }
 
     fn to_runtime(&self) -> Result<GenerationState, String> {
+        let shape_catalog = crate::polyhedra::ShapeCatalog::new();
         let nodes = self
             .nodes
             .iter()
-            .map(PolyhedronNodeSnapshot::to_runtime)
+            .map(|node| node.to_runtime(&shape_catalog))
             .collect::<Result<Vec<_>, _>>()?;
         if nodes.is_empty() {
             return Err("Preset scene has no polyhedron nodes.".to_string());
@@ -359,6 +373,7 @@ impl GenerationSnapshot {
             nodes,
             selected_kind: self.selected_kind,
             scale_ratio: self.scale_ratio,
+            spawn_placement_mode: self.spawn_placement_mode,
             twist_per_vertex_radians: self.twist_per_vertex_radians,
             vertex_offset_ratio: self.vertex_offset_ratio,
             vertex_spawn_exclusion_probability: self.vertex_spawn_exclusion_probability,
@@ -390,12 +405,19 @@ impl PolyhedronNodeSnapshot {
             rotation: quat_to_array(node.rotation),
             scale: node.scale,
             radius: node.radius,
-            occupied_vertices: node.occupied_vertices.clone(),
+            occupied_vertices: node.occupied_attachments.vertices.clone(),
+            occupied_edges: node.occupied_attachments.edges.clone(),
+            occupied_faces: node.occupied_attachments.faces.clone(),
             origin: NodeOriginSnapshot::capture(node.origin),
         }
     }
 
-    fn to_runtime(&self) -> Result<PolyhedronNode, String> {
+    fn to_runtime(
+        &self,
+        shape_catalog: &crate::polyhedra::ShapeCatalog,
+    ) -> Result<PolyhedronNode, String> {
+        let geometry = shape_catalog.geometry(self.kind);
+
         Ok(PolyhedronNode {
             kind: self.kind,
             level: self.level,
@@ -403,7 +425,11 @@ impl PolyhedronNodeSnapshot {
             rotation: quat_from_array(self.rotation),
             scale: self.scale,
             radius: self.radius,
-            occupied_vertices: self.occupied_vertices.clone(),
+            occupied_attachments: AttachmentOccupancy {
+                vertices: resize_occupancy(&self.occupied_vertices, geometry.vertices.len()),
+                edges: resize_occupancy(&self.occupied_edges, geometry.edges.len()),
+                faces: resize_occupancy(&self.occupied_faces, geometry.faces.len()),
+            },
             origin: self.origin.to_runtime()?,
         })
     }
@@ -415,10 +441,11 @@ impl NodeOriginSnapshot {
             NodeOrigin::Root => Self::Root,
             NodeOrigin::Child {
                 parent_index,
-                vertex_index,
+                attachment,
             } => Self::Child {
                 parent_index,
-                vertex_index,
+                attachment_mode: attachment.mode,
+                attachment_index: attachment.index,
             },
         }
     }
@@ -428,10 +455,14 @@ impl NodeOriginSnapshot {
             Self::Root => NodeOrigin::Root,
             Self::Child {
                 parent_index,
-                vertex_index,
+                attachment_mode,
+                attachment_index,
             } => NodeOrigin::Child {
                 parent_index: *parent_index,
-                vertex_index: *vertex_index,
+                attachment: SpawnAttachment {
+                    mode: *attachment_mode,
+                    index: *attachment_index,
+                },
             },
         })
     }
@@ -493,6 +524,13 @@ fn quat_to_array(quat: Quat) -> [f32; 4] {
 
 fn quat_from_array(quat: [f32; 4]) -> Quat {
     Quat::from_xyzw(quat[0], quat[1], quat[2], quat[3]).normalize()
+}
+
+fn resize_occupancy(values: &[bool], len: usize) -> Vec<bool> {
+    let mut resized = values.to_vec();
+    resized.resize(len, false);
+    resized.truncate(len);
+    resized
 }
 
 impl ScenePresetFile {
@@ -948,6 +986,7 @@ mod tests {
             },
             generation: super::GenerationSnapshot {
                 selected_kind: crate::polyhedra::PolyhedronKind::Cube,
+                spawn_placement_mode: crate::polyhedra::SpawnPlacementMode::Vertex,
                 scale_ratio: 0.5,
                 twist_per_vertex_radians: 0.0,
                 vertex_offset_ratio: 0.0,
@@ -960,6 +999,8 @@ mod tests {
                     scale: 1.0,
                     radius: 1.0,
                     occupied_vertices: vec![],
+                    occupied_edges: vec![],
+                    occupied_faces: vec![],
                     origin: super::NodeOriginSnapshot::Root,
                 }],
             },

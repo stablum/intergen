@@ -5,11 +5,12 @@ use crate::camera::{CameraRig, SceneCamera};
 use crate::config::{AppConfig, GenerationConfig, MaterialConfig};
 use crate::effects::{camera_effects_from_config, effects_status_messages};
 use crate::generation::{
-    SpawnHoldState, twist_status_message, vertex_exclusion_status_message,
-    vertex_offset_status_message,
+    SpawnHoldState, spawn_placement_mode_status_message, twist_status_message,
+    vertex_exclusion_status_message, vertex_offset_status_message,
 };
 use crate::polyhedra::{
-    PolyhedronKind, PolyhedronNode, ShapeCatalog, ShapeGeometry, build_mesh, root_node,
+    PolyhedronKind, PolyhedronNode, ShapeCatalog, ShapeGeometry, SpawnPlacementMode, build_mesh,
+    root_node,
 };
 use crate::ui::{UiFontSource, load_ui_theme, spawn_help_ui};
 
@@ -62,6 +63,7 @@ pub(crate) struct GenerationState {
     pub(crate) nodes: Vec<PolyhedronNode>,
     pub(crate) selected_kind: PolyhedronKind,
     pub(crate) scale_ratio: f32,
+    pub(crate) spawn_placement_mode: SpawnPlacementMode,
     pub(crate) twist_per_vertex_radians: f32,
     pub(crate) vertex_offset_ratio: f32,
     pub(crate) vertex_spawn_exclusion_probability: f32,
@@ -153,6 +155,7 @@ pub(crate) fn setup_scene(
     spawn_help_ui(&mut commands, &ui_theme, scene_camera, &app_config.ui);
 
     let initial_scale_ratio = app_config.generation.default_scale_ratio_clamped();
+    let initial_spawn_placement_mode = app_config.generation.default_spawn_placement_mode;
     let initial_twist = app_config
         .generation
         .default_twist_per_vertex_radians_clamped();
@@ -166,6 +169,7 @@ pub(crate) fn setup_scene(
         nodes: vec![root],
         selected_kind: app_config.generation.default_child_kind,
         scale_ratio: initial_scale_ratio,
+        spawn_placement_mode: initial_spawn_placement_mode,
         twist_per_vertex_radians: initial_twist,
         vertex_offset_ratio: initial_vertex_offset,
         vertex_spawn_exclusion_probability: initial_vertex_spawn_exclusion,
@@ -182,7 +186,7 @@ pub(crate) fn setup_scene(
     });
 
     println!(
-        "Controls: F1/H help, F2 FX strip, F3 scene presets, F4 export Blender .blend, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to spawn, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset, hold V/B to adjust vertex exclusion probability, N reset vertex exclusion"
+        "Controls: F1/H help, F2 FX strip, F3 scene presets, F4 export Blender .blend, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to spawn, G cycles spawn mode, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset, hold V/B to adjust spawn exclusion probability, N reset spawn exclusion"
     );
     println!(
         "FX strip: Ctrl+Up/Down selects a parameter, Ctrl+Left/Right adjusts the highlighted field, Tab toggles the effect, L toggles the selected parameter LFO, M cycles the highlighted value/amp/freq/shape field, Shift is coarse, Alt is fine, Enter resets the field, Shift+Enter resets all FX settings and LFOs."
@@ -190,6 +194,10 @@ pub(crate) fn setup_scene(
     println!(
         "Selected child shape: {:?}, ratio: {:.2}",
         app_config.generation.default_child_kind, initial_scale_ratio
+    );
+    println!(
+        "{}",
+        spawn_placement_mode_status_message(initial_spawn_placement_mode)
     );
     println!("{}", twist_status_message(initial_twist));
     println!("{}", vertex_offset_status_message(initial_vertex_offset));
@@ -321,7 +329,10 @@ mod tests {
 
     use crate::config::GenerationConfig;
     use crate::generation::SpawnHoldState;
-    use crate::polyhedra::{NodeOrigin, PolyhedronKind, PolyhedronNode, ShapeCatalog};
+    use crate::polyhedra::{
+        AttachmentOccupancy, NodeOrigin, PolyhedronKind, PolyhedronNode, ShapeCatalog,
+        SpawnAttachment, SpawnPlacementMode,
+    };
 
     use super::{
         GenerationState, alpha_mode_for_opacity, reset_generation_state, root_generation_node,
@@ -332,7 +343,7 @@ mod tests {
         let shape_catalog = ShapeCatalog::new();
         let generation_config = GenerationConfig::default();
         let mut root = root_generation_node(&shape_catalog, &generation_config);
-        root.occupied_vertices[0] = true;
+        root.occupied_attachments.vertices[0] = true;
 
         let child = PolyhedronNode {
             kind: PolyhedronKind::Tetrahedron,
@@ -341,10 +352,13 @@ mod tests {
             rotation: Quat::IDENTITY,
             scale: 0.4,
             radius: 0.7,
-            occupied_vertices: vec![false; 4],
+            occupied_attachments: AttachmentOccupancy::default(),
             origin: NodeOrigin::Child {
                 parent_index: 0,
-                vertex_index: 0,
+                attachment: SpawnAttachment {
+                    mode: SpawnPlacementMode::Vertex,
+                    index: 0,
+                },
             },
         };
 
@@ -352,6 +366,7 @@ mod tests {
             nodes: vec![root, child],
             selected_kind: PolyhedronKind::Octahedron,
             scale_ratio: 0.42,
+            spawn_placement_mode: SpawnPlacementMode::Face,
             twist_per_vertex_radians: 0.3,
             vertex_offset_ratio: 0.6,
             vertex_spawn_exclusion_probability: 0.2,
@@ -379,9 +394,28 @@ mod tests {
         assert_eq!(generation_state.twist_per_vertex_radians, 0.3);
         assert_eq!(generation_state.vertex_offset_ratio, 0.6);
         assert_eq!(generation_state.vertex_spawn_exclusion_probability, 0.2);
+        assert_eq!(
+            generation_state.spawn_placement_mode,
+            SpawnPlacementMode::Face
+        );
         assert!(
             generation_state.nodes[0]
-                .occupied_vertices
+                .occupied_attachments
+                .vertices
+                .iter()
+                .all(|occupied| !occupied)
+        );
+        assert!(
+            generation_state.nodes[0]
+                .occupied_attachments
+                .edges
+                .iter()
+                .all(|occupied| !occupied)
+        );
+        assert!(
+            generation_state.nodes[0]
+                .occupied_attachments
+                .faces
                 .iter()
                 .all(|occupied| !occupied)
         );

@@ -1,11 +1,14 @@
+use std::collections::BTreeSet;
+
 use bevy::prelude::*;
 
 use super::mesh::{centroid, face_normal};
-use super::spawn::PolyhedronKind;
+use super::spawn::{PolyhedronKind, SpawnPlacementMode};
 
 #[derive(Clone)]
 pub(crate) struct ShapeGeometry {
     pub(crate) vertices: Vec<Vec3>,
+    pub(crate) edges: Vec<[usize; 2]>,
     pub(crate) faces: Vec<Vec<usize>>,
     pub(crate) radius: f32,
 }
@@ -38,12 +41,49 @@ impl ShapeCatalog {
     }
 }
 
+impl ShapeGeometry {
+    pub(crate) fn attachment_count(&self, mode: SpawnPlacementMode) -> usize {
+        match mode {
+            SpawnPlacementMode::Vertex => self.vertices.len(),
+            SpawnPlacementMode::Edge => self.edges.len(),
+            SpawnPlacementMode::Face => self.faces.len(),
+        }
+    }
+
+    pub(crate) fn attachment_anchor(&self, mode: SpawnPlacementMode, index: usize) -> Vec3 {
+        match mode {
+            SpawnPlacementMode::Vertex => self.vertices[index],
+            SpawnPlacementMode::Edge => {
+                let [left, right] = self.edges[index];
+                (self.vertices[left] + self.vertices[right]) * 0.5
+            }
+            SpawnPlacementMode::Face => {
+                let face_vertices: Vec<Vec3> = self.faces[index]
+                    .iter()
+                    .map(|face_index| self.vertices[*face_index])
+                    .collect();
+                centroid(&face_vertices)
+            }
+        }
+    }
+
+    pub(crate) fn attachment_direction(&self, mode: SpawnPlacementMode, index: usize) -> Vec3 {
+        let anchor = self.attachment_anchor(mode, index);
+        if anchor.length_squared() > 0.0 {
+            anchor.normalize()
+        } else {
+            Vec3::Y
+        }
+    }
+}
+
 fn static_geometry(vertices: &[[f32; 3]], faces: &[&[usize]]) -> ShapeGeometry {
     let vertices: Vec<Vec3> = vertices
         .iter()
         .map(|vertex| Vec3::from_array(*vertex))
         .collect();
     let faces: Vec<Vec<usize>> = faces.iter().map(|face| face.to_vec()).collect();
+    let edges = collect_edges(&faces);
     let radius = vertices
         .iter()
         .map(|vertex| vertex.length())
@@ -51,6 +91,7 @@ fn static_geometry(vertices: &[[f32; 3]], faces: &[&[usize]]) -> ShapeGeometry {
 
     ShapeGeometry {
         vertices,
+        edges,
         faces,
         radius,
     }
@@ -156,12 +197,36 @@ fn dodecahedron_geometry() -> ShapeGeometry {
         .iter()
         .map(|vertex| vertex.length())
         .fold(0.0, f32::max);
+    let edges = collect_edges(&faces);
 
     ShapeGeometry {
         vertices,
+        edges,
         faces,
         radius,
     }
+}
+
+fn collect_edges(faces: &[Vec<usize>]) -> Vec<[usize; 2]> {
+    let mut edges = BTreeSet::new();
+
+    for face in faces {
+        for edge_index in 0..face.len() {
+            let left = face[edge_index];
+            let right = face[(edge_index + 1) % face.len()];
+            let edge = if left < right {
+                (left, right)
+            } else {
+                (right, left)
+            };
+            edges.insert(edge);
+        }
+    }
+
+    edges
+        .into_iter()
+        .map(|(left, right)| [left, right])
+        .collect()
 }
 
 fn sort_face_indices(normal: Vec3, vertices: &[Vec3], face_indices: &mut [usize]) {
@@ -240,6 +305,7 @@ mod tests {
     fn dodecahedron_has_expected_counts() {
         let dodecahedron = dodecahedron_geometry();
         assert_eq!(dodecahedron.vertices.len(), 20);
+        assert_eq!(dodecahedron.edges.len(), 30);
         assert_eq!(dodecahedron.faces.len(), 12);
         assert!(dodecahedron.faces.iter().all(|face| face.len() == 5));
     }
