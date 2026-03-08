@@ -5,6 +5,7 @@ use bevy::prelude::*;
 use bevy::window::PresentMode;
 use serde::{Deserialize, Serialize};
 
+use crate::parameters::{GenerationParameter, ScalarParameterSpec};
 use crate::polyhedra::{PolyhedronKind, SpawnPlacementMode, SpawnTuning};
 
 #[path = "config_effects.rs"]
@@ -209,48 +210,77 @@ pub(crate) struct GenerationConfig {
     pub(crate) max_vertex_spawn_exclusion_probability: f32,
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 impl GenerationConfig {
-    pub(crate) fn scale_bounds(&self) -> (f32, f32) {
-        ordered_pair(self.min_scale_ratio, self.max_scale_ratio)
-    }
-
-    pub(crate) fn default_scale_ratio_clamped(&self) -> f32 {
-        let (min, max) = self.scale_bounds();
-        self.default_scale_ratio.clamp(min, max)
+    pub(crate) fn parameter_spec(&self, parameter: GenerationParameter) -> ScalarParameterSpec {
+        match parameter {
+            GenerationParameter::ChildScaleRatio => ScalarParameterSpec::new(
+                self.default_scale_ratio,
+                self.min_scale_ratio,
+                self.max_scale_ratio,
+                self.scale_adjust_step,
+                0.0,
+                0.0,
+            ),
+            GenerationParameter::ChildTwistPerVertexRadians => {
+                ScalarParameterSpec::new_nonnegative(
+                    self.twist_per_vertex_radians,
+                    self.min_twist_per_vertex_radians,
+                    self.max_twist_per_vertex_radians,
+                    self.twist_adjust_step,
+                    self.twist_hold_delay_secs,
+                    self.twist_repeat_interval_secs,
+                )
+            }
+            GenerationParameter::ChildOutwardOffsetRatio => ScalarParameterSpec::new_nonnegative(
+                self.default_vertex_offset_ratio,
+                self.min_vertex_offset_ratio,
+                self.max_vertex_offset_ratio,
+                self.vertex_offset_adjust_step,
+                self.vertex_offset_hold_delay_secs,
+                self.vertex_offset_repeat_interval_secs,
+            ),
+            GenerationParameter::ChildSpawnExclusionProbability => {
+                ScalarParameterSpec::new_probability(
+                    self.default_vertex_spawn_exclusion_probability,
+                    self.min_vertex_spawn_exclusion_probability,
+                    self.max_vertex_spawn_exclusion_probability,
+                    self.vertex_spawn_exclusion_adjust_step,
+                    self.vertex_spawn_exclusion_hold_delay_secs,
+                    self.vertex_spawn_exclusion_repeat_interval_secs,
+                )
+            }
+        }
     }
 
     pub(crate) fn twist_bounds(&self) -> (f32, f32) {
-        let min = self.min_twist_per_vertex_radians.max(0.0);
-        let max = self.max_twist_per_vertex_radians.max(min);
-        (min, max)
+        self.parameter_spec(GenerationParameter::ChildTwistPerVertexRadians)
+            .bounds()
     }
 
     pub(crate) fn default_twist_per_vertex_radians_clamped(&self) -> f32 {
-        let (min, max) = self.twist_bounds();
-        self.twist_per_vertex_radians.clamp(min, max)
+        self.parameter_spec(GenerationParameter::ChildTwistPerVertexRadians)
+            .default_value()
     }
 
     pub(crate) fn vertex_offset_bounds(&self) -> (f32, f32) {
-        let min = self.min_vertex_offset_ratio.max(0.0);
-        let max = self.max_vertex_offset_ratio.max(min);
-        (min, max)
+        self.parameter_spec(GenerationParameter::ChildOutwardOffsetRatio)
+            .bounds()
     }
 
     pub(crate) fn default_vertex_offset_ratio_clamped(&self) -> f32 {
-        let (min, max) = self.vertex_offset_bounds();
-        self.default_vertex_offset_ratio.clamp(min, max)
+        self.parameter_spec(GenerationParameter::ChildOutwardOffsetRatio)
+            .default_value()
     }
 
     pub(crate) fn vertex_spawn_exclusion_bounds(&self) -> (f32, f32) {
-        let min = self.min_vertex_spawn_exclusion_probability.clamp(0.0, 1.0);
-        let max = self.max_vertex_spawn_exclusion_probability.clamp(min, 1.0);
-        (min, max)
+        self.parameter_spec(GenerationParameter::ChildSpawnExclusionProbability)
+            .bounds()
     }
 
     pub(crate) fn default_vertex_spawn_exclusion_probability_clamped(&self) -> f32 {
-        let (min, max) = self.vertex_spawn_exclusion_bounds();
-        self.default_vertex_spawn_exclusion_probability
-            .clamp(min, max)
+        self.parameter_spec(GenerationParameter::ChildSpawnExclusionProbability)
+            .default_value()
     }
 
     pub(crate) fn spawn_tuning(
@@ -260,28 +290,24 @@ impl GenerationConfig {
         vertex_spawn_exclusion_probability: f32,
         spawn_placement_mode: SpawnPlacementMode,
     ) -> SpawnTuning {
-        let (min_scale_ratio, max_scale_ratio) = self.scale_bounds();
-        let (min_twist_per_vertex_radians, max_twist_per_vertex_radians) = self.twist_bounds();
-        let (min_vertex_offset_ratio, max_vertex_offset_ratio) = self.vertex_offset_bounds();
-        let (min_vertex_spawn_exclusion_probability, max_vertex_spawn_exclusion_probability) =
-            self.vertex_spawn_exclusion_bounds();
+        let scale_spec = self.parameter_spec(GenerationParameter::ChildScaleRatio);
+        let twist_spec = self.parameter_spec(GenerationParameter::ChildTwistPerVertexRadians);
+        let offset_spec = self.parameter_spec(GenerationParameter::ChildOutwardOffsetRatio);
+        let exclusion_spec =
+            self.parameter_spec(GenerationParameter::ChildSpawnExclusionProbability);
+        let (min_scale_ratio, max_scale_ratio) = scale_spec.bounds();
         SpawnTuning {
             min_scale_ratio,
             max_scale_ratio,
             containment_epsilon: self.containment_epsilon,
-            twist_per_vertex_radians: twist_per_vertex_radians
-                .clamp(min_twist_per_vertex_radians, max_twist_per_vertex_radians),
-            vertex_offset_ratio: vertex_offset_ratio
-                .clamp(min_vertex_offset_ratio, max_vertex_offset_ratio),
-            vertex_spawn_exclusion_probability: vertex_spawn_exclusion_probability.clamp(
-                min_vertex_spawn_exclusion_probability,
-                max_vertex_spawn_exclusion_probability,
-            ),
+            twist_per_vertex_radians: twist_spec.clamp(twist_per_vertex_radians),
+            vertex_offset_ratio: offset_spec.clamp(vertex_offset_ratio),
+            vertex_spawn_exclusion_probability: exclusion_spec
+                .clamp(vertex_spawn_exclusion_probability),
             spawn_placement_mode,
         }
     }
 }
-
 impl Default for GenerationConfig {
     fn default() -> Self {
         Self {

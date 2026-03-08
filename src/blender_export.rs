@@ -356,10 +356,11 @@ impl BlendGenerationMetadata {
         Self {
             selected_kind: generation_state.selected_kind,
             spawn_placement_mode: generation_state.spawn_placement_mode,
-            scale_ratio: generation_state.scale_ratio,
-            twist_per_vertex_radians: generation_state.twist_per_vertex_radians,
-            vertex_offset_ratio: generation_state.vertex_offset_ratio,
-            vertex_spawn_exclusion_probability: generation_state.vertex_spawn_exclusion_probability,
+            scale_ratio: generation_state.scale_ratio_base(),
+            twist_per_vertex_radians: generation_state.twist_per_vertex_radians_base(),
+            vertex_offset_ratio: generation_state.vertex_offset_ratio_base(),
+            vertex_spawn_exclusion_probability: generation_state
+                .vertex_spawn_exclusion_probability_base(),
             nodes: generation_state
                 .nodes
                 .iter()

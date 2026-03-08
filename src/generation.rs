@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+use crate::parameters::GenerationParameter;
 use crate::polyhedra::{PolyhedronKind, SpawnPlacementMode, next_spawn, recompute_spawn_tree};
 use crate::presets::PresetBrowserState;
 use crate::runtime_scene::GenerationSceneAccess;
@@ -15,54 +16,6 @@ const VERTEX_OFFSET_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyZ];
 const VERTEX_OFFSET_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyX];
 const VERTEX_EXCLUSION_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyV];
 const VERTEX_EXCLUSION_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyB];
-
-#[derive(Default)]
-pub(crate) struct SpawnHoldState {
-    pub(crate) elapsed_secs: f32,
-    pub(crate) repeating: bool,
-}
-
-impl SpawnHoldState {
-    pub(crate) fn update(
-        &mut self,
-        just_pressed: bool,
-        pressed: bool,
-        just_released: bool,
-        delta_secs: f32,
-        hold_delay_secs: f32,
-        repeat_interval_secs: f32,
-    ) -> bool {
-        if just_released || !pressed {
-            self.reset();
-            return false;
-        }
-
-        if just_pressed {
-            self.reset();
-            return true;
-        }
-
-        self.elapsed_secs += delta_secs;
-        let threshold = if self.repeating {
-            repeat_interval_secs
-        } else {
-            hold_delay_secs
-        };
-
-        if self.elapsed_secs < threshold {
-            return false;
-        }
-
-        self.elapsed_secs = 0.0;
-        self.repeating = true;
-        true
-    }
-
-    pub(crate) fn reset(&mut self) {
-        self.elapsed_secs = 0.0;
-        self.repeating = false;
-    }
-}
 
 pub(crate) fn generation_input_system(
     keys: Res<ButtonInput<KeyCode>>,
@@ -111,24 +64,23 @@ pub(crate) fn generation_input_system(
         );
     }
 
-    let (min_scale_ratio, max_scale_ratio) = scene.app_config.generation.scale_bounds();
+    let scale_spec = scene
+        .app_config
+        .generation
+        .parameter_spec(GenerationParameter::ChildScaleRatio);
     if keys.just_pressed(KeyCode::Minus) || keys.just_pressed(KeyCode::NumpadSubtract) {
-        scene.generation_state.scale_ratio = (scene.generation_state.scale_ratio
-            - scene.app_config.generation.scale_adjust_step)
-            .clamp(min_scale_ratio, max_scale_ratio);
-        println!(
-            "Child scale ratio: {:.2}",
-            scene.generation_state.scale_ratio
-        );
+        let scale_ratio = scene
+            .generation_state
+            .parameter_mut(GenerationParameter::ChildScaleRatio)
+            .adjust_clamped_base_value(-scale_spec.step(), scale_spec);
+        println!("Child scale ratio: {:.2}", scale_ratio);
     }
     if keys.just_pressed(KeyCode::Equal) || keys.just_pressed(KeyCode::NumpadAdd) {
-        scene.generation_state.scale_ratio = (scene.generation_state.scale_ratio
-            + scene.app_config.generation.scale_adjust_step)
-            .clamp(min_scale_ratio, max_scale_ratio);
-        println!(
-            "Child scale ratio: {:.2}",
-            scene.generation_state.scale_ratio
-        );
+        let scale_ratio = scene
+            .generation_state
+            .parameter_mut(GenerationParameter::ChildScaleRatio)
+            .adjust_clamped_base_value(scale_spec.step(), scale_spec);
+        println!("Child scale ratio: {:.2}", scale_ratio);
     }
 
     let (min_opacity, max_opacity) = scene.app_config.materials.opacity_bounds();
@@ -169,226 +121,192 @@ pub(crate) fn generation_input_system(
         );
     }
 
-    let (min_twist, max_twist) = scene.app_config.generation.twist_bounds();
-    let (min_vertex_offset, max_vertex_offset) = scene.app_config.generation.vertex_offset_bounds();
-    let (min_vertex_exclusion, max_vertex_exclusion) =
-        scene.app_config.generation.vertex_spawn_exclusion_bounds();
+    let twist_spec = scene
+        .app_config
+        .generation
+        .parameter_spec(GenerationParameter::ChildTwistPerVertexRadians);
+    let offset_spec = scene
+        .app_config
+        .generation
+        .parameter_spec(GenerationParameter::ChildOutwardOffsetRatio);
+    let exclusion_spec = scene
+        .app_config
+        .generation
+        .parameter_spec(GenerationParameter::ChildSpawnExclusionProbability);
     let mut transform_changed = false;
-    let twist_decrease_requested = scene.generation_state.twist_decrease_hold.update(
-        key_group_just_pressed(&keys, &TWIST_DECREASE_KEYS),
-        key_group_pressed(&keys, &TWIST_DECREASE_KEYS),
-        key_group_just_released(&keys, &TWIST_DECREASE_KEYS),
-        time.delta_secs(),
-        scene.app_config.generation.twist_hold_delay_secs,
-        scene.app_config.generation.twist_repeat_interval_secs,
-    );
+
+    let twist_decrease_requested = scene
+        .generation_state
+        .parameter_mut(GenerationParameter::ChildTwistPerVertexRadians)
+        .input_mut()
+        .request_decrease(
+            key_group_just_pressed(&keys, &TWIST_DECREASE_KEYS),
+            key_group_pressed(&keys, &TWIST_DECREASE_KEYS),
+            key_group_just_released(&keys, &TWIST_DECREASE_KEYS),
+            time.delta_secs(),
+            twist_spec,
+        );
     if twist_decrease_requested {
-        scene.generation_state.twist_per_vertex_radians = adjust_clamped_value(
-            scene.generation_state.twist_per_vertex_radians,
-            -scene.app_config.generation.twist_adjust_step,
-            min_twist,
-            max_twist,
-        );
+        let twist = scene
+            .generation_state
+            .parameter_mut(GenerationParameter::ChildTwistPerVertexRadians)
+            .adjust_clamped_base_value(-twist_spec.step(), twist_spec);
         transform_changed = true;
-        println!(
-            "{}",
-            twist_status_message(scene.generation_state.twist_per_vertex_radians)
-        );
-    }
-    let twist_increase_requested = scene.generation_state.twist_increase_hold.update(
-        key_group_just_pressed(&keys, &TWIST_INCREASE_KEYS),
-        key_group_pressed(&keys, &TWIST_INCREASE_KEYS),
-        key_group_just_released(&keys, &TWIST_INCREASE_KEYS),
-        time.delta_secs(),
-        scene.app_config.generation.twist_hold_delay_secs,
-        scene.app_config.generation.twist_repeat_interval_secs,
-    );
-    if twist_increase_requested {
-        scene.generation_state.twist_per_vertex_radians = adjust_clamped_value(
-            scene.generation_state.twist_per_vertex_radians,
-            scene.app_config.generation.twist_adjust_step,
-            min_twist,
-            max_twist,
-        );
-        transform_changed = true;
-        println!(
-            "{}",
-            twist_status_message(scene.generation_state.twist_per_vertex_radians)
-        );
-    }
-    if keys.just_pressed(KeyCode::KeyT) {
-        scene.generation_state.twist_per_vertex_radians = scene
-            .app_config
-            .generation
-            .default_twist_per_vertex_radians_clamped();
-        transform_changed = true;
-        scene.generation_state.twist_decrease_hold.reset();
-        scene.generation_state.twist_increase_hold.reset();
-        println!(
-            "Reset {}",
-            twist_status_message(scene.generation_state.twist_per_vertex_radians).to_lowercase()
-        );
+        println!("{}", twist_status_message(twist));
     }
 
-    let vertex_offset_decrease_requested =
-        scene.generation_state.vertex_offset_decrease_hold.update(
+    let twist_increase_requested = scene
+        .generation_state
+        .parameter_mut(GenerationParameter::ChildTwistPerVertexRadians)
+        .input_mut()
+        .request_increase(
+            key_group_just_pressed(&keys, &TWIST_INCREASE_KEYS),
+            key_group_pressed(&keys, &TWIST_INCREASE_KEYS),
+            key_group_just_released(&keys, &TWIST_INCREASE_KEYS),
+            time.delta_secs(),
+            twist_spec,
+        );
+    if twist_increase_requested {
+        let twist = scene
+            .generation_state
+            .parameter_mut(GenerationParameter::ChildTwistPerVertexRadians)
+            .adjust_clamped_base_value(twist_spec.step(), twist_spec);
+        transform_changed = true;
+        println!("{}", twist_status_message(twist));
+    }
+
+    if keys.just_pressed(KeyCode::KeyT) {
+        let twist = scene
+            .generation_state
+            .parameter_mut(GenerationParameter::ChildTwistPerVertexRadians)
+            .reset_to_default(twist_spec);
+        transform_changed = true;
+        scene
+            .generation_state
+            .parameter_mut(GenerationParameter::ChildTwistPerVertexRadians)
+            .input_mut()
+            .reset();
+        println!("Reset {}", twist_status_message(twist).to_lowercase());
+    }
+
+    let vertex_offset_decrease_requested = scene
+        .generation_state
+        .parameter_mut(GenerationParameter::ChildOutwardOffsetRatio)
+        .input_mut()
+        .request_decrease(
             key_group_just_pressed(&keys, &VERTEX_OFFSET_DECREASE_KEYS),
             key_group_pressed(&keys, &VERTEX_OFFSET_DECREASE_KEYS),
             key_group_just_released(&keys, &VERTEX_OFFSET_DECREASE_KEYS),
             time.delta_secs(),
-            scene.app_config.generation.vertex_offset_hold_delay_secs,
-            scene
-                .app_config
-                .generation
-                .vertex_offset_repeat_interval_secs,
+            offset_spec,
         );
     if vertex_offset_decrease_requested {
-        scene.generation_state.vertex_offset_ratio = adjust_clamped_value(
-            scene.generation_state.vertex_offset_ratio,
-            -scene.app_config.generation.vertex_offset_adjust_step,
-            min_vertex_offset,
-            max_vertex_offset,
-        );
+        let vertex_offset = scene
+            .generation_state
+            .parameter_mut(GenerationParameter::ChildOutwardOffsetRatio)
+            .adjust_clamped_base_value(-offset_spec.step(), offset_spec);
         transform_changed = true;
-        println!(
-            "{}",
-            vertex_offset_status_message(scene.generation_state.vertex_offset_ratio)
-        );
+        println!("{}", vertex_offset_status_message(vertex_offset));
     }
-    let vertex_offset_increase_requested =
-        scene.generation_state.vertex_offset_increase_hold.update(
+
+    let vertex_offset_increase_requested = scene
+        .generation_state
+        .parameter_mut(GenerationParameter::ChildOutwardOffsetRatio)
+        .input_mut()
+        .request_increase(
             key_group_just_pressed(&keys, &VERTEX_OFFSET_INCREASE_KEYS),
             key_group_pressed(&keys, &VERTEX_OFFSET_INCREASE_KEYS),
             key_group_just_released(&keys, &VERTEX_OFFSET_INCREASE_KEYS),
             time.delta_secs(),
-            scene.app_config.generation.vertex_offset_hold_delay_secs,
-            scene
-                .app_config
-                .generation
-                .vertex_offset_repeat_interval_secs,
+            offset_spec,
         );
     if vertex_offset_increase_requested {
-        scene.generation_state.vertex_offset_ratio = adjust_clamped_value(
-            scene.generation_state.vertex_offset_ratio,
-            scene.app_config.generation.vertex_offset_adjust_step,
-            min_vertex_offset,
-            max_vertex_offset,
-        );
+        let vertex_offset = scene
+            .generation_state
+            .parameter_mut(GenerationParameter::ChildOutwardOffsetRatio)
+            .adjust_clamped_base_value(offset_spec.step(), offset_spec);
         transform_changed = true;
-        println!(
-            "{}",
-            vertex_offset_status_message(scene.generation_state.vertex_offset_ratio)
-        );
+        println!("{}", vertex_offset_status_message(vertex_offset));
     }
+
     if keys.just_pressed(KeyCode::KeyC) {
-        scene.generation_state.vertex_offset_ratio = scene
-            .app_config
-            .generation
-            .default_vertex_offset_ratio_clamped();
+        let vertex_offset = scene
+            .generation_state
+            .parameter_mut(GenerationParameter::ChildOutwardOffsetRatio)
+            .reset_to_default(offset_spec);
         transform_changed = true;
-        scene.generation_state.vertex_offset_decrease_hold.reset();
-        scene.generation_state.vertex_offset_increase_hold.reset();
+        scene
+            .generation_state
+            .parameter_mut(GenerationParameter::ChildOutwardOffsetRatio)
+            .input_mut()
+            .reset();
         println!(
             "Reset {}",
-            vertex_offset_status_message(scene.generation_state.vertex_offset_ratio).to_lowercase()
+            vertex_offset_status_message(vertex_offset).to_lowercase()
         );
     }
 
     let vertex_exclusion_decrease_requested = scene
         .generation_state
-        .vertex_exclusion_decrease_hold
-        .update(
+        .parameter_mut(GenerationParameter::ChildSpawnExclusionProbability)
+        .input_mut()
+        .request_decrease(
             key_group_just_pressed(&keys, &VERTEX_EXCLUSION_DECREASE_KEYS),
             key_group_pressed(&keys, &VERTEX_EXCLUSION_DECREASE_KEYS),
             key_group_just_released(&keys, &VERTEX_EXCLUSION_DECREASE_KEYS),
             time.delta_secs(),
-            scene
-                .app_config
-                .generation
-                .vertex_spawn_exclusion_hold_delay_secs,
-            scene
-                .app_config
-                .generation
-                .vertex_spawn_exclusion_repeat_interval_secs,
+            exclusion_spec,
         );
     if vertex_exclusion_decrease_requested {
-        scene.generation_state.vertex_spawn_exclusion_probability = adjust_clamped_value(
-            scene.generation_state.vertex_spawn_exclusion_probability,
-            -scene
-                .app_config
-                .generation
-                .vertex_spawn_exclusion_adjust_step,
-            min_vertex_exclusion,
-            max_vertex_exclusion,
-        );
-        println!(
-            "{}",
-            vertex_exclusion_status_message(
-                scene.generation_state.vertex_spawn_exclusion_probability,
-            )
-        );
+        let exclusion = scene
+            .generation_state
+            .parameter_mut(GenerationParameter::ChildSpawnExclusionProbability)
+            .adjust_clamped_base_value(-exclusion_spec.step(), exclusion_spec);
+        println!("{}", vertex_exclusion_status_message(exclusion));
     }
 
     let vertex_exclusion_increase_requested = scene
         .generation_state
-        .vertex_exclusion_increase_hold
-        .update(
+        .parameter_mut(GenerationParameter::ChildSpawnExclusionProbability)
+        .input_mut()
+        .request_increase(
             key_group_just_pressed(&keys, &VERTEX_EXCLUSION_INCREASE_KEYS),
             key_group_pressed(&keys, &VERTEX_EXCLUSION_INCREASE_KEYS),
             key_group_just_released(&keys, &VERTEX_EXCLUSION_INCREASE_KEYS),
             time.delta_secs(),
-            scene
-                .app_config
-                .generation
-                .vertex_spawn_exclusion_hold_delay_secs,
-            scene
-                .app_config
-                .generation
-                .vertex_spawn_exclusion_repeat_interval_secs,
+            exclusion_spec,
         );
     if vertex_exclusion_increase_requested {
-        scene.generation_state.vertex_spawn_exclusion_probability = adjust_clamped_value(
-            scene.generation_state.vertex_spawn_exclusion_probability,
-            scene
-                .app_config
-                .generation
-                .vertex_spawn_exclusion_adjust_step,
-            min_vertex_exclusion,
-            max_vertex_exclusion,
-        );
-        println!(
-            "{}",
-            vertex_exclusion_status_message(
-                scene.generation_state.vertex_spawn_exclusion_probability,
-            )
-        );
+        let exclusion = scene
+            .generation_state
+            .parameter_mut(GenerationParameter::ChildSpawnExclusionProbability)
+            .adjust_clamped_base_value(exclusion_spec.step(), exclusion_spec);
+        println!("{}", vertex_exclusion_status_message(exclusion));
     }
 
     if keys.just_pressed(KeyCode::KeyN) {
-        scene.generation_state.vertex_spawn_exclusion_probability = scene
-            .app_config
-            .generation
-            .default_vertex_spawn_exclusion_probability_clamped();
+        let exclusion = scene
+            .generation_state
+            .parameter_mut(GenerationParameter::ChildSpawnExclusionProbability)
+            .reset_to_default(exclusion_spec);
         scene
             .generation_state
-            .vertex_exclusion_decrease_hold
-            .reset();
-        scene
-            .generation_state
-            .vertex_exclusion_increase_hold
+            .parameter_mut(GenerationParameter::ChildSpawnExclusionProbability)
+            .input_mut()
             .reset();
         println!(
             "Reset {}",
-            vertex_exclusion_status_message(
-                scene.generation_state.vertex_spawn_exclusion_probability,
-            )
-            .to_lowercase()
+            vertex_exclusion_status_message(exclusion).to_lowercase()
         );
     }
 
     if transform_changed {
-        let twist_per_vertex_radians = scene.generation_state.twist_per_vertex_radians;
-        let vertex_offset_ratio = scene.generation_state.vertex_offset_ratio;
+        let twist_per_vertex_radians = scene
+            .generation_state
+            .twist_per_vertex_radians(&scene.app_config.generation);
+        let vertex_offset_ratio = scene
+            .generation_state
+            .vertex_offset_ratio(&scene.app_config.generation);
         recompute_spawn_tree(
             &mut scene.generation_state.nodes,
             &scene.shape_assets.catalog,
@@ -437,23 +355,18 @@ pub(crate) fn generation_input_system(
     }
 
     let selected_kind = scene.generation_state.selected_kind;
-    let scale_ratio = scene.generation_state.scale_ratio;
-    let spawn_placement_mode = scene.generation_state.spawn_placement_mode;
-    let twist_per_vertex_radians = scene.generation_state.twist_per_vertex_radians;
-    let vertex_offset_ratio = scene.generation_state.vertex_offset_ratio;
-    let vertex_spawn_exclusion_probability =
-        scene.generation_state.vertex_spawn_exclusion_probability;
+    let scale_ratio = scene
+        .generation_state
+        .scale_ratio(&scene.app_config.generation);
+    let spawn_tuning = scene
+        .generation_state
+        .spawn_tuning(&scene.app_config.generation);
     let Some(spawn) = next_spawn(
         &mut scene.generation_state.nodes,
         &scene.shape_assets.catalog,
         selected_kind,
         scale_ratio,
-        scene.app_config.generation.spawn_tuning(
-            twist_per_vertex_radians,
-            vertex_offset_ratio,
-            vertex_spawn_exclusion_probability,
-            spawn_placement_mode,
-        ),
+        spawn_tuning,
     ) else {
         eprintln!("No valid spawn position is currently available.");
         return;
@@ -543,15 +456,16 @@ pub(crate) fn spawn_placement_mode_status_message(mode: SpawnPlacementMode) -> S
 #[cfg(test)]
 mod tests {
     use super::{
-        SpawnHoldState, adjust_clamped_value, twist_status_message,
-        vertex_exclusion_status_message, vertex_offset_status_message,
+        adjust_clamped_value, twist_status_message, vertex_exclusion_status_message,
+        vertex_offset_status_message,
     };
     use crate::config::GenerationConfig;
+    use crate::parameters::HoldRepeatState;
 
     #[test]
     fn spawn_hold_repeats_while_space_is_held() {
         let generation_config = GenerationConfig::default();
-        let mut spawn_hold = SpawnHoldState::default();
+        let mut spawn_hold = HoldRepeatState::default();
 
         assert!(spawn_hold.update(
             true,
@@ -598,7 +512,7 @@ mod tests {
     #[test]
     fn spawn_hold_resets_after_release() {
         let generation_config = GenerationConfig::default();
-        let mut spawn_hold = SpawnHoldState::default();
+        let mut spawn_hold = HoldRepeatState::default();
 
         assert!(spawn_hold.update(
             true,

@@ -13,7 +13,7 @@ use crate::polyhedra::{
     SpawnPlacementMode,
 };
 use crate::runtime_scene::SceneMutationAccess;
-use crate::scene::{GenerationState, MaterialState, spawn_polyhedron_entity};
+use crate::scene::{GenerationParameters, GenerationState, MaterialState, spawn_polyhedron_entity};
 
 const PRESET_DIR: &str = "scene-presets";
 const PRESET_FORMAT_VERSION: u32 = 1;
@@ -347,10 +347,11 @@ impl GenerationSnapshot {
         Self {
             selected_kind: generation_state.selected_kind,
             spawn_placement_mode: generation_state.spawn_placement_mode,
-            scale_ratio: generation_state.scale_ratio,
-            twist_per_vertex_radians: generation_state.twist_per_vertex_radians,
-            vertex_offset_ratio: generation_state.vertex_offset_ratio,
-            vertex_spawn_exclusion_probability: generation_state.vertex_spawn_exclusion_probability,
+            scale_ratio: generation_state.scale_ratio_base(),
+            twist_per_vertex_radians: generation_state.twist_per_vertex_radians_base(),
+            vertex_offset_ratio: generation_state.vertex_offset_ratio_base(),
+            vertex_spawn_exclusion_probability: generation_state
+                .vertex_spawn_exclusion_probability_base(),
             nodes: generation_state
                 .nodes
                 .iter()
@@ -372,18 +373,14 @@ impl GenerationSnapshot {
         Ok(GenerationState {
             nodes,
             selected_kind: self.selected_kind,
-            scale_ratio: self.scale_ratio,
             spawn_placement_mode: self.spawn_placement_mode,
-            twist_per_vertex_radians: self.twist_per_vertex_radians,
-            vertex_offset_ratio: self.vertex_offset_ratio,
-            vertex_spawn_exclusion_probability: self.vertex_spawn_exclusion_probability,
+            parameters: GenerationParameters::from_base_values(
+                self.scale_ratio,
+                self.twist_per_vertex_radians,
+                self.vertex_offset_ratio,
+                self.vertex_spawn_exclusion_probability,
+            ),
             spawn_hold: default(),
-            twist_decrease_hold: default(),
-            twist_increase_hold: default(),
-            vertex_offset_decrease_hold: default(),
-            vertex_offset_increase_hold: default(),
-            vertex_exclusion_decrease_hold: default(),
-            vertex_exclusion_increase_hold: default(),
         })
     }
 }
