@@ -10,7 +10,10 @@ use crate::capture::{
     manual_screenshot_input_system,
 };
 use crate::config::AppConfig;
-use crate::control_page::{ControlPageState, control_page_input_system};
+use crate::control_page::{
+    ControlPageInputMask, ControlPageState, control_page_input_system,
+    sync_control_page_input_mask_system,
+};
 use crate::effect_tuner::{EffectTunerState, apply_effect_tuner_system, effect_tuner_input_system};
 use crate::effects::EffectsPlugin;
 use crate::generation::generation_input_system;
@@ -53,6 +56,7 @@ pub fn run() {
         .insert_resource(CameraRig::from_config(&app_config.camera))
         .insert_resource(HelpOverlayState::default())
         .insert_resource(ControlPageState::default())
+        .insert_resource(ControlPageInputMask::default())
         .insert_resource(EffectTunerState::from_config(&app_config.effects))
         .insert_resource(PresetBrowserState::load_from_disk())
         .insert_resource(ScreenshotCounter::default())
@@ -76,6 +80,7 @@ pub fn run() {
                 toggle_help_overlay_system,
                 control_page_input_system,
                 preset_input_system,
+                sync_control_page_input_mask_system,
                 blender_export_input_system,
                 effect_tuner_input_system,
                 camera_input_system,

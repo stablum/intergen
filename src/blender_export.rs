@@ -13,7 +13,7 @@ use crate::camera::CameraRig;
 use crate::config::{
     AppConfig, EffectsConfig, LightingConfig, MaterialConfig, RenderingConfig, WindowConfig,
 };
-use crate::control_page::ControlPageState;
+use crate::control_page::{ControlPageInputMask, just_pressed_unmasked};
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
 use crate::polyhedra::{PolyhedronKind, PolyhedronNode, SpawnAddMode, SpawnPlacementMode};
 use crate::runtime_scene::SceneSnapshotAccess;
@@ -408,10 +408,10 @@ impl BlendNodeOrigin {
 pub(crate) fn blender_export_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    control_page: Res<ControlPageState>,
+    control_page_input_mask: Res<ControlPageInputMask>,
     scene: SceneSnapshotAccess,
 ) {
-    if control_page.captures_scene_input() || !keys.just_pressed(KeyCode::F4) {
+    if !just_pressed_unmasked(&keys, *control_page_input_mask, KeyCode::F4) {
         return;
     }
 
