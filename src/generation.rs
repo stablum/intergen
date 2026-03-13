@@ -1,6 +1,8 @@
 use bevy::prelude::*;
 
-use crate::control_page::ControlPageState;
+use crate::control_page::{
+    ControlPageInputMask, just_pressed_unmasked, just_released_unmasked, pressed_unmasked,
+};
 use crate::parameters::GenerationParameter;
 use crate::polyhedra::{PolyhedronKind, SpawnPlacementMode, next_spawn, recompute_spawn_tree};
 use crate::runtime_scene::GenerationSceneAccess;
@@ -20,42 +22,40 @@ const VERTEX_EXCLUSION_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyB];
 pub(crate) fn generation_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
-    control_page: Res<ControlPageState>,
+    control_page_input_mask: Res<ControlPageInputMask>,
     mut scene: GenerationSceneAccess,
 ) {
-    if control_page.captures_scene_input() {
-        return;
-    }
+    let input_mask = *control_page_input_mask;
 
-    if keys.just_pressed(KeyCode::Digit1) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::Digit1) {
         scene.generation_state.selected_kind = PolyhedronKind::Cube;
         println!(
             "Selected child shape: {:?}",
             scene.generation_state.selected_kind
         );
     }
-    if keys.just_pressed(KeyCode::Digit2) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::Digit2) {
         scene.generation_state.selected_kind = PolyhedronKind::Tetrahedron;
         println!(
             "Selected child shape: {:?}",
             scene.generation_state.selected_kind
         );
     }
-    if keys.just_pressed(KeyCode::Digit3) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::Digit3) {
         scene.generation_state.selected_kind = PolyhedronKind::Octahedron;
         println!(
             "Selected child shape: {:?}",
             scene.generation_state.selected_kind
         );
     }
-    if keys.just_pressed(KeyCode::Digit4) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::Digit4) {
         scene.generation_state.selected_kind = PolyhedronKind::Dodecahedron;
         println!(
             "Selected child shape: {:?}",
             scene.generation_state.selected_kind
         );
     }
-    if keys.just_pressed(KeyCode::KeyG) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::KeyG) {
         scene.generation_state.spawn_placement_mode =
             scene.generation_state.spawn_placement_mode.next();
         println!(
@@ -68,14 +68,18 @@ pub(crate) fn generation_input_system(
         .app_config
         .generation
         .parameter_spec(GenerationParameter::ChildScaleRatio);
-    if keys.just_pressed(KeyCode::Minus) || keys.just_pressed(KeyCode::NumpadSubtract) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::Minus)
+        || just_pressed_unmasked(&keys, input_mask, KeyCode::NumpadSubtract)
+    {
         let scale_ratio = scene
             .generation_state
             .parameter_mut(GenerationParameter::ChildScaleRatio)
             .adjust_clamped_base_value(-scale_spec.step(), scale_spec);
         println!("Child scale ratio: {:.2}", scale_ratio);
     }
-    if keys.just_pressed(KeyCode::Equal) || keys.just_pressed(KeyCode::NumpadAdd) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::Equal)
+        || just_pressed_unmasked(&keys, input_mask, KeyCode::NumpadAdd)
+    {
         let scale_ratio = scene
             .generation_state
             .parameter_mut(GenerationParameter::ChildScaleRatio)
@@ -85,7 +89,7 @@ pub(crate) fn generation_input_system(
 
     let (min_opacity, max_opacity) = scene.app_config.materials.opacity_bounds();
     let mut opacity_changed = false;
-    if keys.just_pressed(KeyCode::KeyO) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::KeyO) {
         scene.material_state.opacity = adjust_clamped_value(
             scene.material_state.opacity,
             -scene.app_config.materials.opacity_adjust_step,
@@ -95,7 +99,7 @@ pub(crate) fn generation_input_system(
         opacity_changed = true;
         println!("{}", opacity_status_message(scene.material_state.opacity));
     }
-    if keys.just_pressed(KeyCode::KeyP) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::KeyP) {
         scene.material_state.opacity = adjust_clamped_value(
             scene.material_state.opacity,
             scene.app_config.materials.opacity_adjust_step,
@@ -105,7 +109,7 @@ pub(crate) fn generation_input_system(
         opacity_changed = true;
         println!("{}", opacity_status_message(scene.material_state.opacity));
     }
-    if keys.just_pressed(KeyCode::KeyI) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::KeyI) {
         scene.material_state.opacity = scene.app_config.materials.default_opacity_clamped();
         opacity_changed = true;
         println!(
@@ -140,9 +144,9 @@ pub(crate) fn generation_input_system(
         .parameter_mut(GenerationParameter::ChildTwistPerVertexRadians)
         .input_mut()
         .request_decrease(
-            key_group_just_pressed(&keys, &TWIST_DECREASE_KEYS),
-            key_group_pressed(&keys, &TWIST_DECREASE_KEYS),
-            key_group_just_released(&keys, &TWIST_DECREASE_KEYS),
+            key_group_just_pressed(&keys, input_mask, &TWIST_DECREASE_KEYS),
+            key_group_pressed(&keys, input_mask, &TWIST_DECREASE_KEYS),
+            key_group_just_released(&keys, input_mask, &TWIST_DECREASE_KEYS),
             time.delta_secs(),
             twist_spec,
         );
@@ -160,9 +164,9 @@ pub(crate) fn generation_input_system(
         .parameter_mut(GenerationParameter::ChildTwistPerVertexRadians)
         .input_mut()
         .request_increase(
-            key_group_just_pressed(&keys, &TWIST_INCREASE_KEYS),
-            key_group_pressed(&keys, &TWIST_INCREASE_KEYS),
-            key_group_just_released(&keys, &TWIST_INCREASE_KEYS),
+            key_group_just_pressed(&keys, input_mask, &TWIST_INCREASE_KEYS),
+            key_group_pressed(&keys, input_mask, &TWIST_INCREASE_KEYS),
+            key_group_just_released(&keys, input_mask, &TWIST_INCREASE_KEYS),
             time.delta_secs(),
             twist_spec,
         );
@@ -175,7 +179,7 @@ pub(crate) fn generation_input_system(
         println!("{}", twist_status_message(twist));
     }
 
-    if keys.just_pressed(KeyCode::KeyT) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::KeyT) {
         let twist = scene
             .generation_state
             .parameter_mut(GenerationParameter::ChildTwistPerVertexRadians)
@@ -194,9 +198,9 @@ pub(crate) fn generation_input_system(
         .parameter_mut(GenerationParameter::ChildOutwardOffsetRatio)
         .input_mut()
         .request_decrease(
-            key_group_just_pressed(&keys, &VERTEX_OFFSET_DECREASE_KEYS),
-            key_group_pressed(&keys, &VERTEX_OFFSET_DECREASE_KEYS),
-            key_group_just_released(&keys, &VERTEX_OFFSET_DECREASE_KEYS),
+            key_group_just_pressed(&keys, input_mask, &VERTEX_OFFSET_DECREASE_KEYS),
+            key_group_pressed(&keys, input_mask, &VERTEX_OFFSET_DECREASE_KEYS),
+            key_group_just_released(&keys, input_mask, &VERTEX_OFFSET_DECREASE_KEYS),
             time.delta_secs(),
             offset_spec,
         );
@@ -214,9 +218,9 @@ pub(crate) fn generation_input_system(
         .parameter_mut(GenerationParameter::ChildOutwardOffsetRatio)
         .input_mut()
         .request_increase(
-            key_group_just_pressed(&keys, &VERTEX_OFFSET_INCREASE_KEYS),
-            key_group_pressed(&keys, &VERTEX_OFFSET_INCREASE_KEYS),
-            key_group_just_released(&keys, &VERTEX_OFFSET_INCREASE_KEYS),
+            key_group_just_pressed(&keys, input_mask, &VERTEX_OFFSET_INCREASE_KEYS),
+            key_group_pressed(&keys, input_mask, &VERTEX_OFFSET_INCREASE_KEYS),
+            key_group_just_released(&keys, input_mask, &VERTEX_OFFSET_INCREASE_KEYS),
             time.delta_secs(),
             offset_spec,
         );
@@ -229,7 +233,7 @@ pub(crate) fn generation_input_system(
         println!("{}", vertex_offset_status_message(vertex_offset));
     }
 
-    if keys.just_pressed(KeyCode::KeyC) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::KeyC) {
         let vertex_offset = scene
             .generation_state
             .parameter_mut(GenerationParameter::ChildOutwardOffsetRatio)
@@ -251,9 +255,9 @@ pub(crate) fn generation_input_system(
         .parameter_mut(GenerationParameter::ChildSpawnExclusionProbability)
         .input_mut()
         .request_decrease(
-            key_group_just_pressed(&keys, &VERTEX_EXCLUSION_DECREASE_KEYS),
-            key_group_pressed(&keys, &VERTEX_EXCLUSION_DECREASE_KEYS),
-            key_group_just_released(&keys, &VERTEX_EXCLUSION_DECREASE_KEYS),
+            key_group_just_pressed(&keys, input_mask, &VERTEX_EXCLUSION_DECREASE_KEYS),
+            key_group_pressed(&keys, input_mask, &VERTEX_EXCLUSION_DECREASE_KEYS),
+            key_group_just_released(&keys, input_mask, &VERTEX_EXCLUSION_DECREASE_KEYS),
             time.delta_secs(),
             exclusion_spec,
         );
@@ -270,9 +274,9 @@ pub(crate) fn generation_input_system(
         .parameter_mut(GenerationParameter::ChildSpawnExclusionProbability)
         .input_mut()
         .request_increase(
-            key_group_just_pressed(&keys, &VERTEX_EXCLUSION_INCREASE_KEYS),
-            key_group_pressed(&keys, &VERTEX_EXCLUSION_INCREASE_KEYS),
-            key_group_just_released(&keys, &VERTEX_EXCLUSION_INCREASE_KEYS),
+            key_group_just_pressed(&keys, input_mask, &VERTEX_EXCLUSION_INCREASE_KEYS),
+            key_group_pressed(&keys, input_mask, &VERTEX_EXCLUSION_INCREASE_KEYS),
+            key_group_just_released(&keys, input_mask, &VERTEX_EXCLUSION_INCREASE_KEYS),
             time.delta_secs(),
             exclusion_spec,
         );
@@ -284,7 +288,7 @@ pub(crate) fn generation_input_system(
         println!("{}", vertex_exclusion_status_message(exclusion));
     }
 
-    if keys.just_pressed(KeyCode::KeyN) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::KeyN) {
         let exclusion = scene
             .generation_state
             .parameter_mut(GenerationParameter::ChildSpawnExclusionProbability)
@@ -319,7 +323,7 @@ pub(crate) fn generation_input_system(
         );
     }
 
-    if keys.just_pressed(KeyCode::KeyR) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::KeyR) {
         for entity in scene.polyhedron_entities.iter() {
             scene.commands.entity(entity).despawn();
         }
@@ -343,9 +347,9 @@ pub(crate) fn generation_input_system(
     }
 
     let spawn_requested = scene.generation_state.spawn_hold.update(
-        keys.just_pressed(KeyCode::Space),
-        keys.pressed(KeyCode::Space),
-        keys.just_released(KeyCode::Space),
+        just_pressed_unmasked(&keys, input_mask, KeyCode::Space),
+        pressed_unmasked(&keys, input_mask, KeyCode::Space),
+        just_released_unmasked(&keys, input_mask, KeyCode::Space),
         time.delta_secs(),
         scene.app_config.generation.spawn_hold_delay_secs,
         scene.app_config.generation.spawn_repeat_interval_secs,
@@ -388,26 +392,38 @@ pub(crate) fn generation_input_system(
     );
 }
 
-fn key_group_just_pressed(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool {
+fn key_group_just_pressed(
+    keys: &ButtonInput<KeyCode>,
+    input_mask: ControlPageInputMask,
+    key_codes: &[KeyCode],
+) -> bool {
     key_codes
         .iter()
         .copied()
-        .any(|key_code| keys.just_pressed(key_code))
+        .any(|key_code| just_pressed_unmasked(keys, input_mask, key_code))
 }
 
-fn key_group_pressed(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool {
+fn key_group_pressed(
+    keys: &ButtonInput<KeyCode>,
+    input_mask: ControlPageInputMask,
+    key_codes: &[KeyCode],
+) -> bool {
     key_codes
         .iter()
         .copied()
-        .any(|key_code| keys.pressed(key_code))
+        .any(|key_code| pressed_unmasked(keys, input_mask, key_code))
 }
 
-fn key_group_just_released(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool {
-    !key_group_pressed(keys, key_codes)
+fn key_group_just_released(
+    keys: &ButtonInput<KeyCode>,
+    input_mask: ControlPageInputMask,
+    key_codes: &[KeyCode],
+) -> bool {
+    !key_group_pressed(keys, input_mask, key_codes)
         && key_codes
             .iter()
             .copied()
-            .any(|key_code| keys.just_released(key_code))
+            .any(|key_code| just_released_unmasked(keys, input_mask, key_code))
 }
 
 fn adjust_clamped_value(current: f32, delta: f32, min: f32, max: f32) -> f32 {

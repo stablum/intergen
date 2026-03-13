@@ -3,6 +3,76 @@ use bevy::prelude::*;
 use crate::effect_tuner::EffectTunerState;
 use crate::presets::PresetBrowserState;
 
+const EFFECT_TUNER_BINDINGS: [KeyBindingPattern; 10] = [
+    KeyBindingPattern::any_modifiers(KeyCode::Space),
+    KeyBindingPattern::any_modifiers(KeyCode::KeyL),
+    KeyBindingPattern::any_modifiers(KeyCode::Tab),
+    KeyBindingPattern::any_modifiers(KeyCode::ArrowLeft),
+    KeyBindingPattern::any_modifiers(KeyCode::ArrowRight),
+    KeyBindingPattern::any_modifiers(KeyCode::ArrowUp),
+    KeyBindingPattern::any_modifiers(KeyCode::ArrowDown),
+    KeyBindingPattern::any_modifiers(KeyCode::Enter),
+    KeyBindingPattern::any_modifiers(KeyCode::NumpadEnter),
+    KeyBindingPattern::any_modifiers(KeyCode::Backspace),
+];
+const EFFECT_TUNER_NUMERIC_BINDINGS: [KeyBindingPattern; 26] = [
+    KeyBindingPattern::unmodified(KeyCode::Digit0),
+    KeyBindingPattern::unmodified(KeyCode::Digit1),
+    KeyBindingPattern::unmodified(KeyCode::Digit2),
+    KeyBindingPattern::unmodified(KeyCode::Digit3),
+    KeyBindingPattern::unmodified(KeyCode::Digit4),
+    KeyBindingPattern::unmodified(KeyCode::Digit5),
+    KeyBindingPattern::unmodified(KeyCode::Digit6),
+    KeyBindingPattern::unmodified(KeyCode::Digit7),
+    KeyBindingPattern::unmodified(KeyCode::Digit8),
+    KeyBindingPattern::unmodified(KeyCode::Digit9),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad0),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad1),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad2),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad3),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad4),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad5),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad6),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad7),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad8),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad9),
+    KeyBindingPattern::unmodified(KeyCode::Period),
+    KeyBindingPattern::unmodified(KeyCode::Minus),
+    KeyBindingPattern::shifted(KeyCode::Equal),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::NumpadDecimal),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::NumpadSubtract),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::NumpadAdd),
+];
+const PRESET_PAGE_BINDINGS: [KeyBindingPattern; 22] = [
+    KeyBindingPattern::any_modifiers(KeyCode::KeyS),
+    KeyBindingPattern::any_modifiers(KeyCode::Delete),
+    KeyBindingPattern::any_modifiers(KeyCode::Digit0),
+    KeyBindingPattern::any_modifiers(KeyCode::Digit1),
+    KeyBindingPattern::any_modifiers(KeyCode::Digit2),
+    KeyBindingPattern::any_modifiers(KeyCode::Digit3),
+    KeyBindingPattern::any_modifiers(KeyCode::Digit4),
+    KeyBindingPattern::any_modifiers(KeyCode::Digit5),
+    KeyBindingPattern::any_modifiers(KeyCode::Digit6),
+    KeyBindingPattern::any_modifiers(KeyCode::Digit7),
+    KeyBindingPattern::any_modifiers(KeyCode::Digit8),
+    KeyBindingPattern::any_modifiers(KeyCode::Digit9),
+    KeyBindingPattern::any_modifiers(KeyCode::Numpad0),
+    KeyBindingPattern::any_modifiers(KeyCode::Numpad1),
+    KeyBindingPattern::any_modifiers(KeyCode::Numpad2),
+    KeyBindingPattern::any_modifiers(KeyCode::Numpad3),
+    KeyBindingPattern::any_modifiers(KeyCode::Numpad4),
+    KeyBindingPattern::any_modifiers(KeyCode::Numpad5),
+    KeyBindingPattern::any_modifiers(KeyCode::Numpad6),
+    KeyBindingPattern::any_modifiers(KeyCode::Numpad7),
+    KeyBindingPattern::any_modifiers(KeyCode::Numpad8),
+    KeyBindingPattern::any_modifiers(KeyCode::Numpad9),
+];
+const PRESET_CHOOSER_BINDINGS: [KeyBindingPattern; 3] = [
+    KeyBindingPattern::any_modifiers(KeyCode::ArrowUp),
+    KeyBindingPattern::any_modifiers(KeyCode::ArrowDown),
+    KeyBindingPattern::any_modifiers(KeyCode::Enter),
+];
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum ControlPage {
     EffectTuner,
@@ -10,10 +80,6 @@ pub(crate) enum ControlPage {
 }
 
 impl ControlPage {
-    fn captures_keyboard_focus(self) -> bool {
-        true
-    }
-
     fn closed_message(self) -> &'static str {
         match self {
             Self::EffectTuner => "FX tuner closed.",
@@ -38,15 +104,10 @@ impl ControlPageState {
 
     pub(crate) fn focused_page(&self) -> Option<ControlPage> {
         self.active_page()
-            .filter(|page| page.captures_keyboard_focus())
     }
 
     pub(crate) fn page_has_focus(&self, page: ControlPage) -> bool {
         self.focused_page() == Some(page)
-    }
-
-    pub(crate) fn captures_scene_input(&self) -> bool {
-        self.focused_page().is_some()
     }
 
     fn open_page(&mut self, page: ControlPage) -> Option<ControlPage> {
@@ -60,6 +121,172 @@ impl ControlPageState {
     fn close_active_page(&mut self) -> Option<ControlPage> {
         self.active_page.take()
     }
+}
+
+#[derive(Resource, Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) struct ControlPageInputMask {
+    active_page: Option<ControlPage>,
+    preset_chooser_visible: bool,
+}
+
+impl ControlPageInputMask {
+    fn from_states(control_page: &ControlPageState, preset_browser: &PresetBrowserState) -> Self {
+        Self {
+            active_page: control_page.active_page(),
+            preset_chooser_visible: preset_browser.chooser_visible(),
+        }
+    }
+
+    fn captures_binding(self, binding: KeyBinding) -> bool {
+        match self.active_page {
+            Some(ControlPage::EffectTuner) => {
+                binding_captured(binding, &EFFECT_TUNER_BINDINGS)
+                    || binding_captured(binding, &EFFECT_TUNER_NUMERIC_BINDINGS)
+            }
+            Some(ControlPage::ScenePresets) => {
+                binding_captured(binding, &PRESET_PAGE_BINDINGS)
+                    || (self.preset_chooser_visible
+                        && binding_captured(binding, &PRESET_CHOOSER_BINDINGS))
+            }
+            None => false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+struct KeyModifiers {
+    shift: bool,
+    control: bool,
+    alt: bool,
+}
+
+impl KeyModifiers {
+    fn from_keys(keys: &ButtonInput<KeyCode>) -> Self {
+        Self {
+            shift: modifier_pressed(keys, &[KeyCode::ShiftLeft, KeyCode::ShiftRight]),
+            control: modifier_pressed(keys, &[KeyCode::ControlLeft, KeyCode::ControlRight]),
+            alt: modifier_pressed(keys, &[KeyCode::AltLeft, KeyCode::AltRight]),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct KeyBinding {
+    key_code: KeyCode,
+    modifiers: KeyModifiers,
+}
+
+impl KeyBinding {
+    fn from_keys(keys: &ButtonInput<KeyCode>, key_code: KeyCode) -> Self {
+        Self {
+            key_code,
+            modifiers: KeyModifiers::from_keys(keys),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum ModifierRequirement {
+    Any,
+    Required,
+    Forbidden,
+}
+
+impl ModifierRequirement {
+    const fn matches(self, pressed: bool) -> bool {
+        match self {
+            Self::Any => true,
+            Self::Required => pressed,
+            Self::Forbidden => !pressed,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+struct KeyBindingPattern {
+    key_code: KeyCode,
+    shift: ModifierRequirement,
+    control: ModifierRequirement,
+    alt: ModifierRequirement,
+}
+
+impl KeyBindingPattern {
+    const fn any_modifiers(key_code: KeyCode) -> Self {
+        Self {
+            key_code,
+            shift: ModifierRequirement::Any,
+            control: ModifierRequirement::Any,
+            alt: ModifierRequirement::Any,
+        }
+    }
+
+    const fn unmodified(key_code: KeyCode) -> Self {
+        Self {
+            key_code,
+            shift: ModifierRequirement::Forbidden,
+            control: ModifierRequirement::Forbidden,
+            alt: ModifierRequirement::Forbidden,
+        }
+    }
+
+    const fn shifted(key_code: KeyCode) -> Self {
+        Self {
+            key_code,
+            shift: ModifierRequirement::Required,
+            control: ModifierRequirement::Forbidden,
+            alt: ModifierRequirement::Forbidden,
+        }
+    }
+
+    const fn no_ctrl_or_alt(key_code: KeyCode) -> Self {
+        Self {
+            key_code,
+            shift: ModifierRequirement::Any,
+            control: ModifierRequirement::Forbidden,
+            alt: ModifierRequirement::Forbidden,
+        }
+    }
+
+    fn matches(self, binding: KeyBinding) -> bool {
+        self.key_code == binding.key_code
+            && self.shift.matches(binding.modifiers.shift)
+            && self.control.matches(binding.modifiers.control)
+            && self.alt.matches(binding.modifiers.alt)
+    }
+}
+
+pub(crate) fn sync_control_page_input_mask_system(
+    control_page: Res<ControlPageState>,
+    preset_browser: Res<PresetBrowserState>,
+    mut input_mask: ResMut<ControlPageInputMask>,
+) {
+    *input_mask = ControlPageInputMask::from_states(&control_page, &preset_browser);
+}
+
+pub(crate) fn just_pressed_unmasked(
+    keys: &ButtonInput<KeyCode>,
+    input_mask: ControlPageInputMask,
+    key_code: KeyCode,
+) -> bool {
+    keys.just_pressed(key_code)
+        && !input_mask.captures_binding(KeyBinding::from_keys(keys, key_code))
+}
+
+pub(crate) fn pressed_unmasked(
+    keys: &ButtonInput<KeyCode>,
+    input_mask: ControlPageInputMask,
+    key_code: KeyCode,
+) -> bool {
+    keys.pressed(key_code) && !input_mask.captures_binding(KeyBinding::from_keys(keys, key_code))
+}
+
+pub(crate) fn just_released_unmasked(
+    keys: &ButtonInput<KeyCode>,
+    input_mask: ControlPageInputMask,
+    key_code: KeyCode,
+) -> bool {
+    keys.just_released(key_code)
+        && !input_mask.captures_binding(KeyBinding::from_keys(keys, key_code))
 }
 
 pub(crate) fn control_page_input_system(
@@ -126,9 +353,25 @@ fn close_page(
     }
 }
 
+fn binding_captured(binding: KeyBinding, patterns: &[KeyBindingPattern]) -> bool {
+    patterns
+        .iter()
+        .copied()
+        .any(|pattern| pattern.matches(binding))
+}
+
+fn modifier_pressed(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool {
+    key_codes
+        .iter()
+        .copied()
+        .any(|key_code| keys.pressed(key_code))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{ControlPage, ControlPageState};
+    use bevy::prelude::KeyCode;
+
+    use super::{ControlPage, ControlPageInputMask, ControlPageState, KeyBinding, KeyModifiers};
 
     #[test]
     fn opening_a_page_replaces_the_previous_page() {
@@ -150,16 +393,72 @@ mod tests {
 
         assert_eq!(state.active_page(), None);
         assert_eq!(state.focused_page(), None);
-        assert!(!state.captures_scene_input());
 
         state.open_page(ControlPage::EffectTuner);
         assert_eq!(state.active_page(), Some(ControlPage::EffectTuner));
         assert!(state.page_has_focus(ControlPage::EffectTuner));
-        assert!(state.captures_scene_input());
 
         state.open_page(ControlPage::ScenePresets);
         assert_eq!(state.focused_page(), Some(ControlPage::ScenePresets));
         assert!(state.page_has_focus(ControlPage::ScenePresets));
-        assert!(state.captures_scene_input());
+    }
+
+    #[test]
+    fn effect_tuner_mask_only_captures_its_own_bindings() {
+        let mask = ControlPageInputMask {
+            active_page: Some(ControlPage::EffectTuner),
+            preset_chooser_visible: false,
+        };
+
+        assert!(mask.captures_binding(binding(KeyCode::Space)));
+        assert!(mask.captures_binding(binding(KeyCode::ArrowUp)));
+        assert!(mask.captures_binding(binding(KeyCode::Digit1)));
+        assert!(mask.captures_binding(binding(KeyCode::Minus)));
+        assert!(mask.captures_binding(shifted_binding(KeyCode::Equal)));
+        assert!(mask.captures_binding(binding(KeyCode::NumpadAdd)));
+
+        assert!(!mask.captures_binding(binding(KeyCode::KeyG)));
+        assert!(!mask.captures_binding(binding(KeyCode::KeyW)));
+        assert!(!mask.captures_binding(binding(KeyCode::Comma)));
+        assert!(!mask.captures_binding(binding(KeyCode::Equal)));
+    }
+
+    #[test]
+    fn preset_page_mask_tracks_collision_chooser_bindings() {
+        let preset_page_mask = ControlPageInputMask {
+            active_page: Some(ControlPage::ScenePresets),
+            preset_chooser_visible: false,
+        };
+
+        assert!(preset_page_mask.captures_binding(binding(KeyCode::KeyS)));
+        assert!(preset_page_mask.captures_binding(binding(KeyCode::Digit4)));
+        assert!(!preset_page_mask.captures_binding(binding(KeyCode::ArrowUp)));
+        assert!(!preset_page_mask.captures_binding(binding(KeyCode::KeyW)));
+
+        let chooser_mask = ControlPageInputMask {
+            preset_chooser_visible: true,
+            ..preset_page_mask
+        };
+
+        assert!(chooser_mask.captures_binding(binding(KeyCode::ArrowUp)));
+        assert!(chooser_mask.captures_binding(binding(KeyCode::ArrowDown)));
+        assert!(chooser_mask.captures_binding(binding(KeyCode::Enter)));
+    }
+
+    fn binding(key_code: KeyCode) -> KeyBinding {
+        KeyBinding {
+            key_code,
+            modifiers: KeyModifiers::default(),
+        }
+    }
+
+    fn shifted_binding(key_code: KeyCode) -> KeyBinding {
+        KeyBinding {
+            key_code,
+            modifiers: KeyModifiers {
+                shift: true,
+                ..KeyModifiers::default()
+            },
+        }
     }
 }

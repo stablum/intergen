@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 
 use crate::config::{AppConfig, CameraConfig};
-use crate::control_page::ControlPageState;
+use crate::control_page::{ControlPageInputMask, just_pressed_unmasked, pressed_unmasked};
 
 #[derive(Resource)]
 pub(crate) struct CameraRig {
@@ -29,14 +29,12 @@ pub(crate) fn camera_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     app_config: Res<AppConfig>,
-    control_page: Res<ControlPageState>,
+    control_page_input_mask: Res<ControlPageInputMask>,
     mut camera_rig: ResMut<CameraRig>,
 ) {
-    if control_page.captures_scene_input() {
-        return;
-    }
+    let input_mask = *control_page_input_mask;
 
-    if keys.just_pressed(KeyCode::Backspace) {
+    if just_pressed_unmasked(&keys, input_mask, KeyCode::Backspace) {
         stop_angular_momentum(&mut camera_rig);
         println!("Stopped camera rotation momentum.");
     }
@@ -45,28 +43,28 @@ pub(crate) fn camera_input_system(
     let torque_step = app_config.camera.rotation_accel * dt;
     let ctrl_pressed = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
 
-    if !ctrl_pressed && keys.pressed(KeyCode::ArrowUp) {
+    if !ctrl_pressed && pressed_unmasked(&keys, input_mask, KeyCode::ArrowUp) {
         camera_rig.angular_velocity.x += torque_step;
     }
-    if !ctrl_pressed && keys.pressed(KeyCode::ArrowDown) {
+    if !ctrl_pressed && pressed_unmasked(&keys, input_mask, KeyCode::ArrowDown) {
         camera_rig.angular_velocity.x -= torque_step;
     }
-    if !ctrl_pressed && keys.pressed(KeyCode::ArrowLeft) {
+    if !ctrl_pressed && pressed_unmasked(&keys, input_mask, KeyCode::ArrowLeft) {
         camera_rig.angular_velocity.y += torque_step;
     }
-    if !ctrl_pressed && keys.pressed(KeyCode::ArrowRight) {
+    if !ctrl_pressed && pressed_unmasked(&keys, input_mask, KeyCode::ArrowRight) {
         camera_rig.angular_velocity.y -= torque_step;
     }
-    if keys.pressed(KeyCode::KeyQ) {
+    if pressed_unmasked(&keys, input_mask, KeyCode::KeyQ) {
         camera_rig.angular_velocity.z += torque_step;
     }
-    if keys.pressed(KeyCode::KeyE) {
+    if pressed_unmasked(&keys, input_mask, KeyCode::KeyE) {
         camera_rig.angular_velocity.z -= torque_step;
     }
-    if keys.pressed(KeyCode::KeyW) {
+    if pressed_unmasked(&keys, input_mask, KeyCode::KeyW) {
         camera_rig.zoom_velocity -= app_config.camera.zoom_accel * dt;
     }
-    if keys.pressed(KeyCode::KeyS) {
+    if pressed_unmasked(&keys, input_mask, KeyCode::KeyS) {
         camera_rig.zoom_velocity += app_config.camera.zoom_accel * dt;
     }
 }
