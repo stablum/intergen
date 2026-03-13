@@ -148,7 +148,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
 
     for (field, mut background) in field_query.iter_mut() {
         *background = if field.0 == snapshot.active_field {
-            BackgroundColor(srgba(ui_config.hint_background))
+            BackgroundColor(srgba(ui_config.focus_background))
         } else {
             BackgroundColor(Color::NONE)
         };
@@ -175,7 +175,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
 
         let color = if let Some(editable_field) = editable_field {
             if editable_field.0 == snapshot.active_field {
-                srgb(ui_config.hint_text)
+                srgb(ui_config.focus_text)
             } else {
                 srgb(ui_config.body_text)
             }

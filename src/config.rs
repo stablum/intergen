@@ -505,6 +505,8 @@ pub(crate) struct UiConfig {
     pub(crate) hint_padding_y: f32,
     pub(crate) hint_background: [f32; 4],
     pub(crate) hint_text: [f32; 3],
+    pub(crate) focus_background: [f32; 4],
+    pub(crate) focus_text: [f32; 3],
     pub(crate) hint_font_size: f32,
     pub(crate) overlay_background: [f32; 4],
     pub(crate) overlay_padding: f32,
@@ -540,6 +542,8 @@ impl Default for UiConfig {
             hint_padding_y: 8.0,
             hint_background: [0.06, 0.08, 0.13, 0.86],
             hint_text: [0.93, 0.95, 0.99],
+            focus_background: [0.92, 0.78, 0.36, 0.98],
+            focus_text: [0.05, 0.07, 0.10],
             hint_font_size: 14.0,
             overlay_background: [0.01, 0.02, 0.04, 0.72],
             overlay_padding: 24.0,
@@ -869,5 +873,19 @@ mod tests {
         .expect("vertex offset config should parse");
 
         assert_eq!(config.generation.vertex_offset_bounds(), (0.0, 0.75));
+    }
+    #[test]
+    fn ui_focus_colors_default_when_not_overridden() {
+        let config = parse_config(
+            r#"
+            [ui]
+            body_text = [0.1, 0.2, 0.3]
+            "#,
+        )
+        .expect("ui config should parse");
+
+        assert_eq!(config.ui.body_text, [0.1, 0.2, 0.3]);
+        assert_eq!(config.ui.focus_background, [0.92, 0.78, 0.36, 0.98]);
+        assert_eq!(config.ui.focus_text, [0.05, 0.07, 0.10]);
     }
 }
