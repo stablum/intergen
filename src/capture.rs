@@ -15,6 +15,7 @@ pub(crate) struct LaunchConfig {
     pub(crate) capture_delay_frames: u32,
     pub(crate) blend_export_path: Option<PathBuf>,
     pub(crate) blend_export_delay_frames: u32,
+    pub(crate) scene_preset_path: Option<PathBuf>,
 }
 
 impl LaunchConfig {
@@ -31,6 +32,7 @@ fn parse_launch_config(
     let mut capture_delay_frames = default_capture_delay_frames;
     let mut blend_export_path = None;
     let mut blend_export_delay_frames = default_capture_delay_frames;
+    let mut scene_preset_path = None;
     let mut args = args.into_iter();
 
     while let Some(arg) = args.next() {
@@ -65,9 +67,15 @@ fn parse_launch_config(
                     format!("Invalid frame count for --export-blend-delay-frames: {frame_count}")
                 })?;
             }
+            "--load-scene-preset" => {
+                let Some(path) = args.next() else {
+                    return Err("Missing path after --load-scene-preset".to_string());
+                };
+                scene_preset_path = Some(PathBuf::from(path));
+            }
             "--help" | "-h" => {
                 return Err(
-                    "Usage: cargo run -- [--capture <output.png>] [--capture-delay-frames <n>] [--export-blend <output.blend>] [--export-blend-delay-frames <n>]\nF12 saves a screenshot during normal interactive runs. F4 exports a Blender .blend during normal interactive runs."
+                    "Usage: cargo run -- [--capture <output.png>] [--capture-delay-frames <n>] [--export-blend <output.blend>] [--export-blend-delay-frames <n>] [--load-scene-preset <preset.toml>]\nF12 saves a screenshot during normal interactive runs. F4 exports a Blender .blend during normal interactive runs."
                         .to_string(),
                 );
             }
@@ -82,6 +90,7 @@ fn parse_launch_config(
         capture_delay_frames,
         blend_export_path,
         blend_export_delay_frames,
+        scene_preset_path,
     })
 }
 
@@ -226,6 +235,7 @@ mod tests {
             config.blend_export_delay_frames,
             CaptureConfig::default().default_capture_delay_frames
         );
+        assert_eq!(config.scene_preset_path, None);
     }
 
     #[test]
@@ -242,6 +252,7 @@ mod tests {
         assert_eq!(config.capture_delay_frames, 64);
         assert_eq!(config.capture_path, None);
         assert_eq!(config.blend_export_path, None);
+        assert_eq!(config.scene_preset_path, None);
     }
 
     #[test]
@@ -263,8 +274,27 @@ mod tests {
         );
         assert_eq!(config.blend_export_delay_frames, 96);
         assert_eq!(config.capture_path, None);
+        assert_eq!(config.scene_preset_path, None);
     }
 
+    #[test]
+    fn launch_config_parses_scene_preset_path() {
+        let config = parse_launch_config(
+            [
+                OsString::from("--load-scene-preset"),
+                OsString::from("scene-presets/test.toml"),
+            ],
+            CaptureConfig::default().default_capture_delay_frames,
+        )
+        .expect("scene preset path should parse");
+
+        assert_eq!(
+            config.scene_preset_path.as_deref(),
+            Some(Path::new("scene-presets/test.toml"))
+        );
+        assert_eq!(config.capture_path, None);
+        assert_eq!(config.blend_export_path, None);
+    }
     #[test]
     fn manual_screenshot_filename_includes_seconds_and_sequence() {
         let filename = manual_screenshot_filename(Duration::new(1_741_018_296, 45_000_000), 7);

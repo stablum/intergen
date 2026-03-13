@@ -14,7 +14,10 @@ use crate::control_page::{ControlPageState, control_page_input_system};
 use crate::effect_tuner::{EffectTunerState, apply_effect_tuner_system, effect_tuner_input_system};
 use crate::effects::EffectsPlugin;
 use crate::generation::generation_input_system;
-use crate::presets::{PresetBrowserState, preset_input_system};
+use crate::presets::{
+    AutomatedScenePresetLoad, PresetBrowserState, automated_scene_preset_load_system,
+    preset_input_system,
+};
 use crate::scene::setup_scene;
 use crate::ui::{
     HelpOverlayState, toggle_help_overlay_system, update_effect_tuner_overlay_system,
@@ -63,7 +66,10 @@ pub fn run() {
             ..default()
         }))
         .add_plugins(EffectsPlugin)
-        .add_systems(Startup, setup_scene)
+        .add_systems(
+            Startup,
+            (setup_scene, automated_scene_preset_load_system).chain(),
+        )
         .add_systems(
             Update,
             (
@@ -102,6 +108,10 @@ pub fn run() {
             path,
             launch_config.blend_export_delay_frames,
         ));
+    }
+
+    if let Some(path) = launch_config.scene_preset_path {
+        app.insert_resource(AutomatedScenePresetLoad::new(path));
     }
 
     app.run();

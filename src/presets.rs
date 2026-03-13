@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use bevy::app::AppExit;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -156,6 +157,17 @@ pub(crate) struct PresetBrowserState {
     chooser: Option<CollisionResolutionState>,
 }
 
+#[derive(Resource)]
+pub(crate) struct AutomatedScenePresetLoad {
+    path: PathBuf,
+}
+
+impl AutomatedScenePresetLoad {
+    pub(crate) fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+}
+
 impl Default for PresetBrowserState {
     fn default() -> Self {
         Self {
@@ -165,6 +177,38 @@ impl Default for PresetBrowserState {
             records: Vec::new(),
             chooser: None,
         }
+    }
+}
+
+pub(crate) fn automated_scene_preset_load_system(
+    preset_load: Option<Res<AutomatedScenePresetLoad>>,
+    mut scene: SceneMutationAccess,
+    mut app_exit: MessageWriter<AppExit>,
+) {
+    let Some(preset_load) = preset_load else {
+        return;
+    };
+
+    let result = read_preset_file(&preset_load.path)
+        .and_then(|file| {
+            let summary = file.summary.clone();
+            apply_scene_preset(&file.scene, &mut scene)?;
+            Ok(summary)
+        })
+        .map(|summary| {
+            println!(
+                "Loaded scene preset from {}: {}",
+                preset_load.path.display(),
+                summary
+            );
+        });
+
+    if let Err(error) = result {
+        eprintln!(
+            "Could not load scene preset {}: {error}",
+            preset_load.path.display()
+        );
+        app_exit.write(AppExit::error());
     }
 }
 

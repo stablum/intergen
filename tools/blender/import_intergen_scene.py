@@ -378,8 +378,14 @@ def build_edge_detection(node_tree, source, config, x_cursor):
     links = node_tree.links
 
     sobel = nodes.new("CompositorNodeFilter")
-    sobel.filter_type = "SOBEL"
     sobel.location = (x_cursor, 0)
+    if hasattr(sobel, "filter_type"):
+        sobel.filter_type = "SOBEL"
+    else:
+        print(
+            "Blender compositor filter node no longer exposes filter_type; using the default filter node as a best-effort edge pass.",
+            file=sys.stderr,
+        )
     links.new(source, sobel.inputs[0])
 
     rgb_to_bw = nodes.new("CompositorNodeRGBToBW")
