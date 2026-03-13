@@ -6,6 +6,8 @@ Runtime tuning lives in `config.toml` at the repository root.
 
 ## Gallery
 
+![Recent Intergen screenshot](screenshots/intergen-1773391201-479-0000.png)
+
 | View 1 | View 2 |
 | --- | --- |
 | ![Intergen screenshot 0000](screenshots/intergen-0000.png) | ![Intergen screenshot 0001](screenshots/intergen-0001.png) |
