@@ -15,7 +15,7 @@ use crate::config::{
 };
 use crate::control_page::ControlPageState;
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
-use crate::polyhedra::{PolyhedronKind, PolyhedronNode, SpawnPlacementMode};
+use crate::polyhedra::{PolyhedronKind, PolyhedronNode, SpawnAddMode, SpawnPlacementMode};
 use crate::runtime_scene::SceneSnapshotAccess;
 use crate::scene::{GenerationState, MaterialState, ShapeAssets};
 
@@ -141,6 +141,7 @@ struct BlendCameraRigMetadata {
 struct BlendGenerationMetadata {
     selected_kind: PolyhedronKind,
     spawn_placement_mode: SpawnPlacementMode,
+    spawn_add_mode: SpawnAddMode,
     scale_ratio: f32,
     twist_per_vertex_radians: f32,
     vertex_offset_ratio: f32,
@@ -356,6 +357,7 @@ impl BlendGenerationMetadata {
         Self {
             selected_kind: generation_state.selected_kind,
             spawn_placement_mode: generation_state.spawn_placement_mode,
+            spawn_add_mode: generation_state.spawn_add_mode,
             scale_ratio: generation_state.scale_ratio_base(),
             twist_per_vertex_radians: generation_state.twist_per_vertex_radians_base(),
             vertex_offset_ratio: generation_state.vertex_offset_ratio_base(),

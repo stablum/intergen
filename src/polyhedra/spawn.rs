@@ -43,6 +43,30 @@ impl SpawnPlacementMode {
     }
 }
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum SpawnAddMode {
+    #[default]
+    Single,
+    FillLevel,
+}
+
+impl SpawnAddMode {
+    pub(crate) fn next(self) -> Self {
+        match self {
+            Self::Single => Self::FillLevel,
+            Self::FillLevel => Self::Single,
+        }
+    }
+
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Single => "single object",
+            Self::FillLevel => "fill current level",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub(crate) enum PolyhedronKind {
@@ -127,6 +151,20 @@ pub(crate) struct SpawnedNode {
     pub(crate) node: PolyhedronNode,
 }
 
+#[derive(Clone, Copy, Debug)]
+enum SpawnLevelConstraint {
+    Any,
+    Exact(usize),
+}
+
+#[derive(Clone, Debug)]
+struct PendingSpawn {
+    parent_index: usize,
+    parent_level: usize,
+    attachment: SpawnAttachment,
+    node: PolyhedronNode,
+}
+
 struct SpawnCandidateInput<'a> {
     parent: &'a PolyhedronNode,
     parent_geometry: &'a ShapeGeometry,
@@ -159,10 +197,87 @@ pub(crate) fn next_spawn(
     scale_ratio: f32,
     tuning: SpawnTuning,
 ) -> Option<SpawnedNode> {
+    find_next_spawn(
+        nodes,
+        shapes,
+        child_kind,
+        scale_ratio,
+        tuning,
+        SpawnLevelConstraint::Any,
+    )
+    .map(|pending| apply_spawn(nodes, pending))
+}
+
+pub(crate) fn spawn_batch(
+    nodes: &mut Vec<PolyhedronNode>,
+    shapes: &ShapeCatalog,
+    child_kind: PolyhedronKind,
+    scale_ratio: f32,
+    tuning: SpawnTuning,
+    add_mode: SpawnAddMode,
+) -> Vec<SpawnedNode> {
+    let Some(first) = next_spawn(nodes, shapes, child_kind, scale_ratio, tuning) else {
+        return Vec::new();
+    };
+
+    let mut spawned = vec![first];
+    if add_mode != SpawnAddMode::FillLevel {
+        return spawned;
+    }
+
+    let target_level = spawned[0].node.level;
+    while let Some(spawn) =
+        next_spawn_at_level(nodes, shapes, child_kind, scale_ratio, tuning, target_level)
+    {
+        spawned.push(spawn);
+    }
+
+    spawned
+}
+
+fn next_spawn_at_level(
+    nodes: &mut Vec<PolyhedronNode>,
+    shapes: &ShapeCatalog,
+    child_kind: PolyhedronKind,
+    scale_ratio: f32,
+    tuning: SpawnTuning,
+    target_level: usize,
+) -> Option<SpawnedNode> {
+    find_next_spawn(
+        nodes,
+        shapes,
+        child_kind,
+        scale_ratio,
+        tuning,
+        SpawnLevelConstraint::Exact(target_level),
+    )
+    .map(|pending| apply_spawn(nodes, pending))
+}
+
+fn find_next_spawn(
+    nodes: &[PolyhedronNode],
+    shapes: &ShapeCatalog,
+    child_kind: PolyhedronKind,
+    scale_ratio: f32,
+    tuning: SpawnTuning,
+    level_constraint: SpawnLevelConstraint,
+) -> Option<PendingSpawn> {
     let scale_ratio = scale_ratio.clamp(tuning.min_scale_ratio, tuning.max_scale_ratio);
     let highest_level = nodes.iter().map(|node| node.level).max().unwrap_or(0);
+    let (start_level, end_level) = match level_constraint {
+        SpawnLevelConstraint::Any => (0, highest_level),
+        SpawnLevelConstraint::Exact(target_level) => {
+            let Some(parent_level) = target_level.checked_sub(1) else {
+                return None;
+            };
+            if parent_level > highest_level {
+                return None;
+            }
+            (parent_level, parent_level)
+        }
+    };
 
-    for level in 0..=highest_level {
+    for level in start_level..=end_level {
         let parent_indices: Vec<usize> = nodes
             .iter()
             .enumerate()
@@ -216,14 +331,10 @@ pub(crate) fn next_spawn(
                     continue;
                 }
 
-                nodes[parent_index]
-                    .occupied_attachments
-                    .mark_occupied(attachment);
-                nodes.push(candidate.clone());
-
-                return Some(SpawnedNode {
-                    kind: child_kind,
+                return Some(PendingSpawn {
+                    parent_index,
                     parent_level: parent.level,
+                    attachment,
                     node: candidate,
                 });
             }
@@ -231,6 +342,20 @@ pub(crate) fn next_spawn(
     }
 
     None
+}
+
+fn apply_spawn(nodes: &mut Vec<PolyhedronNode>, pending: PendingSpawn) -> SpawnedNode {
+    let node = pending.node;
+    nodes[pending.parent_index]
+        .occupied_attachments
+        .mark_occupied(pending.attachment);
+    nodes.push(node.clone());
+
+    SpawnedNode {
+        kind: node.kind,
+        parent_level: pending.parent_level,
+        node,
+    }
 }
 
 pub(crate) fn recompute_spawn_tree(
@@ -416,6 +541,62 @@ mod tests {
 
         assert!(parent_levels[..8].iter().all(|level| *level == 0));
         assert_eq!(parent_levels[8], 1);
+    }
+
+    #[test]
+    fn fill_level_mode_spawns_remaining_nodes_only_on_the_current_level() {
+        let shapes = ShapeCatalog::new();
+        let mut nodes = vec![root_node(PolyhedronKind::Cube, 1.4, &shapes)];
+
+        next_spawn(
+            &mut nodes,
+            &shapes,
+            PolyhedronKind::Cube,
+            0.35,
+            test_tuning(),
+        )
+        .expect("initial spawn should succeed");
+        let spawned = spawn_batch(
+            &mut nodes,
+            &shapes,
+            PolyhedronKind::Cube,
+            0.35,
+            test_tuning(),
+            SpawnAddMode::FillLevel,
+        );
+
+        assert_eq!(spawned.len(), 7);
+        assert!(spawned.iter().all(|spawn| spawn.node.level == 1));
+        assert_eq!(nodes.iter().map(|node| node.level).max(), Some(1));
+    }
+
+    #[test]
+    fn fill_level_mode_stops_before_opening_the_next_level() {
+        let shapes = ShapeCatalog::new();
+        let mut nodes = vec![root_node(PolyhedronKind::Cube, 1.4, &shapes)];
+
+        let first_batch = spawn_batch(
+            &mut nodes,
+            &shapes,
+            PolyhedronKind::Cube,
+            0.35,
+            test_tuning(),
+            SpawnAddMode::FillLevel,
+        );
+        let second_batch = spawn_batch(
+            &mut nodes,
+            &shapes,
+            PolyhedronKind::Cube,
+            0.35,
+            test_tuning(),
+            SpawnAddMode::FillLevel,
+        );
+
+        assert_eq!(first_batch.len(), 8);
+        assert!(first_batch.iter().all(|spawn| spawn.node.level == 1));
+        assert!(!second_batch.is_empty());
+        assert!(second_batch.iter().all(|spawn| spawn.node.level == 2));
+        assert_eq!(nodes.iter().map(|node| node.level).max(), Some(2));
     }
 
     #[test]
@@ -624,6 +805,12 @@ mod tests {
         );
 
         assert!(spawn.is_some());
+    }
+
+    #[test]
+    fn add_modes_cycle_between_single_and_fill_level() {
+        assert_eq!(SpawnAddMode::Single.next(), SpawnAddMode::FillLevel);
+        assert_eq!(SpawnAddMode::FillLevel.next(), SpawnAddMode::Single);
     }
 
     #[test]

@@ -5,13 +5,13 @@ use crate::camera::{CameraRig, SceneCamera};
 use crate::config::{AppConfig, GenerationConfig, MaterialConfig};
 use crate::effects::{camera_effects_from_config, effects_status_messages};
 use crate::generation::{
-    spawn_placement_mode_status_message, twist_status_message, vertex_exclusion_status_message,
-    vertex_offset_status_message,
+    spawn_add_mode_status_message, spawn_placement_mode_status_message, twist_status_message,
+    vertex_exclusion_status_message, vertex_offset_status_message,
 };
 use crate::parameters::{GenerationParameter, HoldRepeatState, ScalarParameterState};
 use crate::polyhedra::{
-    PolyhedronKind, PolyhedronNode, ShapeCatalog, ShapeGeometry, SpawnPlacementMode, SpawnTuning,
-    build_mesh, root_node,
+    PolyhedronKind, PolyhedronNode, ShapeCatalog, ShapeGeometry, SpawnAddMode, SpawnPlacementMode,
+    SpawnTuning, build_mesh, root_node,
 };
 use crate::ui::{UiFontSource, load_ui_theme, spawn_help_ui};
 
@@ -171,6 +171,7 @@ pub(crate) struct GenerationState {
     pub(crate) nodes: Vec<PolyhedronNode>,
     pub(crate) selected_kind: PolyhedronKind,
     pub(crate) spawn_placement_mode: SpawnPlacementMode,
+    pub(crate) spawn_add_mode: SpawnAddMode,
     pub(crate) parameters: GenerationParameters,
     pub(crate) spawn_hold: HoldRepeatState,
 }
@@ -326,6 +327,7 @@ pub(crate) fn setup_scene(
         nodes: vec![root],
         selected_kind: app_config.generation.default_child_kind,
         spawn_placement_mode: initial_spawn_placement_mode,
+        spawn_add_mode: SpawnAddMode::default(),
         parameters: initial_parameters,
         spawn_hold: HoldRepeatState::default(),
     });
@@ -334,7 +336,7 @@ pub(crate) fn setup_scene(
     });
 
     println!(
-        "Controls: F1/H help, F2 FX page, F3 scene preset page, Esc closes the active control page, F4 export Blender .blend, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to spawn, G cycles spawn mode, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset, hold V/B to adjust spawn exclusion probability, N reset spawn exclusion"
+        "Controls: F1/H help, F2 FX page, F3 scene preset page, Esc closes the active control page, F4 export Blender .blend, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to add objects, Ctrl+Space cycles add mode, G cycles spawn placement mode, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset, hold V/B to adjust spawn exclusion probability, N reset spawn exclusion"
     );
     println!(
         "FX page: Ctrl+Up/Down selects a parameter, Left/Right or Tab/Shift+Tab switch the active field, Up/Down adjust the active field, Space toggles the effect, L toggles the selected parameter LFO, typing a number sets the active numeric field, Backspace erases typed FX input, Shift is coarse, Alt is fine, Enter resets the field, Shift+Enter resets all FX settings and LFOs."
@@ -347,6 +349,7 @@ pub(crate) fn setup_scene(
         "{}",
         spawn_placement_mode_status_message(initial_spawn_placement_mode)
     );
+    println!("{}", spawn_add_mode_status_message(SpawnAddMode::default()));
     println!("{}", twist_status_message(initial_twist));
     println!("{}", vertex_offset_status_message(initial_vertex_offset));
     println!(
@@ -474,7 +477,7 @@ mod tests {
     use crate::parameters::{GenerationParameter, HoldRepeatState};
     use crate::polyhedra::{
         AttachmentOccupancy, NodeOrigin, PolyhedronKind, PolyhedronNode, ShapeCatalog,
-        SpawnAttachment, SpawnPlacementMode,
+        SpawnAddMode, SpawnAttachment, SpawnPlacementMode,
     };
 
     use super::{
@@ -510,6 +513,7 @@ mod tests {
             nodes: vec![root, child],
             selected_kind: PolyhedronKind::Octahedron,
             spawn_placement_mode: SpawnPlacementMode::Face,
+            spawn_add_mode: SpawnAddMode::FillLevel,
             parameters: GenerationParameters::from_base_values(0.42, 0.3, 0.6, 0.2),
             spawn_hold: HoldRepeatState {
                 elapsed_secs: 1.0,
@@ -602,6 +606,7 @@ mod tests {
             generation_state.spawn_placement_mode,
             SpawnPlacementMode::Face
         );
+        assert_eq!(generation_state.spawn_add_mode, SpawnAddMode::FillLevel);
         assert!(
             generation_state.nodes[0]
                 .occupied_attachments

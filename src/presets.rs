@@ -10,7 +10,7 @@ use crate::config::{AppConfig, LightingConfig, MaterialConfig, RenderingConfig};
 use crate::control_page::{ControlPage, ControlPageState};
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
 use crate::polyhedra::{
-    AttachmentOccupancy, NodeOrigin, PolyhedronKind, PolyhedronNode, SpawnAttachment,
+    AttachmentOccupancy, NodeOrigin, PolyhedronKind, PolyhedronNode, SpawnAddMode, SpawnAttachment,
     SpawnPlacementMode,
 };
 use crate::runtime_scene::SceneMutationAccess;
@@ -106,6 +106,8 @@ struct GenerationSnapshot {
     selected_kind: PolyhedronKind,
     #[serde(default)]
     spawn_placement_mode: SpawnPlacementMode,
+    #[serde(default)]
+    spawn_add_mode: SpawnAddMode,
     scale_ratio: f32,
     twist_per_vertex_radians: f32,
     vertex_offset_ratio: f32,
@@ -329,6 +331,7 @@ impl GenerationSnapshot {
         Self {
             selected_kind: generation_state.selected_kind,
             spawn_placement_mode: generation_state.spawn_placement_mode,
+            spawn_add_mode: generation_state.spawn_add_mode,
             scale_ratio: generation_state.scale_ratio_base(),
             twist_per_vertex_radians: generation_state.twist_per_vertex_radians_base(),
             vertex_offset_ratio: generation_state.vertex_offset_ratio_base(),
@@ -356,6 +359,7 @@ impl GenerationSnapshot {
             nodes,
             selected_kind: self.selected_kind,
             spawn_placement_mode: self.spawn_placement_mode,
+            spawn_add_mode: self.spawn_add_mode,
             parameters: GenerationParameters::from_base_values(
                 self.scale_ratio,
                 self.twist_per_vertex_radians,
@@ -945,6 +949,7 @@ mod tests {
             generation: super::GenerationSnapshot {
                 selected_kind: crate::polyhedra::PolyhedronKind::Cube,
                 spawn_placement_mode: crate::polyhedra::SpawnPlacementMode::Vertex,
+                spawn_add_mode: crate::polyhedra::SpawnAddMode::Single,
                 scale_ratio: 0.5,
                 twist_per_vertex_radians: 0.0,
                 vertex_offset_ratio: 0.0,
