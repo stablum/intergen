@@ -1,6 +1,7 @@
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use bevy::app::AppExit;
 use bevy::diagnostic::FrameCount;
@@ -116,8 +117,10 @@ pub(crate) fn manual_screenshot_input_system(
         return;
     }
 
-    let path = PathBuf::from(&app_config.capture.output_dir)
-        .join(format!("intergen-{:04}.png", screenshot_counter.next_index));
+    let path = PathBuf::from(&app_config.capture.output_dir).join(manual_screenshot_filename(
+        current_unix_timestamp(),
+        screenshot_counter.next_index,
+    ));
     screenshot_counter.next_index += 1;
     request_screenshot(&mut commands, path, false);
 }
@@ -175,12 +178,28 @@ fn exit_after_screenshot_capture(_: On<ScreenshotCaptured>, mut app_exit: Messag
     app_exit.write(AppExit::Success);
 }
 
+fn manual_screenshot_filename(timestamp: Duration, sequence: u32) -> String {
+    format!(
+        "intergen-{}-{:03}-{:04}.png",
+        timestamp.as_secs(),
+        timestamp.subsec_millis(),
+        sequence
+    )
+}
+
+fn current_unix_timestamp() -> Duration {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use std::ffi::OsString;
     use std::path::Path;
+    use std::time::Duration;
 
-    use super::parse_launch_config;
+    use super::{manual_screenshot_filename, parse_launch_config};
     use crate::config::CaptureConfig;
 
     #[test]
@@ -244,5 +263,12 @@ mod tests {
         );
         assert_eq!(config.blend_export_delay_frames, 96);
         assert_eq!(config.capture_path, None);
+    }
+
+    #[test]
+    fn manual_screenshot_filename_includes_seconds_and_sequence() {
+        let filename = manual_screenshot_filename(Duration::new(1_741_018_296, 45_000_000), 7);
+
+        assert_eq!(filename, "intergen-1741018296-045-0007.png");
     }
 }
