@@ -148,7 +148,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
 
     for (field, mut background) in field_query.iter_mut() {
         *background = if field.0 == snapshot.active_field {
-            BackgroundColor(srgba(ui_config.hint_background))
+            BackgroundColor(srgba(ui_config.focus_background))
         } else {
             BackgroundColor(Color::NONE)
         };
@@ -175,7 +175,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
 
         let color = if let Some(editable_field) = editable_field {
             if editable_field.0 == snapshot.active_field {
-                srgb(ui_config.hint_text)
+                srgb(ui_config.focus_text)
             } else {
                 srgb(ui_config.body_text)
             }
@@ -801,7 +801,8 @@ pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
             "Q / E: Roll camera\n",
             "W / S: Zoom in / out\n",
             "Backspace: Stop camera rotation momentum\n",
-            "Space: Spawn polyhedra (hold to repeat)\n",
+            "Space: Add polyhedra using the current add mode (hold to repeat)\n",
+            "Ctrl + Space: Cycle add mode (single / fill current level)\n",
             "G: Cycle spawn placement mode (vertex / edge / face)\n",
             "R: Reset to the selected polyhedron as root\n",
             "1: Select cube\n",
@@ -863,7 +864,8 @@ mod tests {
         assert!(text.contains(
             "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions"
         ));
-        assert!(text.contains("Space: Spawn polyhedra (hold to repeat)"));
+        assert!(text.contains("Space: Add polyhedra using the current add mode (hold to repeat)"));
+        assert!(text.contains("Ctrl + Space: Cycle add mode (single / fill current level)"));
         assert!(text.contains("G: Cycle spawn placement mode (vertex / edge / face)"));
         assert!(text.contains("Backspace: Stop camera rotation momentum"));
         assert!(text.contains("R: Reset to the selected polyhedron as root"));
