@@ -2,7 +2,10 @@ use bevy::prelude::*;
 
 use crate::control_page::ControlPageState;
 use crate::parameters::GenerationParameter;
-use crate::polyhedra::{PolyhedronKind, SpawnPlacementMode, next_spawn, recompute_spawn_tree};
+use crate::polyhedra::{
+    PolyhedronKind, SpawnAddMode, SpawnPlacementMode, SpawnedNode, recompute_spawn_tree,
+    spawn_batch,
+};
 use crate::runtime_scene::GenerationSceneAccess;
 use crate::scene::{
     PolyhedronEntity, alpha_mode_for_opacity, opacity_status_message, reset_generation_state,
@@ -61,6 +64,15 @@ pub(crate) fn generation_input_system(
         println!(
             "{}",
             spawn_placement_mode_status_message(scene.generation_state.spawn_placement_mode)
+        );
+    }
+
+    let ctrl_pressed = keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight);
+    if ctrl_pressed && keys.just_pressed(KeyCode::Space) {
+        scene.generation_state.spawn_add_mode = scene.generation_state.spawn_add_mode.next();
+        println!(
+            "{}",
+            spawn_add_mode_status_message(scene.generation_state.spawn_add_mode)
         );
     }
 
@@ -343,9 +355,9 @@ pub(crate) fn generation_input_system(
     }
 
     let spawn_requested = scene.generation_state.spawn_hold.update(
-        keys.just_pressed(KeyCode::Space),
-        keys.pressed(KeyCode::Space),
-        keys.just_released(KeyCode::Space),
+        !ctrl_pressed && keys.just_pressed(KeyCode::Space),
+        !ctrl_pressed && keys.pressed(KeyCode::Space),
+        !ctrl_pressed && keys.just_released(KeyCode::Space),
         time.delta_secs(),
         scene.app_config.generation.spawn_hold_delay_secs,
         scene.app_config.generation.spawn_repeat_interval_secs,
@@ -361,31 +373,33 @@ pub(crate) fn generation_input_system(
     let spawn_tuning = scene
         .generation_state
         .spawn_tuning(&scene.app_config.generation);
-    let Some(spawn) = next_spawn(
+    let add_mode = scene.generation_state.spawn_add_mode;
+    let spawned = spawn_batch(
         &mut scene.generation_state.nodes,
         &scene.shape_assets.catalog,
         selected_kind,
         scale_ratio,
         spawn_tuning,
-    ) else {
+        add_mode,
+    );
+    if spawned.is_empty() {
         eprintln!("No valid spawn position is currently available.");
         return;
-    };
-    let node_index = scene.generation_state.nodes.len() - 1;
+    }
 
-    spawn_polyhedron_entity(
-        &mut scene.commands,
-        &mut scene.materials,
-        scene.shape_assets.mesh(spawn.kind),
-        &spawn.node,
-        &scene.app_config.materials,
-        scene.material_state.opacity,
-        node_index,
-    );
-    println!(
-        "Spawned {:?} at level {} from parent level {}",
-        spawn.kind, spawn.node.level, spawn.parent_level
-    );
+    let first_new_index = scene.generation_state.nodes.len() - spawned.len();
+    for (offset, spawn) in spawned.iter().enumerate() {
+        spawn_polyhedron_entity(
+            &mut scene.commands,
+            &mut scene.materials,
+            scene.shape_assets.mesh(spawn.kind),
+            &spawn.node,
+            &scene.app_config.materials,
+            scene.material_state.opacity,
+            first_new_index + offset,
+        );
+    }
+    println!("{}", spawn_summary_status_message(&spawned, add_mode));
 }
 
 fn key_group_just_pressed(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool {
@@ -449,18 +463,42 @@ pub(crate) fn vertex_exclusion_status_message(probability: f32) -> String {
     )
 }
 
+pub(crate) fn spawn_add_mode_status_message(mode: SpawnAddMode) -> String {
+    format!("Object add mode: {}", mode.label())
+}
+
 pub(crate) fn spawn_placement_mode_status_message(mode: SpawnPlacementMode) -> String {
     format!("Spawn placement mode: {}", mode.plural_label())
+}
+
+fn spawn_summary_status_message(spawned: &[SpawnedNode], add_mode: SpawnAddMode) -> String {
+    let first = &spawned[0];
+    if spawned.len() == 1 {
+        return format!(
+            "Spawned {:?} at level {} from parent level {}",
+            first.kind, first.node.level, first.parent_level
+        );
+    }
+
+    format!(
+        "Spawned {} {:?} objects at level {} from parent level {} ({})",
+        spawned.len(),
+        first.kind,
+        first.node.level,
+        first.parent_level,
+        add_mode.label()
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        adjust_clamped_value, twist_status_message, vertex_exclusion_status_message,
-        vertex_offset_status_message,
+        adjust_clamped_value, spawn_add_mode_status_message, twist_status_message,
+        vertex_exclusion_status_message, vertex_offset_status_message,
     };
     use crate::config::GenerationConfig;
     use crate::parameters::HoldRepeatState;
+    use crate::polyhedra::SpawnAddMode;
 
     #[test]
     fn spawn_hold_repeats_while_space_is_held() {
@@ -566,5 +604,12 @@ mod tests {
         let status = vertex_exclusion_status_message(0.35);
 
         assert!(status.contains("35%"));
+    }
+
+    #[test]
+    fn spawn_add_mode_status_message_mentions_fill_level() {
+        let status = spawn_add_mode_status_message(SpawnAddMode::FillLevel);
+
+        assert!(status.contains("fill current level"));
     }
 }
