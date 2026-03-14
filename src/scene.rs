@@ -8,6 +8,7 @@ use crate::generation::{
     spawn_add_mode_status_message, spawn_placement_mode_status_message, twist_status_message,
     vertex_exclusion_status_message, vertex_offset_status_message,
 };
+use crate::help_text::{startup_controls_message, startup_fx_message};
 use crate::parameters::{GenerationParameter, HoldRepeatState, ScalarParameterState};
 use crate::polyhedra::{
     PolyhedronKind, PolyhedronNode, ShapeCatalog, ShapeGeometry, SpawnAddMode, SpawnPlacementMode,
@@ -335,12 +336,8 @@ pub(crate) fn setup_scene(
         opacity: initial_opacity,
     });
 
-    println!(
-        "Controls: F1/H help, F2 FX page, F3 scene preset page, Esc closes the active control page, F4 export Blender .blend, arrows pitch/yaw, Q/E roll, W/S zoom, Backspace stops camera rotation, hold Space to add objects, Ctrl+Space cycles add mode, G cycles spawn placement mode, R reset scene, 1-4 select shape, F12 screenshot, -/+ adjust child scale ratio, O/P adjust opacity, I reset opacity, hold [/] or ,/. to adjust child twist, T reset twist, hold Z/X to adjust child offset, C reset offset, hold V/B to adjust spawn exclusion probability, N reset spawn exclusion"
-    );
-    println!(
-        "FX page: Ctrl+Up/Down selects a parameter, Left/Right or Tab/Shift+Tab switch the active field, Up/Down adjust the active field, Space toggles the effect, L toggles the selected parameter LFO, typing a number sets the active numeric field, Backspace erases typed FX input, Shift is coarse, Alt is fine, Enter resets the field, Shift+Enter resets all FX settings and LFOs."
-    );
+    println!("{}", startup_controls_message());
+    println!("{}", startup_fx_message());
     println!(
         "Selected child shape: {:?}, ratio: {:.2}",
         app_config.generation.default_child_kind, initial_scale_ratio

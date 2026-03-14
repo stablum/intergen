@@ -170,6 +170,14 @@ impl ScalarParameterValue {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct HoldInput {
+    pub(crate) just_pressed: bool,
+    pub(crate) pressed: bool,
+    pub(crate) just_released: bool,
+    pub(crate) delta_secs: f32,
+}
+
 #[derive(Clone, Debug, Default, PartialEq)]
 pub(crate) struct HoldRepeatState {
     pub(crate) elapsed_secs: f32,
@@ -186,17 +194,35 @@ impl HoldRepeatState {
         hold_delay_secs: f32,
         repeat_interval_secs: f32,
     ) -> bool {
-        if just_released || !pressed {
+        self.update_with_input(
+            HoldInput {
+                just_pressed,
+                pressed,
+                just_released,
+                delta_secs,
+            },
+            hold_delay_secs,
+            repeat_interval_secs,
+        )
+    }
+
+    pub(crate) fn update_with_input(
+        &mut self,
+        input: HoldInput,
+        hold_delay_secs: f32,
+        repeat_interval_secs: f32,
+    ) -> bool {
+        if input.just_released || !input.pressed {
             self.reset();
             return false;
         }
 
-        if just_pressed {
+        if input.just_pressed {
             self.reset();
             return true;
         }
 
-        self.elapsed_secs += delta_secs;
+        self.elapsed_secs += input.delta_secs;
         let threshold = if self.repeating {
             repeat_interval_secs
         } else {

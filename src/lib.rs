@@ -7,6 +7,7 @@ mod control_page;
 mod effect_tuner;
 mod effects;
 mod generation;
+mod help_text;
 mod parameters;
 mod polyhedra;
 mod presets;

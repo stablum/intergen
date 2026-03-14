@@ -2,6 +2,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use crate::config::{EffectGroup, EffectNumericParameter, EffectsConfig};
+use crate::parameters::{HoldInput, HoldRepeatState};
 
 use super::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LFO_FREQUENCY_STEP_HZ, LfoShape, ParameterLfo};
 use super::metadata::{EffectEditMode, EffectOverlayField};
@@ -32,57 +33,9 @@ pub(crate) struct EffectRuntimeSnapshot {
 }
 
 #[derive(Clone, Copy)]
-pub(crate) struct HoldInput {
-    pub(crate) just_pressed: bool,
-    pub(crate) pressed: bool,
-    pub(crate) just_released: bool,
-    pub(crate) delta_secs: f32,
-}
-
-#[derive(Clone, Copy)]
 pub(crate) struct AdjustmentModifiers {
     pub(crate) shift_pressed: bool,
     pub(crate) alt_pressed: bool,
-}
-
-#[derive(Default, Clone)]
-struct RepeatHoldState {
-    elapsed_secs: f32,
-    repeating: bool,
-}
-
-impl RepeatHoldState {
-    fn update(&mut self, input: HoldInput) -> bool {
-        if input.just_released || !input.pressed {
-            self.reset();
-            return false;
-        }
-
-        if input.just_pressed {
-            self.reset();
-            return true;
-        }
-
-        self.elapsed_secs += input.delta_secs;
-        let threshold = if self.repeating {
-            REPEAT_INTERVAL_SECS
-        } else {
-            HOLD_DELAY_SECS
-        };
-
-        if self.elapsed_secs < threshold {
-            return false;
-        }
-
-        self.elapsed_secs = 0.0;
-        self.repeating = true;
-        true
-    }
-
-    fn reset(&mut self) {
-        self.elapsed_secs = 0.0;
-        self.repeating = false;
-    }
 }
 
 #[derive(Default, Clone)]
@@ -151,10 +104,10 @@ pub(crate) struct EffectTunerState {
     numeric_entry: NumericEntryBuffer,
     pinned: bool,
     visible_until_secs: f32,
-    select_previous_hold: RepeatHoldState,
-    select_next_hold: RepeatHoldState,
-    decrease_hold: RepeatHoldState,
-    increase_hold: RepeatHoldState,
+    select_previous_hold: HoldRepeatState,
+    select_next_hold: HoldRepeatState,
+    decrease_hold: HoldRepeatState,
+    increase_hold: HoldRepeatState,
 }
 
 impl EffectTunerState {
@@ -168,10 +121,10 @@ impl EffectTunerState {
             numeric_entry: NumericEntryBuffer::default(),
             pinned: false,
             visible_until_secs: 0.0,
-            select_previous_hold: RepeatHoldState::default(),
-            select_next_hold: RepeatHoldState::default(),
-            decrease_hold: RepeatHoldState::default(),
-            increase_hold: RepeatHoldState::default(),
+            select_previous_hold: HoldRepeatState::default(),
+            select_next_hold: HoldRepeatState::default(),
+            decrease_hold: HoldRepeatState::default(),
+            increase_hold: HoldRepeatState::default(),
         }
     }
 
@@ -316,7 +269,7 @@ impl EffectTunerState {
             &mut self.select_next_hold
         };
 
-        if hold.update(input) {
+        if hold.update_with_input(input, HOLD_DELAY_SECS, REPEAT_INTERVAL_SECS) {
             self.cycle_selection(direction, now_secs);
             true
         } else {
@@ -337,7 +290,7 @@ impl EffectTunerState {
             &mut self.increase_hold
         };
 
-        if hold.update(input) {
+        if hold.update_with_input(input, HOLD_DELAY_SECS, REPEAT_INTERVAL_SECS) {
             self.adjust_selected(direction, modifiers, now_secs);
             true
         } else {

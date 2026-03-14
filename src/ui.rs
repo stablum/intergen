@@ -5,6 +5,7 @@ use bevy::{ecs::hierarchy::ChildSpawnerCommands, prelude::*};
 use crate::config::{AppConfig, EffectNumericParameter, UiConfig, srgb, srgba};
 use crate::control_page::{ControlPage, ControlPageState};
 use crate::effect_tuner::{EffectOverlayField, EffectTunerState};
+use crate::help_text::overlay_controls_text as shared_overlay_controls_text;
 use crate::presets::PresetBrowserState;
 
 const EFFECT_TUNER_CHAR_WIDTH_FACTOR: f32 = 0.72;
@@ -777,53 +778,7 @@ pub(crate) fn spawn_help_ui(
         });
 }
 pub(crate) fn controls_overlay_text(font_source: UiFontSource) -> String {
-    format!(
-        concat!(
-            "F1 / H: Toggle this overlay\n",
-            "F2: Toggle the FX control page\n",
-            "F3: Toggle the scene preset page\n",
-            "Esc: Close the current control page\n",
-            "F4: Export the current scene as a Blender .blend\n",
-            "In FX page: Ctrl + Up / Down select parameter\n",
-            "In FX page: Left / Right or Tab / Shift+Tab switch the active field\n",
-            "In FX page: Up / Down adjust the active field\n",
-            "In FX page: Space toggles the selected effect\n",
-            "In FX page: L toggles the selected parameter LFO\n",
-            "In FX page: Type digits / . / - / + (for example 0.157) to set the active numeric field\n",
-            "In FX page: Backspace erases the typed numeric input\n",
-            "Shift: Coarse FX adjustment\n",
-            "Alt: Fine FX adjustment\n",
-            "Enter: Reset the selected FX field\n",
-            "Shift + Enter: Reset all FX settings and LFOs\n",
-            "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions\n",
-            "Arrow Up / Down: Pitch camera\n",
-            "Arrow Left / Right: Yaw camera\n",
-            "Q / E: Roll camera\n",
-            "W / S: Zoom in / out\n",
-            "Backspace: Stop camera rotation momentum\n",
-            "Space: Add polyhedra using the current add mode (hold to repeat)\n",
-            "Ctrl + Space: Cycle add mode (single / fill current level)\n",
-            "G: Cycle spawn placement mode (vertex / edge / face)\n",
-            "R: Reset to the selected polyhedron as root\n",
-            "1: Select cube\n",
-            "2: Select tetrahedron\n",
-            "3: Select octahedron\n",
-            "4: Select dodecahedron\n",
-            "F12: Save a screenshot\n",
-            "- / +: Adjust child scale ratio\n",
-            "O / P: Adjust global opacity\n",
-            "I: Reset global opacity\n",
-            "[ / ] or , / .: Adjust child twist angle (hold to repeat)\n",
-            "Z / X: Adjust child outward offset (hold to repeat)\n",
-            "V / B: Adjust spawn exclusion probability (hold to repeat)\n",
-            "C: Reset child outward offset\n",
-            "N: Reset spawn exclusion probability\n",
-            "T: Reset child twist angle\n",
-            "\n",
-            "{}"
-        ),
-        font_status_line(font_source)
-    )
+    shared_overlay_controls_text(font_status_line(font_source))
 }
 
 pub(crate) fn font_status_line(font_source: UiFontSource) -> &'static str {

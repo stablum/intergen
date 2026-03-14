@@ -4,7 +4,8 @@ use crate::camera::SceneCamera;
 use crate::control_page::{ControlPage, ControlPageState};
 use crate::effects::{CameraEffectsSettings, camera_effects_from_config};
 
-use super::state::{AdjustmentModifiers, EffectTunerState, HoldInput};
+use super::state::{AdjustmentModifiers, EffectTunerState};
+use crate::parameters::HoldInput;
 
 pub(crate) fn effect_tuner_input_system(
     keys: Res<ButtonInput<KeyCode>>,
