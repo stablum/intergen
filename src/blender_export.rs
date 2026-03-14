@@ -18,6 +18,10 @@ use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
 use crate::polyhedra::{PolyhedronKind, PolyhedronNode, SpawnAddMode, SpawnPlacementMode};
 use crate::runtime_scene::SceneSnapshotAccess;
 use crate::scene::{GenerationState, MaterialState, ShapeAssets};
+use crate::scene_snapshot::{
+    CameraRigSnapshot, GenerationSnapshot, MaterialRuntimeSnapshot, NodeOriginSnapshot,
+    PolyhedronNodeSnapshot, SceneStateSnapshot,
+};
 
 const BLEND_EXPORT_DIR: &str = "blend-exports";
 const BLEND_EXPORT_FORMAT_VERSION: u32 = 1;
@@ -190,7 +194,14 @@ impl BlendExportFile {
         now_secs: f32,
     ) -> Self {
         let evaluated_effects = effect_tuner.evaluated_effects(now_secs);
-        let effects = effect_tuner.runtime_snapshot();
+        let state_snapshot = SceneStateSnapshot::capture(
+            app_config,
+            camera_rig,
+            generation_state,
+            material_state,
+            effect_tuner,
+        );
+        let effects = state_snapshot.effects.clone();
         let camera_position_bevy =
             camera_rig.orientation * Vec3::new(0.0, 0.0, camera_rig.distance);
         let camera_forward_bevy = safe_normalize(-camera_position_bevy, Vec3::NEG_Z);
@@ -252,19 +263,23 @@ impl BlendExportFile {
                     )
                 })
                 .collect(),
-            state: BlendStateMetadata {
-                window: app_config.window.clone(),
-                rendering: app_config.rendering.clone(),
-                lighting: app_config.lighting.clone(),
-                materials: app_config.materials.clone(),
-                camera_rig: BlendCameraRigMetadata::capture(camera_rig),
-                generation: BlendGenerationMetadata::capture(generation_state),
-                material_state: BlendMaterialStateMetadata {
-                    opacity: material_state.opacity,
-                },
-            },
+            state: BlendStateMetadata::from_scene_snapshot(&app_config.window, &state_snapshot),
             evaluated_effects,
             effects,
+        }
+    }
+}
+
+impl BlendStateMetadata {
+    fn from_scene_snapshot(window: &WindowConfig, snapshot: &SceneStateSnapshot) -> Self {
+        Self {
+            window: window.clone(),
+            rendering: snapshot.rendering.clone(),
+            lighting: snapshot.lighting.clone(),
+            materials: snapshot.materials.clone(),
+            camera_rig: BlendCameraRigMetadata::from_snapshot(&snapshot.camera),
+            generation: BlendGenerationMetadata::from_snapshot(&snapshot.generation),
+            material_state: BlendMaterialStateMetadata::from_snapshot(&snapshot.material_state),
         }
     }
 }
@@ -342,10 +357,10 @@ impl BlendMaterial {
 }
 
 impl BlendCameraRigMetadata {
-    fn capture(camera_rig: &CameraRig) -> Self {
+    fn from_snapshot(camera_rig: &CameraRigSnapshot) -> Self {
         Self {
-            orientation: quat_to_array(camera_rig.orientation),
-            angular_velocity: vec3_to_array(camera_rig.angular_velocity),
+            orientation: camera_rig.orientation,
+            angular_velocity: camera_rig.angular_velocity,
             distance: camera_rig.distance,
             zoom_velocity: camera_rig.zoom_velocity,
         }
@@ -353,53 +368,61 @@ impl BlendCameraRigMetadata {
 }
 
 impl BlendGenerationMetadata {
-    fn capture(generation_state: &GenerationState) -> Self {
+    fn from_snapshot(generation_state: &GenerationSnapshot) -> Self {
         Self {
             selected_kind: generation_state.selected_kind,
             spawn_placement_mode: generation_state.spawn_placement_mode,
             spawn_add_mode: generation_state.spawn_add_mode,
-            scale_ratio: generation_state.scale_ratio_base(),
-            twist_per_vertex_radians: generation_state.twist_per_vertex_radians_base(),
-            vertex_offset_ratio: generation_state.vertex_offset_ratio_base(),
-            vertex_spawn_exclusion_probability: generation_state
-                .vertex_spawn_exclusion_probability_base(),
+            scale_ratio: generation_state.scale_ratio,
+            twist_per_vertex_radians: generation_state.twist_per_vertex_radians,
+            vertex_offset_ratio: generation_state.vertex_offset_ratio,
+            vertex_spawn_exclusion_probability: generation_state.vertex_spawn_exclusion_probability,
             nodes: generation_state
                 .nodes
                 .iter()
-                .map(BlendNodeMetadata::capture)
+                .map(BlendNodeMetadata::from_snapshot)
                 .collect(),
         }
     }
 }
 
+impl BlendMaterialStateMetadata {
+    fn from_snapshot(material_state: &MaterialRuntimeSnapshot) -> Self {
+        Self {
+            opacity: material_state.opacity,
+        }
+    }
+}
+
 impl BlendNodeMetadata {
-    fn capture(node: &PolyhedronNode) -> Self {
+    fn from_snapshot(node: &PolyhedronNodeSnapshot) -> Self {
         Self {
             kind: node.kind,
             level: node.level,
-            center: vec3_to_array(node.center),
-            rotation: quat_to_array(node.rotation),
+            center: node.center,
+            rotation: node.rotation,
             scale: node.scale,
             radius: node.radius,
-            occupied_vertices: node.occupied_attachments.vertices.clone(),
-            occupied_edges: node.occupied_attachments.edges.clone(),
-            occupied_faces: node.occupied_attachments.faces.clone(),
-            origin: BlendNodeOrigin::capture(node.origin),
+            occupied_vertices: node.occupied_vertices.clone(),
+            occupied_edges: node.occupied_edges.clone(),
+            occupied_faces: node.occupied_faces.clone(),
+            origin: BlendNodeOrigin::from_snapshot(&node.origin),
         }
     }
 }
 
 impl BlendNodeOrigin {
-    fn capture(origin: crate::polyhedra::NodeOrigin) -> Self {
+    fn from_snapshot(origin: &NodeOriginSnapshot) -> Self {
         match origin {
-            crate::polyhedra::NodeOrigin::Root => Self::Root,
-            crate::polyhedra::NodeOrigin::Child {
+            NodeOriginSnapshot::Root => Self::Root,
+            NodeOriginSnapshot::Child {
                 parent_index,
-                attachment,
+                attachment_mode,
+                attachment_index,
             } => Self::Child {
-                parent_index,
-                attachment_mode: attachment.mode,
-                attachment_index: attachment.index,
+                parent_index: *parent_index,
+                attachment_mode: *attachment_mode,
+                attachment_index: *attachment_index,
             },
         }
     }
@@ -642,14 +665,6 @@ fn bevy_point_to_blender_array(point: Vec3) -> [f32; 3] {
 
 fn bevy_direction_to_blender_array(direction: Vec3) -> [f32; 3] {
     [direction.x, direction.z, -direction.y]
-}
-
-fn vec3_to_array(vector: Vec3) -> [f32; 3] {
-    [vector.x, vector.y, vector.z]
-}
-
-fn quat_to_array(quat: Quat) -> [f32; 4] {
-    [quat.x, quat.y, quat.z, quat.w]
 }
 
 fn current_unix_ms() -> u64 {

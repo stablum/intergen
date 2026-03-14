@@ -13,6 +13,7 @@ mod polyhedra;
 mod presets;
 mod runtime_scene;
 mod scene;
+mod scene_snapshot;
 mod ui;
 
 pub use app::run;

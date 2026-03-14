@@ -1,0 +1,297 @@
+use std::path::PathBuf;
+
+use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
+
+use super::storage::{PresetRecord, load_preset_records};
+
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, PartialEq, Hash)]
+pub(crate) struct PresetIndex {
+    pub(crate) bank: u8,
+    pub(crate) slot: u8,
+}
+
+impl PresetIndex {
+    pub(super) fn code(self) -> String {
+        format!("{}{}", self.bank, self.slot)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum PresetCommand {
+    Load,
+    Save,
+    Free,
+}
+
+impl PresetCommand {
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            Self::Load => "load",
+            Self::Save => "save",
+            Self::Free => "free",
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(super) struct CollisionResolutionState {
+    pub(super) index: PresetIndex,
+    pub(super) selected: usize,
+    pub(super) candidates: Vec<PresetRecord>,
+    pub(super) load_after_resolution: bool,
+}
+
+#[derive(Resource)]
+pub(crate) struct PresetBrowserState {
+    pub(super) command: PresetCommand,
+    pub(super) first_digit: Option<u8>,
+    pub(super) status_message: String,
+    pub(super) records: Vec<PresetRecord>,
+    pub(super) chooser: Option<CollisionResolutionState>,
+}
+
+#[derive(Resource)]
+pub(crate) struct AutomatedScenePresetLoad {
+    pub(super) path: PathBuf,
+}
+
+impl AutomatedScenePresetLoad {
+    pub(crate) fn new(path: PathBuf) -> Self {
+        Self { path }
+    }
+}
+
+impl Default for PresetBrowserState {
+    fn default() -> Self {
+        Self {
+            command: PresetCommand::Load,
+            first_digit: None,
+            status_message: String::new(),
+            records: Vec::new(),
+            chooser: None,
+        }
+    }
+}
+
+impl PresetBrowserState {
+    pub(crate) fn load_from_disk() -> Self {
+        let mut state = Self::default();
+        if let Err(error) = state.refresh() {
+            state.status_message = error;
+        }
+        state
+    }
+
+    pub(crate) fn chooser_visible(&self) -> bool {
+        self.chooser.is_some()
+    }
+
+    pub(crate) fn strip_text(&self) -> String {
+        let target = match self.first_digit {
+            Some(bank) => format!(" {}_", bank),
+            None => String::new(),
+        };
+        let banks = (0_u8..10)
+            .map(|bank| format!("{}[{}]", bank, self.bank_occupancy(bank)))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let status = if self.status_message.is_empty() {
+            String::new()
+        } else {
+            format!(" | {}", self.status_message)
+        };
+        format!(
+            "PRESETS {}{} {}{}",
+            self.command.label(),
+            target,
+            banks,
+            status
+        )
+    }
+
+    pub(crate) fn chooser_text(&self) -> Option<String> {
+        let chooser = self.chooser.as_ref()?;
+        let mut lines = vec![format!("Resolve slot {}", chooser.index.code())];
+        for (index, candidate) in chooser.candidates.iter().enumerate() {
+            let marker = if index == chooser.selected { '>' } else { ' ' };
+            lines.push(format!(
+                "{} {} {}",
+                marker, candidate.file.saved_at_unix_ms, candidate.file.summary
+            ));
+        }
+        lines.push("Up/Down choose  Enter keep  Esc close".to_string());
+        Some(lines.join("\n"))
+    }
+
+    pub(crate) fn open_page(&mut self) -> Result<(), String> {
+        self.command = PresetCommand::Load;
+        self.first_digit = None;
+        self.chooser = None;
+        self.status_message.clear();
+        self.refresh()
+    }
+
+    pub(crate) fn close_page(&mut self) {
+        self.command = PresetCommand::Load;
+        self.first_digit = None;
+        self.chooser = None;
+        self.status_message.clear();
+    }
+
+    pub(super) fn bank_occupancy(&self, bank: u8) -> String {
+        let mut occupancy = String::with_capacity(10);
+        for slot in 0_u8..10 {
+            let count = self
+                .records
+                .iter()
+                .filter(|record| record.file.assignment == Some(PresetIndex { bank, slot }))
+                .count();
+            let symbol = match count {
+                0 => '.',
+                1 => char::from(b'0' + slot),
+                _ => '!',
+            };
+            occupancy.push(symbol);
+        }
+        occupancy
+    }
+
+    pub(super) fn arm_save(&mut self) {
+        self.command = PresetCommand::Save;
+        self.first_digit = None;
+        self.chooser = None;
+        self.status_message = "type bank+slot".to_string();
+    }
+
+    pub(super) fn arm_free(&mut self) {
+        self.command = PresetCommand::Free;
+        self.first_digit = None;
+        self.chooser = None;
+        self.status_message = "type bank+slot".to_string();
+    }
+
+    pub(super) fn push_digit(&mut self, digit: u8) -> Option<PresetIndex> {
+        if let Some(bank) = self.first_digit.take() {
+            Some(PresetIndex { bank, slot: digit })
+        } else {
+            self.first_digit = Some(digit);
+            self.status_message = format!("{}_", digit);
+            None
+        }
+    }
+
+    pub(super) fn records_for_index(&self, index: PresetIndex) -> Vec<PresetRecord> {
+        let mut records = self
+            .records
+            .iter()
+            .filter(|record| record.file.assignment == Some(index))
+            .cloned()
+            .collect::<Vec<_>>();
+        records.sort_by(|left, right| right.file.saved_at_unix_ms.cmp(&left.file.saved_at_unix_ms));
+        records
+    }
+
+    pub(super) fn start_collision_resolution(
+        &mut self,
+        index: PresetIndex,
+        load_after_resolution: bool,
+    ) {
+        let candidates = self.records_for_index(index);
+        self.chooser = Some(CollisionResolutionState {
+            index,
+            selected: 0,
+            candidates,
+            load_after_resolution,
+        });
+        self.status_message = format!("resolve {}", index.code());
+    }
+
+    pub(super) fn refresh(&mut self) -> Result<(), String> {
+        self.records = load_preset_records()?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{PresetBrowserState, PresetIndex};
+    use crate::config::{EffectsConfig, LightingConfig, MaterialConfig, RenderingConfig};
+    use crate::polyhedra::{PolyhedronKind, SpawnAddMode, SpawnPlacementMode};
+    use crate::presets::storage::ScenePresetFile;
+    use crate::scene_snapshot::{
+        CameraRigSnapshot, GenerationSnapshot, MaterialRuntimeSnapshot, NodeOriginSnapshot,
+        PolyhedronNodeSnapshot, SceneStateSnapshot,
+    };
+
+    #[test]
+    fn bank_occupancy_marks_collisions() {
+        let mut state = PresetBrowserState::default();
+        state.records = vec![
+            super::PresetRecord {
+                path: "one.toml".into(),
+                file: ScenePresetFile {
+                    format_version: 1,
+                    id: "one".to_string(),
+                    saved_at_unix_ms: 1,
+                    summary: "a".to_string(),
+                    assignment: Some(PresetIndex { bank: 2, slot: 3 }),
+                    scene: dummy_scene(),
+                },
+            },
+            super::PresetRecord {
+                path: "two.toml".into(),
+                file: ScenePresetFile {
+                    format_version: 1,
+                    id: "two".to_string(),
+                    saved_at_unix_ms: 2,
+                    summary: "b".to_string(),
+                    assignment: Some(PresetIndex { bank: 2, slot: 3 }),
+                    scene: dummy_scene(),
+                },
+            },
+        ];
+
+        assert_eq!(state.bank_occupancy(2).chars().nth(3), Some('!'));
+    }
+
+    fn dummy_scene() -> SceneStateSnapshot {
+        SceneStateSnapshot {
+            rendering: RenderingConfig::default(),
+            lighting: LightingConfig::default(),
+            materials: MaterialConfig::default(),
+            camera: CameraRigSnapshot {
+                orientation: [0.0, 0.0, 0.0, 1.0],
+                angular_velocity: [0.0, 0.0, 0.0],
+                distance: 1.0,
+                zoom_velocity: 0.0,
+            },
+            generation: GenerationSnapshot {
+                selected_kind: PolyhedronKind::Cube,
+                spawn_placement_mode: SpawnPlacementMode::Vertex,
+                spawn_add_mode: SpawnAddMode::Single,
+                scale_ratio: 0.5,
+                twist_per_vertex_radians: 0.0,
+                vertex_offset_ratio: 0.0,
+                vertex_spawn_exclusion_probability: 0.0,
+                nodes: vec![PolyhedronNodeSnapshot {
+                    kind: PolyhedronKind::Cube,
+                    level: 0,
+                    center: [0.0, 0.0, 0.0],
+                    rotation: [0.0, 0.0, 0.0, 1.0],
+                    scale: 1.0,
+                    radius: 1.0,
+                    occupied_vertices: vec![],
+                    occupied_edges: vec![],
+                    occupied_faces: vec![],
+                    origin: NodeOriginSnapshot::Root,
+                }],
+            },
+            material_state: MaterialRuntimeSnapshot { opacity: 1.0 },
+            effects: crate::effect_tuner::EffectRuntimeSnapshot {
+                current: EffectsConfig::default(),
+                lfos: Vec::new(),
+            },
+        }
+    }
+}

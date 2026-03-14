@@ -1,0 +1,306 @@
+use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
+
+use crate::camera::CameraRig;
+use crate::config::{AppConfig, LightingConfig, MaterialConfig, RenderingConfig};
+use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
+use crate::polyhedra::{
+    AttachmentOccupancy, NodeOrigin, PolyhedronKind, PolyhedronNode, SpawnAddMode, SpawnAttachment,
+    SpawnPlacementMode,
+};
+use crate::scene::{GenerationParameters, GenerationState, MaterialState};
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct SceneStateSnapshot {
+    pub(crate) rendering: RenderingConfig,
+    pub(crate) lighting: LightingConfig,
+    pub(crate) materials: MaterialConfig,
+    pub(crate) camera: CameraRigSnapshot,
+    pub(crate) generation: GenerationSnapshot,
+    pub(crate) material_state: MaterialRuntimeSnapshot,
+    pub(crate) effects: EffectRuntimeSnapshot,
+}
+
+pub(crate) struct PreparedSceneState {
+    pub(crate) rendering: RenderingConfig,
+    pub(crate) lighting: LightingConfig,
+    pub(crate) materials: MaterialConfig,
+    pub(crate) camera_rig: CameraRig,
+    pub(crate) generation: GenerationState,
+    pub(crate) material_opacity: f32,
+    pub(crate) effects: EffectRuntimeSnapshot,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct CameraRigSnapshot {
+    pub(crate) orientation: [f32; 4],
+    pub(crate) angular_velocity: [f32; 3],
+    pub(crate) distance: f32,
+    pub(crate) zoom_velocity: f32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct GenerationSnapshot {
+    pub(crate) selected_kind: PolyhedronKind,
+    #[serde(default)]
+    pub(crate) spawn_placement_mode: SpawnPlacementMode,
+    #[serde(default)]
+    pub(crate) spawn_add_mode: SpawnAddMode,
+    pub(crate) scale_ratio: f32,
+    pub(crate) twist_per_vertex_radians: f32,
+    pub(crate) vertex_offset_ratio: f32,
+    #[serde(default)]
+    pub(crate) vertex_spawn_exclusion_probability: f32,
+    pub(crate) nodes: Vec<PolyhedronNodeSnapshot>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct MaterialRuntimeSnapshot {
+    pub(crate) opacity: f32,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct PolyhedronNodeSnapshot {
+    pub(crate) kind: PolyhedronKind,
+    pub(crate) level: usize,
+    pub(crate) center: [f32; 3],
+    pub(crate) rotation: [f32; 4],
+    pub(crate) scale: f32,
+    pub(crate) radius: f32,
+    pub(crate) occupied_vertices: Vec<bool>,
+    #[serde(default)]
+    pub(crate) occupied_edges: Vec<bool>,
+    #[serde(default)]
+    pub(crate) occupied_faces: Vec<bool>,
+    pub(crate) origin: NodeOriginSnapshot,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) enum NodeOriginSnapshot {
+    Root,
+    Child {
+        parent_index: usize,
+        #[serde(default)]
+        attachment_mode: SpawnPlacementMode,
+        #[serde(alias = "vertex_index")]
+        attachment_index: usize,
+    },
+}
+
+impl SceneStateSnapshot {
+    pub(crate) fn capture(
+        app_config: &AppConfig,
+        camera_rig: &CameraRig,
+        generation_state: &GenerationState,
+        material_state: &MaterialState,
+        effect_tuner: &EffectTunerState,
+    ) -> Self {
+        Self {
+            rendering: app_config.rendering.clone(),
+            lighting: app_config.lighting.clone(),
+            materials: app_config.materials.clone(),
+            camera: CameraRigSnapshot::capture(camera_rig),
+            generation: GenerationSnapshot::capture(generation_state),
+            material_state: MaterialRuntimeSnapshot::capture(material_state),
+            effects: effect_tuner.runtime_snapshot(),
+        }
+    }
+
+    pub(crate) fn summary(&self) -> String {
+        let root_kind = self
+            .generation
+            .nodes
+            .first()
+            .map(|node| format!("{:?}", node.kind))
+            .unwrap_or_else(|| "Unknown".to_string());
+        format!("{} root, {} nodes", root_kind, self.generation.nodes.len())
+    }
+
+    pub(crate) fn prepare_runtime(&self) -> Result<PreparedSceneState, String> {
+        Ok(PreparedSceneState {
+            rendering: self.rendering.clone(),
+            lighting: self.lighting.clone(),
+            materials: self.materials.clone(),
+            camera_rig: self.camera.to_runtime(),
+            generation: self.generation.to_runtime()?,
+            material_opacity: self.material_state.opacity.clamp(0.0, 1.0),
+            effects: self.effects.clone(),
+        })
+    }
+
+    pub(crate) fn file_slug(&self) -> String {
+        self.generation
+            .nodes
+            .first()
+            .map(|node| format!("{:?}", node.kind).to_ascii_lowercase())
+            .unwrap_or_else(|| "scene".to_string())
+    }
+}
+
+impl CameraRigSnapshot {
+    pub(crate) fn capture(camera_rig: &CameraRig) -> Self {
+        Self {
+            orientation: quat_to_array(camera_rig.orientation),
+            angular_velocity: vec3_to_array(camera_rig.angular_velocity),
+            distance: camera_rig.distance,
+            zoom_velocity: camera_rig.zoom_velocity,
+        }
+    }
+
+    pub(crate) fn to_runtime(&self) -> CameraRig {
+        CameraRig {
+            orientation: quat_from_array(self.orientation),
+            angular_velocity: vec3_from_array(self.angular_velocity),
+            distance: self.distance,
+            zoom_velocity: self.zoom_velocity,
+        }
+    }
+}
+
+impl GenerationSnapshot {
+    pub(crate) fn capture(generation_state: &GenerationState) -> Self {
+        Self {
+            selected_kind: generation_state.selected_kind,
+            spawn_placement_mode: generation_state.spawn_placement_mode,
+            spawn_add_mode: generation_state.spawn_add_mode,
+            scale_ratio: generation_state.scale_ratio_base(),
+            twist_per_vertex_radians: generation_state.twist_per_vertex_radians_base(),
+            vertex_offset_ratio: generation_state.vertex_offset_ratio_base(),
+            vertex_spawn_exclusion_probability: generation_state
+                .vertex_spawn_exclusion_probability_base(),
+            nodes: generation_state
+                .nodes
+                .iter()
+                .map(PolyhedronNodeSnapshot::capture)
+                .collect(),
+        }
+    }
+
+    pub(crate) fn to_runtime(&self) -> Result<GenerationState, String> {
+        let shape_catalog = crate::polyhedra::ShapeCatalog::new();
+        let nodes = self
+            .nodes
+            .iter()
+            .map(|node| node.to_runtime(&shape_catalog))
+            .collect::<Result<Vec<_>, _>>()?;
+        if nodes.is_empty() {
+            return Err("Preset scene has no polyhedron nodes.".to_string());
+        }
+        Ok(GenerationState {
+            nodes,
+            selected_kind: self.selected_kind,
+            spawn_placement_mode: self.spawn_placement_mode,
+            spawn_add_mode: self.spawn_add_mode,
+            parameters: GenerationParameters::from_base_values(
+                self.scale_ratio,
+                self.twist_per_vertex_radians,
+                self.vertex_offset_ratio,
+                self.vertex_spawn_exclusion_probability,
+            ),
+            spawn_hold: default(),
+        })
+    }
+}
+
+impl MaterialRuntimeSnapshot {
+    pub(crate) fn capture(material_state: &MaterialState) -> Self {
+        Self {
+            opacity: material_state.opacity,
+        }
+    }
+}
+
+impl PolyhedronNodeSnapshot {
+    pub(crate) fn capture(node: &PolyhedronNode) -> Self {
+        Self {
+            kind: node.kind,
+            level: node.level,
+            center: vec3_to_array(node.center),
+            rotation: quat_to_array(node.rotation),
+            scale: node.scale,
+            radius: node.radius,
+            occupied_vertices: node.occupied_attachments.vertices.clone(),
+            occupied_edges: node.occupied_attachments.edges.clone(),
+            occupied_faces: node.occupied_attachments.faces.clone(),
+            origin: NodeOriginSnapshot::capture(node.origin),
+        }
+    }
+
+    pub(crate) fn to_runtime(
+        &self,
+        shape_catalog: &crate::polyhedra::ShapeCatalog,
+    ) -> Result<PolyhedronNode, String> {
+        let geometry = shape_catalog.geometry(self.kind);
+
+        Ok(PolyhedronNode {
+            kind: self.kind,
+            level: self.level,
+            center: vec3_from_array(self.center),
+            rotation: quat_from_array(self.rotation),
+            scale: self.scale,
+            radius: self.radius,
+            occupied_attachments: AttachmentOccupancy {
+                vertices: resize_occupancy(&self.occupied_vertices, geometry.vertices.len()),
+                edges: resize_occupancy(&self.occupied_edges, geometry.edges.len()),
+                faces: resize_occupancy(&self.occupied_faces, geometry.faces.len()),
+            },
+            origin: self.origin.to_runtime()?,
+        })
+    }
+}
+
+impl NodeOriginSnapshot {
+    pub(crate) fn capture(origin: NodeOrigin) -> Self {
+        match origin {
+            NodeOrigin::Root => Self::Root,
+            NodeOrigin::Child {
+                parent_index,
+                attachment,
+            } => Self::Child {
+                parent_index,
+                attachment_mode: attachment.mode,
+                attachment_index: attachment.index,
+            },
+        }
+    }
+
+    pub(crate) fn to_runtime(&self) -> Result<NodeOrigin, String> {
+        Ok(match self {
+            Self::Root => NodeOrigin::Root,
+            Self::Child {
+                parent_index,
+                attachment_mode,
+                attachment_index,
+            } => NodeOrigin::Child {
+                parent_index: *parent_index,
+                attachment: SpawnAttachment {
+                    mode: *attachment_mode,
+                    index: *attachment_index,
+                },
+            },
+        })
+    }
+}
+
+fn vec3_to_array(vector: Vec3) -> [f32; 3] {
+    [vector.x, vector.y, vector.z]
+}
+
+fn vec3_from_array(vector: [f32; 3]) -> Vec3 {
+    Vec3::new(vector[0], vector[1], vector[2])
+}
+
+fn quat_to_array(quat: Quat) -> [f32; 4] {
+    [quat.x, quat.y, quat.z, quat.w]
+}
+
+fn quat_from_array(quat: [f32; 4]) -> Quat {
+    Quat::from_xyzw(quat[0], quat[1], quat[2], quat[3]).normalize()
+}
+
+fn resize_occupancy(values: &[bool], len: usize) -> Vec<bool> {
+    let mut resized = values.to_vec();
+    resized.resize(len, false);
+    resized.truncate(len);
+    resized
+}
