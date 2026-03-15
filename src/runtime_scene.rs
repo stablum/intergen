@@ -5,18 +5,9 @@ use crate::camera::CameraRig;
 use crate::config::AppConfig;
 use crate::effect_tuner::EffectTunerState;
 use crate::scene::{
-    GenerationState, MaterialState, PolyhedronEntity, SceneDirectionalLight, ScenePointLight,
+    GenerationState, MaterialState, PolyhedronEntity, SceneLightEntity, SceneStageEntity,
     ShapeAssets,
 };
-
-type SceneDirectionalFilter = (With<SceneDirectionalLight>, Without<ScenePointLight>);
-type ScenePointFilter = (With<ScenePointLight>, Without<SceneDirectionalLight>);
-
-pub(crate) type DirectionalLightQuery<'w, 's> =
-    Query<'w, 's, (&'static mut DirectionalLight, &'static mut Transform), SceneDirectionalFilter>;
-
-pub(crate) type PointLightQuery<'w, 's> =
-    Query<'w, 's, (&'static mut PointLight, &'static mut Transform), ScenePointFilter>;
 
 #[derive(SystemParam)]
 pub(crate) struct SceneSnapshotAccess<'w, 's> {
@@ -40,10 +31,11 @@ pub(crate) struct SceneMutationAccess<'w, 's> {
     pub(crate) shape_assets: Res<'w, ShapeAssets>,
     pub(crate) generation_state: ResMut<'w, GenerationState>,
     pub(crate) material_state: ResMut<'w, MaterialState>,
+    pub(crate) meshes: ResMut<'w, Assets<Mesh>>,
     pub(crate) materials: ResMut<'w, Assets<StandardMaterial>>,
     pub(crate) polyhedron_entities: Query<'w, 's, Entity, With<PolyhedronEntity>>,
-    pub(crate) directional_lights: DirectionalLightQuery<'w, 's>,
-    pub(crate) point_lights: PointLightQuery<'w, 's>,
+    pub(crate) light_entities: Query<'w, 's, Entity, With<SceneLightEntity>>,
+    pub(crate) stage_entities: Query<'w, 's, Entity, With<SceneStageEntity>>,
 }
 
 #[derive(SystemParam)]

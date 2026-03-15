@@ -5,9 +5,34 @@ height = 960
 present_mode = "auto_vsync"
 
 [rendering]
-clear_color = [0.0, 0.0, 0.0]
-ambient_light_color = [1.0, 0.0, 0.0]
-ambient_light_brightness = 12.0
+clear_color = [0.015, 0.02, 0.035]
+ambient_light_color = [0.42, 0.47, 0.55]
+ambient_light_brightness = 3.5
+
+[rendering.stage]
+enabled = true
+
+[rendering.stage.floor]
+enabled = true
+color = [0.11, 0.12, 0.14]
+translation = [0.0, -2.25, 0.0]
+rotation_degrees = [0.0, 0.0, 0.0]
+size = [32.0, 32.0]
+thickness = 0.3
+metallic = 0.08
+perceptual_roughness = 0.58
+reflectance = 0.28
+
+[rendering.stage.backdrop]
+enabled = true
+color = [0.07, 0.08, 0.11]
+translation = [0.0, 2.0, -12.0]
+rotation_degrees = [0.0, 0.0, 0.0]
+size = [30.0, 18.0]
+thickness = 0.3
+metallic = 0.02
+perceptual_roughness = 0.76
+reflectance = 0.18
 
 [camera]
 initial_yaw = -0.7853982
@@ -38,18 +63,26 @@ min_twist_per_vertex_radians = 0.0
 max_twist_per_vertex_radians = 3.1415927
 
 [lighting.directional]
-color = [1.0, 0.0, 0.0]
-illuminance = 22000.0
+color = [1.0, 0.93, 0.82]
+illuminance = 18000.0
 shadows_enabled = true
-translation = [12.0, 18.0, 9.0]
+translation = [14.0, 20.0, 10.0]
 look_at = [0.0, 0.0, 0.0]
 
 [lighting.point]
-color = [0.5, 0.6, 0.85]
-intensity = 1200000.0
-range = 60.0
+color = [0.36, 0.56, 0.95]
+intensity = 850000.0
+range = 70.0
 shadows_enabled = false
-translation = [-9.0, 5.0, -12.0]
+translation = [-10.0, 6.0, -13.0]
+
+[lighting.accent]
+enabled = true
+color = [1.0, 0.45, 0.7]
+intensity = 300000.0
+range = 48.0
+shadows_enabled = false
+translation = [12.0, 2.0, 13.0]
 
 [materials]
 hue_step_per_level = 45.0
@@ -66,6 +99,19 @@ cube_hue_bias = 35.0
 tetrahedron_hue_bias = 110.0
 octahedron_hue_bias = 205.0
 dodecahedron_hue_bias = 290.0
+surface_mode = "procedural"
+root_surface = "glossy"
+accent_surface = "metal"
+accent_every_n_levels = 3
+cube_surface = "satin"
+tetrahedron_surface = "matte"
+octahedron_surface = "metal"
+dodecahedron_surface = "glossy"
+level_lightness_shift = -0.012
+level_saturation_shift = -0.005
+level_metallic_shift = 0.015
+level_roughness_shift = 0.025
+level_reflectance_shift = 0.0
 
 [capture]
 output_dir = "screenshots"

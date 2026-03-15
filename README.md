@@ -60,12 +60,12 @@ The app loads `config.toml` from the repository root on startup.
 
 Current configuration sections:
 - `window`: title, resolution, and present mode
-- `rendering`: clear color and ambient light
+- `rendering`: clear color, ambient light, and optional stage floor/backdrop surfaces
 - `camera`: initial orbit, motion tuning, and angular-momentum preservation
 - `generation`: root shape, default child shape, default spawn placement mode, scale limits, twist defaults and bounds, spawn cadence, and spawn heuristics
-- `lighting`: directional and point light colors, positions, and intensities
+- `lighting`: directional, point, and optional accent light colors, positions, and intensities
 - `effects`: camera-output shader effects
-- `materials`: color progression, PBR tuning, and live opacity defaults
+- `materials`: color progression, legacy or procedural material families, PBR tuning, and live opacity defaults
 - `capture`: screenshot output directory and default capture delay
 - `ui`: font candidates plus overlay sizing and colors
 

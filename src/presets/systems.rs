@@ -8,7 +8,10 @@ use crate::config::AppConfig;
 use crate::control_page::{ControlPage, ControlPageState};
 use crate::effect_tuner::EffectTunerState;
 use crate::runtime_scene::SceneMutationAccess;
-use crate::scene::{GenerationState, MaterialState, spawn_polyhedron_entity};
+use crate::scene::{
+    GenerationState, MaterialState, spawn_polyhedron_entity, spawn_scene_lights,
+    spawn_stage_entities,
+};
 use crate::scene_snapshot::SceneStateSnapshot;
 
 pub(crate) fn automated_scene_preset_load_system(
@@ -253,23 +256,6 @@ fn apply_scene_preset(
     runtime.ambient_light.color = runtime.app_config.rendering.ambient_light_color();
     runtime.ambient_light.brightness = runtime.app_config.rendering.ambient_light_brightness;
 
-    for (mut light, mut transform) in runtime.directional_lights.iter_mut() {
-        light.color = runtime.app_config.lighting.directional.color();
-        light.illuminance = runtime.app_config.lighting.directional.illuminance;
-        light.shadows_enabled = runtime.app_config.lighting.directional.shadows_enabled;
-        *transform =
-            Transform::from_translation(runtime.app_config.lighting.directional.translation())
-                .looking_at(runtime.app_config.lighting.directional.look_at(), Vec3::Y);
-    }
-
-    for (mut light, mut transform) in runtime.point_lights.iter_mut() {
-        light.color = runtime.app_config.lighting.point.color();
-        light.intensity = runtime.app_config.lighting.point.intensity;
-        light.range = runtime.app_config.lighting.point.range;
-        light.shadows_enabled = runtime.app_config.lighting.point.shadows_enabled;
-        *transform = Transform::from_translation(runtime.app_config.lighting.point.translation());
-    }
-
     *runtime.camera_rig = prepared.camera_rig;
     runtime
         .effect_tuner
@@ -277,9 +263,23 @@ fn apply_scene_preset(
     *runtime.generation_state = prepared.generation;
     runtime.material_state.opacity = prepared.material_opacity;
 
+    for entity in runtime.light_entities.iter() {
+        runtime.commands.entity(entity).despawn();
+    }
+    for entity in runtime.stage_entities.iter() {
+        runtime.commands.entity(entity).despawn();
+    }
     for entity in runtime.polyhedron_entities.iter() {
         runtime.commands.entity(entity).despawn();
     }
+
+    spawn_scene_lights(&mut runtime.commands, &runtime.app_config);
+    spawn_stage_entities(
+        &mut runtime.commands,
+        &mut runtime.meshes,
+        &mut runtime.materials,
+        &runtime.app_config.rendering,
+    );
 
     for (node_index, node) in runtime.generation_state.nodes.iter().enumerate() {
         spawn_polyhedron_entity(

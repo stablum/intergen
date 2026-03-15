@@ -17,7 +17,7 @@ use crate::control_page::{ControlPageInputMask, just_pressed_unmasked};
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
 use crate::polyhedra::{PolyhedronKind, PolyhedronNode, SpawnAddMode, SpawnPlacementMode};
 use crate::runtime_scene::SceneSnapshotAccess;
-use crate::scene::{GenerationState, MaterialState, ShapeAssets};
+use crate::scene::{GenerationState, MaterialState, ShapeAssets, material_appearance};
 use crate::scene_snapshot::{
     CameraRigSnapshot, GenerationSnapshot, MaterialRuntimeSnapshot, NodeOriginSnapshot,
     PolyhedronNodeSnapshot, SceneStateSnapshot,
@@ -77,6 +77,7 @@ struct BlendCamera {
 struct BlendLights {
     directional: BlendDirectionalLight,
     point: BlendPointLight,
+    accent: Option<BlendPointLight>,
 }
 
 #[derive(Debug, Serialize)]
@@ -213,6 +214,13 @@ impl BlendExportFile {
             Vec3::NEG_Y,
         );
         let point_translation = app_config.lighting.point.translation();
+        let accent = app_config.lighting.accent.enabled.then(|| BlendPointLight {
+            position: bevy_point_to_blender_array(app_config.lighting.accent.translation()),
+            color: app_config.lighting.accent.color,
+            intensity: app_config.lighting.accent.intensity,
+            range: app_config.lighting.accent.range,
+            shadows_enabled: app_config.lighting.accent.shadows_enabled,
+        });
 
         Self {
             format_version: BLEND_EXPORT_FORMAT_VERSION,
@@ -248,6 +256,7 @@ impl BlendExportFile {
                     range: app_config.lighting.point.range,
                     shadows_enabled: app_config.lighting.point.shadows_enabled,
                 },
+                accent,
             },
             objects: generation_state
                 .nodes
@@ -336,22 +345,14 @@ impl BlendObject {
 
 impl BlendMaterial {
     fn capture(node: &PolyhedronNode, material_config: &MaterialConfig, opacity: f32) -> Self {
-        let hue = (node.level as f32 * material_config.hue_step_per_level
-            + material_config.hue_bias(node.kind))
-        .rem_euclid(360.0);
-        let rgb = hsl_to_rgb(
-            hue,
-            material_config.saturation.clamp(0.0, 1.0),
-            material_config.lightness.clamp(0.0, 1.0),
-        );
-        let opacity = opacity.clamp(0.0, 1.0);
+        let appearance = material_appearance(node, material_config, opacity);
 
         Self {
-            base_color: [rgb[0], rgb[1], rgb[2], opacity],
-            metallic: material_config.metallic.clamp(0.0, 1.0),
-            roughness: material_config.perceptual_roughness.clamp(0.0, 1.0),
-            reflectance: material_config.reflectance.clamp(0.0, 1.0),
-            opacity,
+            base_color: appearance.base_color,
+            metallic: appearance.metallic,
+            roughness: appearance.perceptual_roughness,
+            reflectance: appearance.reflectance,
+            opacity: appearance.base_color[3],
         }
     }
 }
@@ -674,6 +675,7 @@ fn current_unix_ms() -> u64 {
         .unwrap_or(0)
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn hsl_to_rgb(hue_degrees: f32, saturation: f32, lightness: f32) -> [f32; 3] {
     if saturation <= f32::EPSILON {
         return [lightness, lightness, lightness];
@@ -694,6 +696,7 @@ fn hsl_to_rgb(hue_degrees: f32, saturation: f32, lightness: f32) -> [f32; 3] {
     ]
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 fn hue_to_rgb(p: f32, q: f32, t: f32) -> f32 {
     let mut t = t;
     if t < 0.0 {

@@ -203,8 +203,15 @@ def create_lights(collection: bpy.types.Collection, lights_data: dict) -> None:
     directional_obj.rotation_mode = "QUATERNION"
     directional_obj.rotation_quaternion = basis_quaternion(directional["forward"], (0.0, 0.0, 1.0))
 
-    point = lights_data["point"]
-    point_data = bpy.data.lights.new("IntergenPoint", type="POINT")
+    create_point_light(collection, "IntergenPoint", lights_data["point"])
+
+    accent = lights_data.get("accent")
+    if accent is not None:
+        create_point_light(collection, "IntergenAccent", accent)
+
+
+def create_point_light(collection: bpy.types.Collection, name: str, point: dict) -> None:
+    point_data = bpy.data.lights.new(name, type="POINT")
     point_data.color = tuple(point["color"])
     point_data.energy = max(0.001, float(point["intensity"]) / POINT_ENERGY_SCALE)
     if hasattr(point_data, "use_shadow"):
@@ -215,7 +222,7 @@ def create_lights(collection: bpy.types.Collection, lights_data: dict) -> None:
         point_data.cutoff_distance = max(0.1, float(point.get("range", 1.0)))
     if hasattr(point_data, "shadow_soft_size"):
         point_data.shadow_soft_size = max(0.05, float(point.get("range", 1.0)) * 0.03)
-    point_obj = bpy.data.objects.new("IntergenPoint", point_data)
+    point_obj = bpy.data.objects.new(name, point_data)
     collection.objects.link(point_obj)
     point_obj.location = tuple(point["position"])
 

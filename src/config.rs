@@ -105,6 +105,7 @@ pub(crate) struct RenderingConfig {
     pub(crate) clear_color: [f32; 3],
     pub(crate) ambient_light_color: [f32; 3],
     pub(crate) ambient_light_brightness: f32,
+    pub(crate) stage: StageConfig,
 }
 
 impl RenderingConfig {
@@ -123,7 +124,104 @@ impl Default for RenderingConfig {
             clear_color: [0.035, 0.04, 0.06],
             ambient_light_color: [0.7, 0.74, 0.82],
             ambient_light_brightness: 12.0,
+            stage: StageConfig::default(),
         }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub(crate) struct StageConfig {
+    pub(crate) enabled: bool,
+    #[serde(default = "StageSurfaceConfig::floor_default")]
+    pub(crate) floor: StageSurfaceConfig,
+    #[serde(default = "StageSurfaceConfig::backdrop_default")]
+    pub(crate) backdrop: StageSurfaceConfig,
+}
+
+impl Default for StageConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            floor: StageSurfaceConfig::floor_default(),
+            backdrop: StageSurfaceConfig::backdrop_default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
+pub(crate) struct StageSurfaceConfig {
+    pub(crate) enabled: bool,
+    pub(crate) color: [f32; 3],
+    pub(crate) translation: [f32; 3],
+    pub(crate) rotation_degrees: [f32; 3],
+    pub(crate) size: [f32; 2],
+    pub(crate) thickness: f32,
+    pub(crate) metallic: f32,
+    pub(crate) perceptual_roughness: f32,
+    pub(crate) reflectance: f32,
+}
+
+impl Default for StageSurfaceConfig {
+    fn default() -> Self {
+        Self::floor_default()
+    }
+}
+
+impl StageSurfaceConfig {
+    fn floor_default() -> Self {
+        Self {
+            enabled: false,
+            color: [0.09, 0.1, 0.12],
+            translation: [0.0, -4.4, 0.0],
+            rotation_degrees: [0.0, 0.0, 0.0],
+            size: [42.0, 42.0],
+            thickness: 0.2,
+            metallic: 0.08,
+            perceptual_roughness: 0.64,
+            reflectance: 0.26,
+        }
+    }
+
+    fn backdrop_default() -> Self {
+        Self {
+            enabled: false,
+            color: [0.05, 0.06, 0.09],
+            translation: [0.0, 4.0, -18.0],
+            rotation_degrees: [0.0, 0.0, 0.0],
+            size: [38.0, 20.0],
+            thickness: 0.2,
+            metallic: 0.02,
+            perceptual_roughness: 0.72,
+            reflectance: 0.2,
+        }
+    }
+
+    pub(crate) fn color(&self) -> Color {
+        srgb(self.color)
+    }
+
+    pub(crate) fn translation(&self) -> Vec3 {
+        vec3(self.translation)
+    }
+
+    pub(crate) fn rotation(&self) -> Quat {
+        let [x, y, z] = self.rotation_degrees;
+        Quat::from_euler(
+            EulerRot::XYZ,
+            x.to_radians(),
+            y.to_radians(),
+            z.to_radians(),
+        )
+    }
+
+    pub(crate) fn size(&self) -> Vec2 {
+        Vec2::new(self.size[0].max(0.01), self.size[1].max(0.01))
+    }
+
+    pub(crate) fn thickness(&self) -> f32 {
+        self.thickness.max(0.01)
     }
 }
 
@@ -349,6 +447,7 @@ impl Default for GenerationConfig {
 pub(crate) struct LightingConfig {
     pub(crate) directional: DirectionalLightConfig,
     pub(crate) point: PointLightConfig,
+    pub(crate) accent: AccentLightConfig,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -421,6 +520,60 @@ impl Default for PointLightConfig {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
+pub(crate) struct AccentLightConfig {
+    pub(crate) enabled: bool,
+    pub(crate) color: [f32; 3],
+    pub(crate) intensity: f32,
+    pub(crate) range: f32,
+    pub(crate) shadows_enabled: bool,
+    pub(crate) translation: [f32; 3],
+}
+
+impl AccentLightConfig {
+    pub(crate) fn color(&self) -> Color {
+        srgb(self.color)
+    }
+
+    pub(crate) fn translation(&self) -> Vec3 {
+        vec3(self.translation)
+    }
+}
+
+impl Default for AccentLightConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            color: [0.9, 0.72, 0.96],
+            intensity: 450_000.0,
+            range: 48.0,
+            shadows_enabled: false,
+            translation: [11.0, 2.5, 13.0],
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum MaterialSurfaceMode {
+    #[default]
+    Legacy,
+    Procedural,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum MaterialSurfaceFamily {
+    #[default]
+    Legacy,
+    Matte,
+    Satin,
+    Glossy,
+    Metal,
+    Frosted,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(default)]
 pub(crate) struct MaterialConfig {
     pub(crate) hue_step_per_level: f32,
     pub(crate) saturation: f32,
@@ -436,6 +589,19 @@ pub(crate) struct MaterialConfig {
     pub(crate) tetrahedron_hue_bias: f32,
     pub(crate) octahedron_hue_bias: f32,
     pub(crate) dodecahedron_hue_bias: f32,
+    pub(crate) surface_mode: MaterialSurfaceMode,
+    pub(crate) root_surface: MaterialSurfaceFamily,
+    pub(crate) accent_surface: MaterialSurfaceFamily,
+    pub(crate) accent_every_n_levels: usize,
+    pub(crate) cube_surface: MaterialSurfaceFamily,
+    pub(crate) tetrahedron_surface: MaterialSurfaceFamily,
+    pub(crate) octahedron_surface: MaterialSurfaceFamily,
+    pub(crate) dodecahedron_surface: MaterialSurfaceFamily,
+    pub(crate) level_lightness_shift: f32,
+    pub(crate) level_saturation_shift: f32,
+    pub(crate) level_metallic_shift: f32,
+    pub(crate) level_roughness_shift: f32,
+    pub(crate) level_reflectance_shift: f32,
 }
 
 impl MaterialConfig {
@@ -456,6 +622,34 @@ impl MaterialConfig {
         let (min, max) = self.opacity_bounds();
         self.default_opacity.clamp(min, max)
     }
+
+    pub(crate) fn surface_family(
+        &self,
+        kind: PolyhedronKind,
+        level: usize,
+    ) -> MaterialSurfaceFamily {
+        match self.surface_mode {
+            MaterialSurfaceMode::Legacy => MaterialSurfaceFamily::Legacy,
+            MaterialSurfaceMode::Procedural => {
+                if level == 0 && self.root_surface != MaterialSurfaceFamily::Legacy {
+                    return self.root_surface;
+                }
+                if self.accent_every_n_levels > 0
+                    && level > 0
+                    && level % self.accent_every_n_levels == 0
+                    && self.accent_surface != MaterialSurfaceFamily::Legacy
+                {
+                    return self.accent_surface;
+                }
+                match kind {
+                    PolyhedronKind::Cube => self.cube_surface,
+                    PolyhedronKind::Tetrahedron => self.tetrahedron_surface,
+                    PolyhedronKind::Octahedron => self.octahedron_surface,
+                    PolyhedronKind::Dodecahedron => self.dodecahedron_surface,
+                }
+            }
+        }
+    }
 }
 
 impl Default for MaterialConfig {
@@ -475,6 +669,19 @@ impl Default for MaterialConfig {
             tetrahedron_hue_bias: 110.0,
             octahedron_hue_bias: 205.0,
             dodecahedron_hue_bias: 290.0,
+            surface_mode: MaterialSurfaceMode::Legacy,
+            root_surface: MaterialSurfaceFamily::Legacy,
+            accent_surface: MaterialSurfaceFamily::Legacy,
+            accent_every_n_levels: 3,
+            cube_surface: MaterialSurfaceFamily::Satin,
+            tetrahedron_surface: MaterialSurfaceFamily::Matte,
+            octahedron_surface: MaterialSurfaceFamily::Metal,
+            dodecahedron_surface: MaterialSurfaceFamily::Glossy,
+            level_lightness_shift: 0.0,
+            level_saturation_shift: 0.0,
+            level_metallic_shift: 0.0,
+            level_roughness_shift: 0.0,
+            level_reflectance_shift: 0.0,
         }
     }
 }
@@ -887,5 +1094,70 @@ mod tests {
         assert_eq!(config.ui.body_text, [0.1, 0.2, 0.3]);
         assert_eq!(config.ui.focus_background, [0.92, 0.78, 0.36, 0.98]);
         assert_eq!(config.ui.focus_text, [0.05, 0.07, 0.10]);
+    }
+
+    #[test]
+    fn legacy_rendering_and_lighting_defaults_keep_new_features_disabled() {
+        let config = parse_config(
+            r#"
+            [rendering]
+            clear_color = [0.0, 0.0, 0.0]
+            ambient_light_color = [1.0, 0.0, 0.0]
+            ambient_light_brightness = 12.0
+
+            [lighting.directional]
+            color = [1.0, 0.0, 0.0]
+            illuminance = 22000.0
+            shadows_enabled = true
+            translation = [12.0, 18.0, 9.0]
+            look_at = [0.0, 0.0, 0.0]
+
+            [lighting.point]
+            color = [0.5, 0.6, 0.85]
+            intensity = 1200000.0
+            range = 60.0
+            shadows_enabled = false
+            translation = [-9.0, 5.0, -12.0]
+            "#,
+        )
+        .expect("legacy rendering and lighting config should parse");
+
+        assert!(!config.rendering.stage.enabled);
+        assert!(!config.lighting.accent.enabled);
+    }
+
+    #[test]
+    fn legacy_material_defaults_keep_surface_mode_on_legacy() {
+        let config = parse_config(
+            r#"
+            [materials]
+            hue_step_per_level = 45.0
+            saturation = 0.68
+            lightness = 0.56
+            metallic = 0.05
+            perceptual_roughness = 0.86
+            reflectance = 0.24
+            default_opacity = 1.0
+            opacity_adjust_step = 0.1
+            min_opacity = 0.1
+            max_opacity = 1.0
+            cube_hue_bias = 35.0
+            tetrahedron_hue_bias = 110.0
+            octahedron_hue_bias = 205.0
+            dodecahedron_hue_bias = 290.0
+            "#,
+        )
+        .expect("legacy materials config should parse");
+
+        assert_eq!(
+            config.materials.surface_mode,
+            super::MaterialSurfaceMode::Legacy
+        );
+        assert_eq!(
+            config
+                .materials
+                .surface_family(super::PolyhedronKind::Cube, 0),
+            super::MaterialSurfaceFamily::Legacy
+        );
     }
 }

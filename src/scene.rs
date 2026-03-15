@@ -1,8 +1,12 @@
 use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::math::primitives::Cuboid;
 use bevy::prelude::*;
 
 use crate::camera::{CameraRig, SceneCamera};
-use crate::config::{AppConfig, GenerationConfig, MaterialConfig};
+use crate::config::{
+    AppConfig, GenerationConfig, MaterialConfig, MaterialSurfaceFamily, RenderingConfig,
+    StageSurfaceConfig,
+};
 use crate::effects::{camera_effects_from_config, effects_status_messages};
 use crate::generation::{
     spawn_add_mode_status_message, spawn_placement_mode_status_message, twist_status_message,
@@ -246,10 +250,19 @@ pub(crate) struct PolyhedronEntity {
 }
 
 #[derive(Component)]
+pub(crate) struct SceneLightEntity;
+
+#[derive(Component)]
 pub(crate) struct SceneDirectionalLight;
 
 #[derive(Component)]
 pub(crate) struct ScenePointLight;
+
+#[derive(Component)]
+pub(crate) struct SceneAccentLight;
+
+#[derive(Component)]
+pub(crate) struct SceneStageEntity;
 
 pub(crate) fn setup_scene(
     mut commands: Commands,
@@ -263,6 +276,14 @@ pub(crate) fn setup_scene(
     let shape_assets = ShapeAssets::new(&mut meshes);
     let root = root_generation_node(&shape_assets.catalog, &app_config.generation);
     let initial_opacity = app_config.materials.default_opacity_clamped();
+
+    spawn_scene_lights(&mut commands, &app_config);
+    spawn_stage_entities(
+        &mut commands,
+        &mut meshes,
+        &mut materials,
+        &app_config.rendering,
+    );
 
     spawn_polyhedron_entity(
         &mut commands,
@@ -286,30 +307,6 @@ pub(crate) fn setup_scene(
             camera_effects_from_config(&app_config.effects),
         ))
         .id();
-
-    commands.spawn((
-        SceneDirectionalLight,
-        DirectionalLight {
-            color: app_config.lighting.directional.color(),
-            illuminance: app_config.lighting.directional.illuminance,
-            shadows_enabled: app_config.lighting.directional.shadows_enabled,
-            ..default()
-        },
-        Transform::from_translation(app_config.lighting.directional.translation())
-            .looking_at(app_config.lighting.directional.look_at(), Vec3::Y),
-    ));
-
-    commands.spawn((
-        ScenePointLight,
-        PointLight {
-            color: app_config.lighting.point.color(),
-            intensity: app_config.lighting.point.intensity,
-            range: app_config.lighting.point.range,
-            shadows_enabled: app_config.lighting.point.shadows_enabled,
-            ..default()
-        },
-        Transform::from_translation(app_config.lighting.point.translation()),
-    ));
 
     spawn_help_ui(&mut commands, &ui_theme, scene_camera, &app_config.ui);
 
@@ -391,6 +388,127 @@ pub(crate) fn reset_generation_state(
     root
 }
 
+pub(crate) fn spawn_scene_lights(commands: &mut Commands, app_config: &AppConfig) {
+    commands.spawn((
+        SceneLightEntity,
+        SceneDirectionalLight,
+        DirectionalLight {
+            color: app_config.lighting.directional.color(),
+            illuminance: app_config.lighting.directional.illuminance,
+            shadows_enabled: app_config.lighting.directional.shadows_enabled,
+            ..default()
+        },
+        Transform::from_translation(app_config.lighting.directional.translation())
+            .looking_at(app_config.lighting.directional.look_at(), Vec3::Y),
+    ));
+
+    commands.spawn((
+        SceneLightEntity,
+        ScenePointLight,
+        PointLight {
+            color: app_config.lighting.point.color(),
+            intensity: app_config.lighting.point.intensity,
+            range: app_config.lighting.point.range,
+            shadows_enabled: app_config.lighting.point.shadows_enabled,
+            ..default()
+        },
+        Transform::from_translation(app_config.lighting.point.translation()),
+    ));
+
+    if app_config.lighting.accent.enabled {
+        commands.spawn((
+            SceneLightEntity,
+            SceneAccentLight,
+            PointLight {
+                color: app_config.lighting.accent.color(),
+                intensity: app_config.lighting.accent.intensity,
+                range: app_config.lighting.accent.range,
+                shadows_enabled: app_config.lighting.accent.shadows_enabled,
+                ..default()
+            },
+            Transform::from_translation(app_config.lighting.accent.translation()),
+        ));
+    }
+}
+
+pub(crate) fn spawn_stage_entities(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    rendering: &RenderingConfig,
+) {
+    if !rendering.stage.enabled {
+        return;
+    }
+
+    if rendering.stage.floor.enabled {
+        spawn_stage_surface(
+            commands,
+            meshes,
+            materials,
+            &rendering.stage.floor,
+            StageSurfaceOrientation::Horizontal,
+        );
+    }
+
+    if rendering.stage.backdrop.enabled {
+        spawn_stage_surface(
+            commands,
+            meshes,
+            materials,
+            &rendering.stage.backdrop,
+            StageSurfaceOrientation::Vertical,
+        );
+    }
+}
+
+fn spawn_stage_surface(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    surface: &StageSurfaceConfig,
+    orientation: StageSurfaceOrientation,
+) {
+    let size = surface.size();
+    let mesh = match orientation {
+        StageSurfaceOrientation::Horizontal => {
+            Mesh::from(Cuboid::new(size.x, surface.thickness(), size.y))
+        }
+        StageSurfaceOrientation::Vertical => {
+            Mesh::from(Cuboid::new(size.x, size.y, surface.thickness()))
+        }
+    };
+    let material = materials.add(stage_surface_material(surface));
+
+    commands.spawn((
+        SceneStageEntity,
+        Mesh3d(meshes.add(mesh)),
+        MeshMaterial3d(material),
+        Transform {
+            translation: surface.translation(),
+            rotation: surface.rotation(),
+            ..default()
+        },
+        Visibility::Visible,
+    ));
+}
+
+fn stage_surface_material(surface: &StageSurfaceConfig) -> StandardMaterial {
+    StandardMaterial {
+        base_color: surface.color(),
+        metallic: surface.metallic.clamp(0.0, 1.0),
+        perceptual_roughness: surface.perceptual_roughness.clamp(0.0, 1.0),
+        reflectance: surface.reflectance.clamp(0.0, 1.0),
+        ..default()
+    }
+}
+
+#[derive(Clone, Copy)]
+enum StageSurfaceOrientation {
+    Horizontal,
+    Vertical,
+}
+
 pub(crate) fn spawn_polyhedron_entity(
     commands: &mut Commands,
     materials: &mut Assets<StandardMaterial>,
@@ -430,25 +548,166 @@ pub(crate) fn sync_polyhedron_transforms(
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct MaterialAppearance {
+    pub(crate) base_color: [f32; 4],
+    pub(crate) metallic: f32,
+    pub(crate) perceptual_roughness: f32,
+    pub(crate) reflectance: f32,
+}
+
+#[derive(Clone, Copy)]
+struct SurfaceProperties {
+    metallic: f32,
+    perceptual_roughness: f32,
+    reflectance: f32,
+    saturation_bias: f32,
+    lightness_bias: f32,
+}
+
+pub(crate) fn material_appearance(
+    node: &PolyhedronNode,
+    material_config: &MaterialConfig,
+    opacity: f32,
+) -> MaterialAppearance {
+    let family = material_config.surface_family(node.kind, node.level);
+    let surface = resolved_surface(material_config, family);
+    let level = node.level as f32;
+    let hue = (node.level as f32 * material_config.hue_step_per_level
+        + material_config.hue_bias(node.kind))
+    .rem_euclid(360.0);
+    let saturation = (material_config.saturation
+        + surface.saturation_bias
+        + material_config.level_saturation_shift * level)
+        .clamp(0.0, 1.0);
+    let lightness = (material_config.lightness
+        + surface.lightness_bias
+        + material_config.level_lightness_shift * level)
+        .clamp(0.0, 1.0);
+    let rgb = hsl_to_rgb(hue, saturation, lightness);
+    let opacity = opacity.clamp(0.0, 1.0);
+
+    MaterialAppearance {
+        base_color: [rgb[0], rgb[1], rgb[2], opacity],
+        metallic: (surface.metallic + material_config.level_metallic_shift * level).clamp(0.0, 1.0),
+        perceptual_roughness: (surface.perceptual_roughness
+            + material_config.level_roughness_shift * level)
+            .clamp(0.02, 1.0),
+        reflectance: (surface.reflectance + material_config.level_reflectance_shift * level)
+            .clamp(0.0, 1.0),
+    }
+}
+
+fn resolved_surface(
+    material_config: &MaterialConfig,
+    family: MaterialSurfaceFamily,
+) -> SurfaceProperties {
+    match family {
+        MaterialSurfaceFamily::Legacy => SurfaceProperties {
+            metallic: material_config.metallic,
+            perceptual_roughness: material_config.perceptual_roughness,
+            reflectance: material_config.reflectance,
+            saturation_bias: 0.0,
+            lightness_bias: 0.0,
+        },
+        MaterialSurfaceFamily::Matte => SurfaceProperties {
+            metallic: 0.0,
+            perceptual_roughness: 0.92,
+            reflectance: 0.22,
+            saturation_bias: -0.06,
+            lightness_bias: 0.02,
+        },
+        MaterialSurfaceFamily::Satin => SurfaceProperties {
+            metallic: 0.08,
+            perceptual_roughness: 0.5,
+            reflectance: 0.32,
+            saturation_bias: 0.0,
+            lightness_bias: 0.0,
+        },
+        MaterialSurfaceFamily::Glossy => SurfaceProperties {
+            metallic: 0.02,
+            perceptual_roughness: 0.18,
+            reflectance: 0.56,
+            saturation_bias: 0.02,
+            lightness_bias: 0.04,
+        },
+        MaterialSurfaceFamily::Metal => SurfaceProperties {
+            metallic: 0.92,
+            perceptual_roughness: 0.28,
+            reflectance: 0.82,
+            saturation_bias: -0.22,
+            lightness_bias: -0.08,
+        },
+        MaterialSurfaceFamily::Frosted => SurfaceProperties {
+            metallic: 0.0,
+            perceptual_roughness: 0.38,
+            reflectance: 0.7,
+            saturation_bias: -0.12,
+            lightness_bias: 0.06,
+        },
+    }
+}
+
 fn polyhedron_material(
     node: &PolyhedronNode,
     material_config: &MaterialConfig,
     opacity: f32,
 ) -> StandardMaterial {
-    let hue = (node.level as f32 * material_config.hue_step_per_level
-        + material_config.hue_bias(node.kind))
-        % 360.0;
-    let opacity = opacity.clamp(0.0, 1.0);
+    let appearance = material_appearance(node, material_config, opacity);
 
     StandardMaterial {
-        base_color: Color::hsl(hue, material_config.saturation, material_config.lightness)
-            .with_alpha(opacity),
-        alpha_mode: alpha_mode_for_opacity(opacity),
-        metallic: material_config.metallic,
-        perceptual_roughness: material_config.perceptual_roughness,
-        reflectance: material_config.reflectance,
+        base_color: Color::srgba(
+            appearance.base_color[0],
+            appearance.base_color[1],
+            appearance.base_color[2],
+            appearance.base_color[3],
+        ),
+        alpha_mode: alpha_mode_for_opacity(appearance.base_color[3]),
+        metallic: appearance.metallic,
+        perceptual_roughness: appearance.perceptual_roughness,
+        reflectance: appearance.reflectance,
         ..default()
     }
+}
+
+pub(crate) fn hsl_to_rgb(hue_degrees: f32, saturation: f32, lightness: f32) -> [f32; 3] {
+    if saturation <= f32::EPSILON {
+        return [lightness, lightness, lightness];
+    }
+
+    let hue = hue_degrees.rem_euclid(360.0) / 360.0;
+    let q = if lightness < 0.5 {
+        lightness * (1.0 + saturation)
+    } else {
+        lightness + saturation - lightness * saturation
+    };
+    let p = 2.0 * lightness - q;
+
+    [
+        hue_to_rgb(p, q, hue + 1.0 / 3.0),
+        hue_to_rgb(p, q, hue),
+        hue_to_rgb(p, q, hue - 1.0 / 3.0),
+    ]
+}
+
+fn hue_to_rgb(p: f32, q: f32, t: f32) -> f32 {
+    let mut t = t;
+    if t < 0.0 {
+        t += 1.0;
+    }
+    if t > 1.0 {
+        t -= 1.0;
+    }
+    if t < 1.0 / 6.0 {
+        return p + (q - p) * 6.0 * t;
+    }
+    if t < 0.5 {
+        return q;
+    }
+    if t < 2.0 / 3.0 {
+        return p + (q - p) * (2.0 / 3.0 - t) * 6.0;
+    }
+    p
 }
 
 pub(crate) fn alpha_mode_for_opacity(opacity: f32) -> AlphaMode {
