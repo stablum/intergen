@@ -1,0 +1,334 @@
+format_version = 1
+id = "preset-1772948133606"
+saved_at_unix_ms = 1772948133606
+summary = "Cube root, 1 nodes"
+
+[scene.rendering]
+clear_color = [
+    0.0,
+    0.0,
+    0.0,
+]
+ambient_light_color = [
+    1.0,
+    0.0,
+    0.0,
+]
+ambient_light_brightness = 12.0
+
+[scene.lighting.directional]
+color = [
+    1.0,
+    0.0,
+    0.0,
+]
+illuminance = 22000.0
+shadows_enabled = true
+translation = [
+    12.0,
+    18.0,
+    9.0,
+]
+look_at = [
+    0.0,
+    0.0,
+    0.0,
+]
+
+[scene.lighting.point]
+color = [
+    0.5,
+    0.6000000238418579,
+    0.8500000238418579,
+]
+intensity = 1200000.0
+range = 60.0
+shadows_enabled = false
+translation = [
+    -9.0,
+    5.0,
+    -12.0,
+]
+
+[scene.materials]
+hue_step_per_level = 45.0
+saturation = 0.6800000071525574
+lightness = 0.5600000023841858
+metallic = 0.05000000074505806
+perceptual_roughness = 0.8600000143051147
+reflectance = 0.23999999463558197
+default_opacity = 1.0
+opacity_adjust_step = 0.10000000149011612
+min_opacity = 0.10000000149011612
+max_opacity = 1.0
+cube_hue_bias = 35.0
+tetrahedron_hue_bias = 110.0
+octahedron_hue_bias = 205.0
+dodecahedron_hue_bias = 290.0
+
+[scene.camera]
+orientation = [
+    -0.2334955334663391,
+    -0.3565441370010376,
+    -0.017657972872257233,
+    0.9044579863548279,
+]
+angular_velocity = [
+    0.0,
+    0.0,
+    0.0,
+]
+distance = 14.0
+zoom_velocity = 0.0
+
+[scene.generation]
+selected_kind = "cube"
+spawn_placement_mode = "vertex"
+scale_ratio = 0.5799999833106995
+twist_per_vertex_radians = 0.6283185482025146
+vertex_offset_ratio = 0.0
+vertex_spawn_exclusion_probability = 0.0
+
+[[scene.generation.nodes]]
+kind = "cube"
+level = 0
+center = [
+    0.0,
+    0.0,
+    0.0,
+]
+rotation = [
+    0.0,
+    0.0,
+    0.0,
+    1.0,
+]
+scale = 1.899999976158142
+radius = 3.290896415710449
+occupied_vertices = [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+]
+occupied_edges = [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+]
+occupied_faces = [
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+]
+origin = "Root"
+
+[scene.material_state]
+opacity = 1.0
+
+[scene.effects.current.color_wavefolder]
+enabled = false
+gain = 10.0
+modulus = 3.0
+
+[scene.effects.current.lens_distortion]
+enabled = true
+strength = 0.0
+radial_k2 = 0.0
+radial_k3 = 0.0
+zoom = 1.0
+center = [
+    0.5,
+    0.5,
+]
+scale = [
+    0.0,
+    0.0,
+]
+tangential = [
+    0.0,
+    0.0,
+]
+chromatic_aberration = 0.0010000000474974513
+
+[scene.effects.current.gaussian_blur]
+enabled = false
+sigma = 10.0
+radius_pixels = 30
+
+[scene.effects.current.bloom]
+enabled = false
+threshold = 0.800000011920929
+intensity = 2.0
+radius_pixels = 30
+
+[scene.effects.current.edge_detection]
+enabled = false
+strength = 3.0
+threshold = 0.20000000298023224
+mix = 0.8500000238418579
+color = [
+    1.0,
+    1.0,
+    1.0,
+]
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.5
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.25
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.25
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.25
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.25
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.04999999701976776
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.04999999701976776
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.25
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.25
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.04999999701976776
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.04999999701976776
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.09999999403953552
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.02499999850988388
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.25
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 5.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.25
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.25
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 5.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.25
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.25
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.09999999403953552
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.09999999403953552
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.09999999403953552
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+enabled = false
+shape = "sine"
+amplitude = 0.09999999403953552
+frequency_hz = 0.25
