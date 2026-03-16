@@ -590,13 +590,10 @@ pub(crate) struct MaterialConfig {
     pub(crate) octahedron_hue_bias: f32,
     pub(crate) dodecahedron_hue_bias: f32,
     pub(crate) surface_mode: MaterialSurfaceMode,
+    pub(crate) base_surface: MaterialSurfaceFamily,
     pub(crate) root_surface: MaterialSurfaceFamily,
     pub(crate) accent_surface: MaterialSurfaceFamily,
     pub(crate) accent_every_n_levels: usize,
-    pub(crate) cube_surface: MaterialSurfaceFamily,
-    pub(crate) tetrahedron_surface: MaterialSurfaceFamily,
-    pub(crate) octahedron_surface: MaterialSurfaceFamily,
-    pub(crate) dodecahedron_surface: MaterialSurfaceFamily,
     pub(crate) level_lightness_shift: f32,
     pub(crate) level_saturation_shift: f32,
     pub(crate) level_metallic_shift: f32,
@@ -623,11 +620,7 @@ impl MaterialConfig {
         self.default_opacity.clamp(min, max)
     }
 
-    pub(crate) fn surface_family(
-        &self,
-        kind: PolyhedronKind,
-        level: usize,
-    ) -> MaterialSurfaceFamily {
+    pub(crate) fn surface_family(&self, level: usize) -> MaterialSurfaceFamily {
         match self.surface_mode {
             MaterialSurfaceMode::Legacy => MaterialSurfaceFamily::Legacy,
             MaterialSurfaceMode::Procedural => {
@@ -641,12 +634,7 @@ impl MaterialConfig {
                 {
                     return self.accent_surface;
                 }
-                match kind {
-                    PolyhedronKind::Cube => self.cube_surface,
-                    PolyhedronKind::Tetrahedron => self.tetrahedron_surface,
-                    PolyhedronKind::Octahedron => self.octahedron_surface,
-                    PolyhedronKind::Dodecahedron => self.dodecahedron_surface,
-                }
+                self.base_surface
             }
         }
     }
@@ -670,13 +658,10 @@ impl Default for MaterialConfig {
             octahedron_hue_bias: 205.0,
             dodecahedron_hue_bias: 290.0,
             surface_mode: MaterialSurfaceMode::Legacy,
+            base_surface: MaterialSurfaceFamily::Satin,
             root_surface: MaterialSurfaceFamily::Legacy,
             accent_surface: MaterialSurfaceFamily::Legacy,
             accent_every_n_levels: 3,
-            cube_surface: MaterialSurfaceFamily::Satin,
-            tetrahedron_surface: MaterialSurfaceFamily::Matte,
-            octahedron_surface: MaterialSurfaceFamily::Metal,
-            dodecahedron_surface: MaterialSurfaceFamily::Glossy,
             level_lightness_shift: 0.0,
             level_saturation_shift: 0.0,
             level_metallic_shift: 0.0,
@@ -1154,10 +1139,43 @@ mod tests {
             super::MaterialSurfaceMode::Legacy
         );
         assert_eq!(
-            config
-                .materials
-                .surface_family(super::PolyhedronKind::Cube, 0),
+            config.materials.surface_family(0),
             super::MaterialSurfaceFamily::Legacy
+        );
+    }
+
+    #[test]
+    fn deprecated_shape_specific_surface_fields_do_not_break_material_parsing() {
+        let config = parse_config(
+            r#"
+            [materials]
+            surface_mode = "procedural"
+            root_surface = "glossy"
+            accent_surface = "metal"
+            accent_every_n_levels = 3
+            cube_surface = "satin"
+            tetrahedron_surface = "matte"
+            octahedron_surface = "metal"
+            dodecahedron_surface = "glossy"
+            "#,
+        )
+        .expect("deprecated shape surface fields should be ignored");
+
+        assert_eq!(
+            config.materials.base_surface,
+            super::MaterialSurfaceFamily::Satin
+        );
+        assert_eq!(
+            config.materials.surface_family(0),
+            super::MaterialSurfaceFamily::Glossy
+        );
+        assert_eq!(
+            config.materials.surface_family(1),
+            super::MaterialSurfaceFamily::Satin
+        );
+        assert_eq!(
+            config.materials.surface_family(3),
+            super::MaterialSurfaceFamily::Metal
         );
     }
 }

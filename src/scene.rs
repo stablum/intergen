@@ -570,7 +570,7 @@ pub(crate) fn material_appearance(
     material_config: &MaterialConfig,
     opacity: f32,
 ) -> MaterialAppearance {
-    let family = material_config.surface_family(node.kind, node.level);
+    let family = material_config.surface_family(node.level);
     let surface = resolved_surface(material_config, family);
     let level = node.level as f32;
     let hue = (node.level as f32 * material_config.hue_step_per_level

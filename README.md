@@ -65,7 +65,7 @@ Current configuration sections:
 - `generation`: root shape, default child shape, default spawn placement mode, scale limits, twist defaults and bounds, spawn cadence, and spawn heuristics
 - `lighting`: directional, point, and optional accent light colors, positions, and intensities
 - `effects`: camera-output shader effects
-- `materials`: color progression, legacy or procedural material families, PBR tuning, and live opacity defaults
+- `materials`: color progression, legacy or scene-wide procedural material families, PBR tuning, and live opacity defaults
 - `capture`: screenshot output directory and default capture delay
 - `ui`: font candidates plus overlay sizing and colors
 
