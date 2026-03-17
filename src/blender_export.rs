@@ -192,6 +192,7 @@ impl BlendExportFile {
         shape_assets: &ShapeAssets,
         generation_state: &GenerationState,
         material_state: &MaterialState,
+        stage_state: &crate::scene::StageState,
         now_secs: f32,
     ) -> Self {
         let evaluated_effects = effect_tuner.evaluated_effects(now_secs);
@@ -200,6 +201,7 @@ impl BlendExportFile {
             camera_rig,
             generation_state,
             material_state,
+            stage_state,
             effect_tuner,
         );
         let live_material_config = state_snapshot.materials.clone();
@@ -490,6 +492,7 @@ fn export_current_scene(
         scene.shape_assets.as_ref(),
         scene.generation_state.as_ref(),
         scene.material_state.as_ref(),
+        scene.stage_state.as_ref(),
         now_secs,
     );
     let snapshot_path = snapshot_sidecar_path(output_path);

@@ -9,7 +9,7 @@ use crate::control_page::{ControlPage, ControlPageState};
 use crate::effect_tuner::EffectTunerState;
 use crate::runtime_scene::SceneMutationAccess;
 use crate::scene::{
-    GenerationState, MaterialState, spawn_polyhedron_entity, spawn_scene_lights,
+    GenerationState, MaterialState, StageState, spawn_polyhedron_entity, spawn_scene_lights,
     spawn_stage_entities,
 };
 use crate::scene_snapshot::SceneStateSnapshot;
@@ -100,6 +100,7 @@ pub(crate) fn preset_input_system(
             &scene.camera_rig,
             &scene.generation_state,
             &scene.material_state,
+            &scene.stage_state,
             &scene.effect_tuner,
         ),
         PresetCommand::Free => free_assigned_slot(&mut preset_browser, index),
@@ -151,6 +152,7 @@ fn save_scene_preset(
     camera_rig: &CameraRig,
     generation_state: &GenerationState,
     material_state: &MaterialState,
+    stage_state: &StageState,
     effect_tuner: &EffectTunerState,
 ) -> Result<Option<String>, String> {
     let scene = SceneStateSnapshot::capture(
@@ -158,6 +160,7 @@ fn save_scene_preset(
         camera_rig,
         generation_state,
         material_state,
+        stage_state,
         effect_tuner,
     );
     let file = ScenePresetFile::new(index, scene.clone());
@@ -263,6 +266,7 @@ fn apply_scene_preset(
     *runtime.generation_state = prepared.generation;
     *runtime.material_state = MaterialState::from_config(&runtime.app_config.materials);
     runtime.material_state.opacity = prepared.material_opacity;
+    *runtime.stage_state = StageState::from_config(&runtime.app_config.rendering.stage);
 
     for entity in runtime.light_entities.iter() {
         runtime.commands.entity(entity).despawn();

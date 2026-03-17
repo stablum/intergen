@@ -8,7 +8,7 @@ use crate::polyhedra::{
     AttachmentOccupancy, NodeOrigin, PolyhedronKind, PolyhedronNode, SpawnAddMode, SpawnAttachment,
     SpawnPlacementMode,
 };
-use crate::scene::{GenerationParameters, GenerationState, MaterialState};
+use crate::scene::{GenerationParameters, GenerationState, MaterialState, StageState};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct SceneStateSnapshot {
@@ -93,12 +93,15 @@ impl SceneStateSnapshot {
         camera_rig: &CameraRig,
         generation_state: &GenerationState,
         material_state: &MaterialState,
+        stage_state: &StageState,
         effect_tuner: &EffectTunerState,
     ) -> Self {
         let runtime_materials = material_state.runtime_material_config(&app_config.materials);
+        let mut runtime_rendering = app_config.rendering.clone();
+        runtime_rendering.stage = stage_state.runtime_stage_config(&app_config.rendering.stage);
 
         Self {
-            rendering: app_config.rendering.clone(),
+            rendering: runtime_rendering,
             lighting: app_config.lighting.clone(),
             materials: runtime_materials,
             camera: CameraRigSnapshot::capture(camera_rig),
@@ -305,4 +308,40 @@ fn resize_occupancy(values: &[bool], len: usize) -> Vec<bool> {
     resized.resize(len, false);
     resized.truncate(len);
     resized
+}
+
+#[cfg(test)]
+mod tests {
+    use super::SceneStateSnapshot;
+    use crate::camera::CameraRig;
+    use crate::config::AppConfig;
+    use crate::effect_tuner::EffectTunerState;
+    use crate::scene::{GenerationState, MaterialState, StageState};
+
+    #[test]
+    fn capture_uses_runtime_stage_visibility() {
+        let app_config = AppConfig::default();
+        let camera_rig = CameraRig::from_config(&app_config.camera);
+        let generation_state = GenerationState::from_config(&app_config.generation);
+        let material_state = MaterialState::from_config(&app_config.materials);
+        let mut stage_state = StageState::from_config(&app_config.rendering.stage);
+        let effect_tuner = EffectTunerState::from_config(&app_config.effects);
+
+        stage_state.enabled = true;
+        stage_state.floor_enabled = true;
+        stage_state.backdrop_enabled = false;
+
+        let snapshot = SceneStateSnapshot::capture(
+            &app_config,
+            &camera_rig,
+            &generation_state,
+            &material_state,
+            &stage_state,
+            &effect_tuner,
+        );
+
+        assert!(snapshot.rendering.stage.enabled);
+        assert!(snapshot.rendering.stage.floor.enabled);
+        assert!(!snapshot.rendering.stage.backdrop.enabled);
+    }
 }

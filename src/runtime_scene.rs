@@ -6,7 +6,7 @@ use crate::config::AppConfig;
 use crate::effect_tuner::EffectTunerState;
 use crate::scene::{
     GenerationState, MaterialState, PolyhedronEntity, SceneLightEntity, SceneStageEntity,
-    ShapeAssets,
+    ShapeAssets, StageState,
 };
 
 #[derive(SystemParam)]
@@ -17,6 +17,7 @@ pub(crate) struct SceneSnapshotAccess<'w, 's> {
     pub(crate) shape_assets: Res<'w, ShapeAssets>,
     pub(crate) generation_state: Res<'w, GenerationState>,
     pub(crate) material_state: Res<'w, MaterialState>,
+    pub(crate) stage_state: Res<'w, StageState>,
     _marker: std::marker::PhantomData<&'s ()>,
 }
 
@@ -31,6 +32,7 @@ pub(crate) struct SceneMutationAccess<'w, 's> {
     pub(crate) shape_assets: Res<'w, ShapeAssets>,
     pub(crate) generation_state: ResMut<'w, GenerationState>,
     pub(crate) material_state: ResMut<'w, MaterialState>,
+    pub(crate) stage_state: ResMut<'w, StageState>,
     pub(crate) meshes: ResMut<'w, Assets<Mesh>>,
     pub(crate) materials: ResMut<'w, Assets<StandardMaterial>>,
     pub(crate) polyhedron_entities: Query<'w, 's, Entity, With<PolyhedronEntity>>,
@@ -45,8 +47,11 @@ pub(crate) struct GenerationSceneAccess<'w, 's> {
     pub(crate) shape_assets: Res<'w, ShapeAssets>,
     pub(crate) generation_state: ResMut<'w, GenerationState>,
     pub(crate) material_state: ResMut<'w, MaterialState>,
+    pub(crate) stage_state: ResMut<'w, StageState>,
+    pub(crate) meshes: ResMut<'w, Assets<Mesh>>,
     pub(crate) materials: ResMut<'w, Assets<StandardMaterial>>,
     pub(crate) polyhedron_entities: Query<'w, 's, Entity, With<PolyhedronEntity>>,
+    pub(crate) stage_entities: Query<'w, 's, Entity, With<SceneStageEntity>>,
     pub(crate) polyhedron_materials: Query<
         'w,
         's,

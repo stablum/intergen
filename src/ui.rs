@@ -325,6 +325,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
     effect_tuner: Res<EffectTunerState>,
     generation_state: Res<GenerationState>,
     material_state: Res<MaterialState>,
+    stage_state: Res<crate::scene::StageState>,
     mut overlay_query: Query<&mut Visibility, With<EffectTunerOverlay>>,
     mut pinned_badge_query: Query<
         &mut Visibility,
@@ -345,6 +346,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
             generation_state: &generation_state,
             material_config: &app_config.materials,
             material_state: &material_state,
+            stage_state: &stage_state,
         },
         now_secs,
     );

@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use crate::camera::{CameraRig, SceneCamera};
 use crate::config::{
     AppConfig, GenerationConfig, MaterialConfig, MaterialSurfaceFamily, MaterialSurfaceMode,
-    RenderingConfig, StageSurfaceConfig,
+    RenderingConfig, StageConfig, StageSurfaceConfig,
 };
 use crate::effects::{camera_effects_from_config, effects_status_messages};
 use crate::generation::{
@@ -278,6 +278,31 @@ pub(crate) struct MaterialState {
     pub(crate) level_reflectance_shift: f32,
 }
 
+#[derive(Resource)]
+pub(crate) struct StageState {
+    pub(crate) enabled: bool,
+    pub(crate) floor_enabled: bool,
+    pub(crate) backdrop_enabled: bool,
+}
+
+impl StageState {
+    pub(crate) fn from_config(stage_config: &StageConfig) -> Self {
+        Self {
+            enabled: stage_config.enabled,
+            floor_enabled: stage_config.floor.enabled,
+            backdrop_enabled: stage_config.backdrop.enabled,
+        }
+    }
+
+    pub(crate) fn runtime_stage_config(&self, defaults: &StageConfig) -> StageConfig {
+        let mut stage = defaults.clone();
+        stage.enabled = self.enabled;
+        stage.floor.enabled = self.floor_enabled;
+        stage.backdrop.enabled = self.backdrop_enabled;
+        stage
+    }
+}
+
 impl MaterialState {
     pub(crate) fn from_config(material_config: &MaterialConfig) -> Self {
         Self {
@@ -362,16 +387,19 @@ pub(crate) fn setup_scene(
     let ui_theme = load_ui_theme(&asset_server, &app_config.ui);
     let shape_assets = ShapeAssets::new(&mut meshes);
     let root = root_generation_node(&shape_assets.catalog, &app_config.generation);
+    let stage_state = StageState::from_config(&app_config.rendering.stage);
     let material_state = MaterialState::from_config(&app_config.materials);
     let runtime_material_config = material_state.runtime_material_config(&app_config.materials);
     let initial_opacity = material_state.opacity;
 
     spawn_scene_lights(&mut commands, &app_config);
+    let mut runtime_rendering = app_config.rendering.clone();
+    runtime_rendering.stage = stage_state.runtime_stage_config(&app_config.rendering.stage);
     spawn_stage_entities(
         &mut commands,
         &mut meshes,
         &mut materials,
-        &app_config.rendering,
+        &runtime_rendering,
     );
 
     spawn_polyhedron_entity(
@@ -419,6 +447,7 @@ pub(crate) fn setup_scene(
         spawn_hold: HoldRepeatState::default(),
     });
     commands.insert_resource(material_state);
+    commands.insert_resource(stage_state);
 
     println!("{}", startup_controls_message());
     println!("{}", startup_fx_message());
@@ -547,6 +576,23 @@ pub(crate) fn spawn_stage_entities(
             StageSurfaceOrientation::Vertical,
         );
     }
+}
+
+pub(crate) fn sync_stage_entities(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+    rendering: &RenderingConfig,
+    stage_state: &StageState,
+    stage_entities: &Query<Entity, With<SceneStageEntity>>,
+) {
+    for entity in stage_entities.iter() {
+        commands.entity(entity).despawn();
+    }
+
+    let mut runtime_rendering = rendering.clone();
+    runtime_rendering.stage = stage_state.runtime_stage_config(&rendering.stage);
+    spawn_stage_entities(commands, meshes, materials, &runtime_rendering);
 }
 
 fn spawn_stage_surface(

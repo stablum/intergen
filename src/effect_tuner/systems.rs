@@ -5,6 +5,7 @@ use crate::control_page::{ControlPage, ControlPageState};
 use crate::effects::{CameraEffectsSettings, camera_effects_from_config};
 use crate::generation::{apply_live_material_state, recompute_generation_tree};
 use crate::runtime_scene::GenerationSceneAccess;
+use crate::scene::sync_stage_entities;
 
 use super::state::{
     AdjustmentModifiers, EffectTunerEditContext, EffectTunerParameter, EffectTunerSceneParameter,
@@ -111,6 +112,7 @@ pub(crate) fn effect_tuner_input_system(
             &scene.app_config,
             &mut scene.generation_state,
             &mut scene.material_state,
+            &mut scene.stage_state,
         );
         effect_tuner.step_adjustment(
             1.0,
@@ -134,6 +136,7 @@ pub(crate) fn effect_tuner_input_system(
                     &scene.app_config,
                     &scene.generation_state,
                     &scene.material_state,
+                    &scene.stage_state,
                 ),
                 now_secs,
             )
@@ -145,6 +148,7 @@ pub(crate) fn effect_tuner_input_system(
             &scene.app_config,
             &mut scene.generation_state,
             &mut scene.material_state,
+            &mut scene.stage_state,
         );
         effect_tuner.step_adjustment(
             -1.0,
@@ -168,6 +172,7 @@ pub(crate) fn effect_tuner_input_system(
                     &scene.app_config,
                     &scene.generation_state,
                     &scene.material_state,
+                    &scene.stage_state,
                 ),
                 now_secs,
             )
@@ -183,6 +188,7 @@ pub(crate) fn effect_tuner_input_system(
                     &scene.app_config,
                     &mut scene.generation_state,
                     &mut scene.material_state,
+                    &mut scene.stage_state,
                 );
                 effect_tuner.reset_all(&mut context, now_secs);
             }
@@ -195,6 +201,7 @@ pub(crate) fn effect_tuner_input_system(
                     &scene.app_config,
                     &mut scene.generation_state,
                     &mut scene.material_state,
+                    &mut scene.stage_state,
                 );
                 effect_tuner.reset_selected(&mut context, now_secs);
             }
@@ -206,6 +213,7 @@ pub(crate) fn effect_tuner_input_system(
                         &scene.app_config,
                         &scene.generation_state,
                         &scene.material_state,
+                        &scene.stage_state,
                     ),
                     now_secs,
                 )
@@ -220,6 +228,7 @@ pub(crate) fn effect_tuner_input_system(
                 &scene.app_config,
                 &mut scene.generation_state,
                 &mut scene.material_state,
+                &mut scene.stage_state,
             );
             effect_tuner.backspace_numeric_input(&mut context, now_secs)
         };
@@ -251,6 +260,7 @@ pub(crate) fn effect_tuner_input_system(
                     &scene.app_config,
                     &mut scene.generation_state,
                     &mut scene.material_state,
+                    &mut scene.stage_state,
                 );
                 effect_tuner.append_numeric_input(character, &mut context, now_secs)
             };
@@ -293,12 +303,14 @@ fn effect_tuner_view_context<'a>(
     app_config: &'a crate::config::AppConfig,
     generation_state: &'a crate::scene::GenerationState,
     material_state: &'a crate::scene::MaterialState,
+    stage_state: &'a crate::scene::StageState,
 ) -> EffectTunerViewContext<'a> {
     EffectTunerViewContext {
         generation_config: &app_config.generation,
         generation_state,
         material_config: &app_config.materials,
         material_state,
+        stage_state,
     }
 }
 
@@ -306,12 +318,15 @@ fn effect_tuner_edit_context<'a>(
     app_config: &'a crate::config::AppConfig,
     generation_state: &'a mut crate::scene::GenerationState,
     material_state: &'a mut crate::scene::MaterialState,
+    stage_state: &'a mut crate::scene::StageState,
 ) -> EffectTunerEditContext<'a> {
     EffectTunerEditContext {
         generation_config: &app_config.generation,
         generation_state,
         material_config: &app_config.materials,
         material_state,
+        stage_config: &app_config.rendering.stage,
+        stage_state,
     }
 }
 
@@ -353,6 +368,18 @@ fn apply_selected_parameter_side_effects(
                 &scene.polyhedron_materials,
             );
         }
+        EffectTunerParameter::Scene(EffectTunerSceneParameter::StageEnabled)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorEnabled)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropEnabled) => {
+            sync_stage_entities(
+                &mut scene.commands,
+                &mut scene.meshes,
+                &mut scene.materials,
+                &scene.app_config.rendering,
+                &scene.stage_state,
+                &scene.stage_entities,
+            );
+        }
         EffectTunerParameter::Effect(_)
         | EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildKind)
         | EffectTunerParameter::Scene(EffectTunerSceneParameter::SpawnPlacementMode)
@@ -371,5 +398,13 @@ fn apply_reset_all_side_effects(scene: &mut GenerationSceneAccess<'_, '_>) {
         &scene.material_state,
         &mut scene.materials,
         &scene.polyhedron_materials,
+    );
+    sync_stage_entities(
+        &mut scene.commands,
+        &mut scene.meshes,
+        &mut scene.materials,
+        &scene.app_config.rendering,
+        &scene.stage_state,
+        &scene.stage_entities,
     );
 }

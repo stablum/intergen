@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{
     EffectGroup, EffectNumericParameter, EffectsConfig, GenerationConfig, MaterialConfig,
-    MaterialSurfaceFamily, MaterialSurfaceMode,
+    MaterialSurfaceFamily, MaterialSurfaceMode, StageConfig,
 };
 use crate::generation::{
     selected_child_shape_status_message, spawn_add_mode_status_message,
@@ -11,7 +11,7 @@ use crate::generation::{
 };
 use crate::parameters::{GenerationParameter, HoldInput, HoldRepeatState};
 use crate::polyhedra::{PolyhedronKind, SpawnAddMode, SpawnPlacementMode};
-use crate::scene::{GenerationState, MaterialState, opacity_status_message};
+use crate::scene::{GenerationState, MaterialState, StageState, opacity_status_message};
 
 use super::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LFO_FREQUENCY_STEP_HZ, LfoShape, ParameterLfo};
 use super::metadata::{EffectEditMode, EffectOverlayField};
@@ -54,6 +54,7 @@ pub(crate) struct EffectTunerViewContext<'a> {
     pub(crate) generation_state: &'a GenerationState,
     pub(crate) material_config: &'a MaterialConfig,
     pub(crate) material_state: &'a MaterialState,
+    pub(crate) stage_state: &'a StageState,
 }
 
 pub(crate) struct EffectTunerEditContext<'a> {
@@ -61,6 +62,8 @@ pub(crate) struct EffectTunerEditContext<'a> {
     pub(crate) generation_state: &'a mut GenerationState,
     pub(crate) material_config: &'a MaterialConfig,
     pub(crate) material_state: &'a mut MaterialState,
+    pub(crate) stage_config: &'a StageConfig,
+    pub(crate) stage_state: &'a mut StageState,
 }
 
 impl EffectTunerEditContext<'_> {
@@ -70,6 +73,7 @@ impl EffectTunerEditContext<'_> {
             generation_state: &*self.generation_state,
             material_config: self.material_config,
             material_state: &*self.material_state,
+            stage_state: &*self.stage_state,
         }
     }
 }
@@ -83,6 +87,9 @@ pub(crate) enum EffectTunerSceneParameter {
     ChildTwistPerVertexRadians,
     ChildOutwardOffsetRatio,
     ChildSpawnExclusionProbability,
+    StageEnabled,
+    StageFloorEnabled,
+    StageBackdropEnabled,
     GlobalOpacity,
     MaterialHueStepPerLevel,
     MaterialSaturation,
@@ -107,7 +114,7 @@ pub(crate) enum EffectTunerSceneParameter {
 }
 
 impl EffectTunerSceneParameter {
-    const ALL: [Self; 28] = [
+    const ALL: [Self; 31] = [
         Self::ChildKind,
         Self::SpawnPlacementMode,
         Self::SpawnAddMode,
@@ -115,6 +122,9 @@ impl EffectTunerSceneParameter {
         Self::ChildTwistPerVertexRadians,
         Self::ChildOutwardOffsetRatio,
         Self::ChildSpawnExclusionProbability,
+        Self::StageEnabled,
+        Self::StageFloorEnabled,
+        Self::StageBackdropEnabled,
         Self::GlobalOpacity,
         Self::MaterialHueStepPerLevel,
         Self::MaterialSaturation,
@@ -151,6 +161,9 @@ impl EffectTunerSceneParameter {
             Self::ChildTwistPerVertexRadians => "generation.child_twist_per_vertex_radians",
             Self::ChildOutwardOffsetRatio => "generation.child_outward_offset_ratio",
             Self::ChildSpawnExclusionProbability => "generation.child_spawn_exclusion_probability",
+            Self::StageEnabled => "stage.enabled",
+            Self::StageFloorEnabled => "stage.floor.enabled",
+            Self::StageBackdropEnabled => "stage.backdrop.enabled",
             Self::GlobalOpacity => "materials.opacity",
             Self::MaterialHueStepPerLevel => "materials.hue_step_per_level",
             Self::MaterialSaturation => "materials.saturation",
@@ -184,6 +197,9 @@ impl EffectTunerSceneParameter {
             Self::ChildTwistPerVertexRadians => "twist",
             Self::ChildOutwardOffsetRatio => "offset",
             Self::ChildSpawnExclusionProbability => "spawn%",
+            Self::StageEnabled => "enabled",
+            Self::StageFloorEnabled => "floor",
+            Self::StageBackdropEnabled => "backdrop",
             Self::GlobalOpacity => "opacity",
             Self::MaterialHueStepPerLevel => "hue step",
             Self::MaterialSaturation => "sat",
@@ -210,6 +226,7 @@ impl EffectTunerSceneParameter {
 
     pub(crate) fn group_label(self) -> &'static str {
         match self {
+            Self::StageEnabled | Self::StageFloorEnabled | Self::StageBackdropEnabled => "stage",
             Self::GlobalOpacity
             | Self::MaterialHueStepPerLevel
             | Self::MaterialSaturation
@@ -281,6 +298,9 @@ impl EffectTunerSceneParameter {
             Self::ChildKind
             | Self::SpawnPlacementMode
             | Self::SpawnAddMode
+            | Self::StageEnabled
+            | Self::StageFloorEnabled
+            | Self::StageBackdropEnabled
             | Self::GlobalOpacity
             | Self::MaterialHueStepPerLevel
             | Self::MaterialSaturation
@@ -329,6 +349,9 @@ impl EffectTunerSceneParameter {
                 Self::ChildKind
                 | Self::SpawnPlacementMode
                 | Self::SpawnAddMode
+                | Self::StageEnabled
+                | Self::StageFloorEnabled
+                | Self::StageBackdropEnabled
                 | Self::MaterialSurfaceMode
                 | Self::MaterialBaseSurface
                 | Self::MaterialRootSurface
@@ -374,6 +397,27 @@ impl EffectTunerSceneParameter {
             Self::ChildSpawnExclusionProbability => context
                 .generation_state
                 .vertex_spawn_exclusion_probability_base(),
+            Self::StageEnabled => {
+                if context.stage_state.enabled {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            Self::StageFloorEnabled => {
+                if context.stage_state.floor_enabled {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
+            Self::StageBackdropEnabled => {
+                if context.stage_state.backdrop_enabled {
+                    1.0
+                } else {
+                    0.0
+                }
+            }
             Self::GlobalOpacity => context.material_state.opacity,
             Self::MaterialHueStepPerLevel => context.material_state.hue_step_per_level,
             Self::MaterialSaturation => context.material_state.saturation,
@@ -475,6 +519,9 @@ impl EffectTunerSceneParameter {
                 Self::ChildKind
                 | Self::SpawnPlacementMode
                 | Self::SpawnAddMode
+                | Self::StageEnabled
+                | Self::StageFloorEnabled
+                | Self::StageBackdropEnabled
                 | Self::MaterialSurfaceMode
                 | Self::MaterialBaseSurface
                 | Self::MaterialRootSurface
@@ -520,6 +567,9 @@ impl EffectTunerSceneParameter {
                 Self::ChildKind
                 | Self::SpawnPlacementMode
                 | Self::SpawnAddMode
+                | Self::StageEnabled
+                | Self::StageFloorEnabled
+                | Self::StageBackdropEnabled
                 | Self::MaterialSurfaceMode
                 | Self::MaterialBaseSurface
                 | Self::MaterialRootSurface
@@ -543,6 +593,13 @@ impl EffectTunerSceneParameter {
                 .plural_label()
                 .to_string(),
             Self::SpawnAddMode => context.generation_state.spawn_add_mode.label().to_string(),
+            Self::StageEnabled => boolean_value_text(context.stage_state.enabled).to_string(),
+            Self::StageFloorEnabled => {
+                boolean_value_text(context.stage_state.floor_enabled).to_string()
+            }
+            Self::StageBackdropEnabled => {
+                boolean_value_text(context.stage_state.backdrop_enabled).to_string()
+            }
             Self::MaterialSurfaceMode => {
                 material_surface_mode_value_text(context.material_state.surface_mode).to_string()
             }
@@ -617,6 +674,17 @@ impl EffectTunerSceneParameter {
                     direction as isize,
                 );
             }
+            Self::StageEnabled => {
+                context.stage_state.enabled = cycle_bool(context.stage_state.enabled, direction);
+            }
+            Self::StageFloorEnabled => {
+                context.stage_state.floor_enabled =
+                    cycle_bool(context.stage_state.floor_enabled, direction);
+            }
+            Self::StageBackdropEnabled => {
+                context.stage_state.backdrop_enabled =
+                    cycle_bool(context.stage_state.backdrop_enabled, direction);
+            }
             Self::MaterialSurfaceMode => {
                 context.material_state.surface_mode = cycle_material_surface_mode(
                     context.material_state.surface_mode,
@@ -683,6 +751,15 @@ impl EffectTunerSceneParameter {
             Self::SpawnAddMode => {
                 context.generation_state.spawn_add_mode = SpawnAddMode::default();
             }
+            Self::StageEnabled => {
+                context.stage_state.enabled = context.stage_config.enabled;
+            }
+            Self::StageFloorEnabled => {
+                context.stage_state.floor_enabled = context.stage_config.floor.enabled;
+            }
+            Self::StageBackdropEnabled => {
+                context.stage_state.backdrop_enabled = context.stage_config.backdrop.enabled;
+            }
             Self::MaterialSurfaceMode => {
                 context.material_state.surface_mode = context.material_config.surface_mode;
             }
@@ -733,6 +810,20 @@ impl EffectTunerSceneParameter {
             Self::SpawnAddMode => {
                 spawn_add_mode_status_message(context.generation_state.spawn_add_mode)
             }
+            Self::StageEnabled => {
+                format!(
+                    "Stage visibility: {}",
+                    boolean_value_text(context.stage_state.enabled)
+                )
+            }
+            Self::StageFloorEnabled => format!(
+                "Stage floor: {}",
+                boolean_value_text(context.stage_state.floor_enabled)
+            ),
+            Self::StageBackdropEnabled => format!(
+                "Stage backdrop: {}",
+                boolean_value_text(context.stage_state.backdrop_enabled)
+            ),
             Self::ChildScaleRatio => {
                 format!("Child scale ratio: {:.2}", self.value(context))
             }
@@ -834,7 +925,7 @@ pub(crate) enum EffectTunerParameter {
 }
 
 impl EffectTunerParameter {
-    const ALL: [Self; 52] = [
+    const ALL: [Self; 55] = [
         Self::Effect(EffectNumericParameter::WavefolderGain),
         Self::Effect(EffectNumericParameter::WavefolderModulus),
         Self::Effect(EffectNumericParameter::LensStrength),
@@ -866,6 +957,9 @@ impl EffectTunerParameter {
         Self::Scene(EffectTunerSceneParameter::ChildTwistPerVertexRadians),
         Self::Scene(EffectTunerSceneParameter::ChildOutwardOffsetRatio),
         Self::Scene(EffectTunerSceneParameter::ChildSpawnExclusionProbability),
+        Self::Scene(EffectTunerSceneParameter::StageEnabled),
+        Self::Scene(EffectTunerSceneParameter::StageFloorEnabled),
+        Self::Scene(EffectTunerSceneParameter::StageBackdropEnabled),
         Self::Scene(EffectTunerSceneParameter::GlobalOpacity),
         Self::Scene(EffectTunerSceneParameter::MaterialHueStepPerLevel),
         Self::Scene(EffectTunerSceneParameter::MaterialSaturation),
@@ -1620,6 +1714,10 @@ fn cycle_spawn_add_mode(current: SpawnAddMode, direction: isize) -> SpawnAddMode
     cycle_from_all(&ALL, current, direction)
 }
 
+fn cycle_bool(current: bool, direction: f32) -> bool {
+    cycle_from_all(&[false, true], current, direction as isize)
+}
+
 fn cycle_material_surface_mode(
     current: MaterialSurfaceMode,
     direction: isize,
@@ -1651,6 +1749,10 @@ fn polyhedron_kind_value_text(kind: PolyhedronKind) -> &'static str {
         PolyhedronKind::Octahedron => "octahedron",
         PolyhedronKind::Dodecahedron => "dodecahedron",
     }
+}
+
+fn boolean_value_text(enabled: bool) -> &'static str {
+    if enabled { "on" } else { "off" }
 }
 
 fn material_surface_mode_value_text(mode: MaterialSurfaceMode) -> &'static str {
@@ -1689,10 +1791,11 @@ fn effect_parameter_index(parameter: EffectNumericParameter) -> Option<usize> {
 mod tests {
     use crate::config::{
         EffectGroup, EffectsConfig, GenerationConfig, MaterialConfig, MaterialSurfaceMode,
+        StageConfig,
     };
     use crate::effect_tuner::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LfoShape};
     use crate::effect_tuner::metadata::{EffectEditMode, EffectOverlayField};
-    use crate::scene::{GenerationState, MaterialState};
+    use crate::scene::{GenerationState, MaterialState, StageState};
 
     use super::{
         EffectTunerEditContext, EffectTunerParameter, EffectTunerSceneParameter, EffectTunerState,
@@ -1704,16 +1807,22 @@ mod tests {
         GenerationState,
         MaterialConfig,
         MaterialState,
+        StageConfig,
+        StageState,
     ) {
         let generation_config = GenerationConfig::default();
         let generation_state = GenerationState::from_config(&generation_config);
         let material_config = MaterialConfig::default();
         let material_state = MaterialState::from_config(&material_config);
+        let stage_config = StageConfig::default();
+        let stage_state = StageState::from_config(&stage_config);
         (
             generation_config,
             generation_state,
             material_config,
             material_state,
+            stage_config,
+            stage_state,
         )
     }
 
@@ -1722,12 +1831,15 @@ mod tests {
         generation_state: &'a GenerationState,
         material_config: &'a MaterialConfig,
         material_state: &'a MaterialState,
+        _stage_config: &'a StageConfig,
+        stage_state: &'a StageState,
     ) -> EffectTunerViewContext<'a> {
         EffectTunerViewContext {
             generation_config,
             generation_state,
             material_config,
             material_state,
+            stage_state,
         }
     }
 
@@ -1736,12 +1848,16 @@ mod tests {
         generation_state: &'a mut GenerationState,
         material_config: &'a MaterialConfig,
         material_state: &'a mut MaterialState,
+        stage_config: &'a StageConfig,
+        stage_state: &'a mut StageState,
     ) -> EffectTunerEditContext<'a> {
         EffectTunerEditContext {
             generation_config,
             generation_state,
             material_config,
             material_state,
+            stage_config,
+            stage_state,
         }
     }
 
@@ -1793,8 +1909,14 @@ mod tests {
     #[test]
     fn overlay_snapshot_uses_compact_labels_and_active_field() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        let (generation_config, generation_state, material_config, material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            generation_state,
+            material_config,
+            material_state,
+            stage_config,
+            stage_state,
+        ) = default_scene_state();
         effect_tuner.selected_index = 3;
         effect_tuner.edit_mode = EffectEditMode::LfoShape;
         effect_tuner.pinned = true;
@@ -1805,6 +1927,8 @@ mod tests {
                 &generation_state,
                 &material_config,
                 &material_state,
+                &stage_config,
+                &stage_state,
             ),
             0.0,
         );
@@ -1818,8 +1942,14 @@ mod tests {
     #[test]
     fn reset_selected_restores_lfo_frequency_default() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        let (generation_config, mut generation_state, material_config, mut material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            stage_config,
+            mut stage_state,
+        ) = default_scene_state();
         effect_tuner.selected_index = 16;
         effect_tuner.edit_mode = EffectEditMode::LfoFrequency;
         effect_tuner.selected_lfo_mut().frequency_hz = 3.0;
@@ -1830,6 +1960,8 @@ mod tests {
                 &mut generation_state,
                 &material_config,
                 &mut material_state,
+                &stage_config,
+                &mut stage_state,
             ),
             1.0,
         );
@@ -1843,8 +1975,14 @@ mod tests {
     #[test]
     fn reset_all_restores_effect_enable_defaults_and_disables_lfos() {
         let mut defaults = EffectsConfig::default();
-        let (generation_config, mut generation_state, material_config, mut material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            stage_config,
+            mut stage_state,
+        ) = default_scene_state();
         defaults.edge_detection.enabled = true;
         let mut effect_tuner = EffectTunerState::from_config(&defaults);
         effect_tuner.current.edge_detection.enabled = false;
@@ -1858,6 +1996,8 @@ mod tests {
                 &mut generation_state,
                 &material_config,
                 &mut material_state,
+                &stage_config,
+                &mut stage_state,
             ),
             1.0,
         );
@@ -1892,8 +2032,14 @@ mod tests {
     #[test]
     fn numeric_entry_updates_selected_value() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        let (generation_config, mut generation_state, material_config, mut material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            stage_config,
+            mut stage_state,
+        ) = default_scene_state();
 
         for character in ['0', '.', '1', '5', '7'] {
             assert!(effect_tuner.append_numeric_input(
@@ -1903,6 +2049,8 @@ mod tests {
                     &mut generation_state,
                     &material_config,
                     &mut material_state,
+                    &stage_config,
+                    &mut stage_state,
                 ),
                 1.0,
             ));
@@ -1914,6 +2062,8 @@ mod tests {
                 &generation_state,
                 &material_config,
                 &material_state,
+                &stage_config,
+                &stage_state,
             ),
             1.0,
         );
@@ -1924,8 +2074,14 @@ mod tests {
     #[test]
     fn numeric_entry_updates_lfo_frequency_and_backspace_reparses() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        let (generation_config, mut generation_state, material_config, mut material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            stage_config,
+            mut stage_state,
+        ) = default_scene_state();
         effect_tuner.edit_mode = EffectEditMode::LfoFrequency;
 
         for character in ['0', '.', '1', '5', '7'] {
@@ -1936,6 +2092,8 @@ mod tests {
                     &mut generation_state,
                     &material_config,
                     &mut material_state,
+                    &stage_config,
+                    &mut stage_state,
                 ),
                 1.0,
             ));
@@ -1946,6 +2104,8 @@ mod tests {
                 &mut generation_state,
                 &material_config,
                 &mut material_state,
+                &stage_config,
+                &mut stage_state,
             ),
             1.2,
         ));
@@ -1956,6 +2116,8 @@ mod tests {
                 &generation_state,
                 &material_config,
                 &material_state,
+                &stage_config,
+                &stage_state,
             ),
             1.2,
         );
@@ -1966,8 +2128,14 @@ mod tests {
     #[test]
     fn switching_field_clears_numeric_entry_highlight_text() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        let (generation_config, mut generation_state, material_config, mut material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            stage_config,
+            mut stage_state,
+        ) = default_scene_state();
         assert!(effect_tuner.append_numeric_input(
             '0',
             &mut edit_context(
@@ -1975,6 +2143,8 @@ mod tests {
                 &mut generation_state,
                 &material_config,
                 &mut material_state,
+                &stage_config,
+                &mut stage_state,
             ),
             1.0,
         ));
@@ -1986,6 +2156,8 @@ mod tests {
             &generation_state,
             &material_config,
             &material_state,
+            &stage_config,
+            &stage_state,
         );
         let snapshot = effect_tuner.overlay_snapshot(&view, 1.1);
         assert_eq!(snapshot.active_field, EffectOverlayField::LfoAmplitude);
@@ -2000,8 +2172,14 @@ mod tests {
     #[test]
     fn selecting_another_parameter_clears_numeric_entry() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        let (generation_config, mut generation_state, material_config, mut material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            stage_config,
+            mut stage_state,
+        ) = default_scene_state();
         assert!(effect_tuner.append_numeric_input(
             '0',
             &mut edit_context(
@@ -2009,6 +2187,8 @@ mod tests {
                 &mut generation_state,
                 &material_config,
                 &mut material_state,
+                &stage_config,
+                &mut stage_state,
             ),
             1.0,
         ));
@@ -2029,6 +2209,8 @@ mod tests {
             &generation_state,
             &material_config,
             &material_state,
+            &stage_config,
+            &stage_state,
         );
         let snapshot = effect_tuner.overlay_snapshot(&view, 1.1);
         assert_eq!(snapshot.parameter_label, "mod");
@@ -2043,8 +2225,14 @@ mod tests {
     #[test]
     fn shape_field_ignores_numeric_entry() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        let (generation_config, mut generation_state, material_config, mut material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            stage_config,
+            mut stage_state,
+        ) = default_scene_state();
         effect_tuner.edit_mode = EffectEditMode::LfoShape;
 
         assert!(!effect_tuner.append_numeric_input(
@@ -2054,6 +2242,8 @@ mod tests {
                 &mut generation_state,
                 &material_config,
                 &mut material_state,
+                &stage_config,
+                &mut stage_state,
             ),
             1.0,
         ));
@@ -2063,8 +2253,14 @@ mod tests {
     #[test]
     fn scene_parameters_only_expose_the_value_field() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        let (generation_config, generation_state, material_config, material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            generation_state,
+            material_config,
+            material_state,
+            stage_config,
+            stage_state,
+        ) = default_scene_state();
         select_parameter(
             &mut effect_tuner,
             EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildKind),
@@ -2077,6 +2273,8 @@ mod tests {
                 &generation_state,
                 &material_config,
                 &material_state,
+                &stage_config,
+                &stage_state,
             ),
             0.0,
         );
@@ -2091,8 +2289,14 @@ mod tests {
     #[test]
     fn reset_all_restores_scene_defaults() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        let (generation_config, mut generation_state, material_config, mut material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            stage_config,
+            mut stage_state,
+        ) = default_scene_state();
         generation_state.selected_kind = crate::polyhedra::PolyhedronKind::Cube;
         generation_state.spawn_placement_mode = crate::polyhedra::SpawnPlacementMode::Face;
         generation_state.spawn_add_mode = crate::polyhedra::SpawnAddMode::FillLevel;
@@ -2107,6 +2311,8 @@ mod tests {
         material_state.opacity = 0.25;
         material_state.saturation = 0.12;
         material_state.surface_mode = MaterialSurfaceMode::Procedural;
+        stage_state.enabled = true;
+        stage_state.floor_enabled = true;
 
         effect_tuner.reset_all(
             &mut edit_context(
@@ -2114,6 +2320,8 @@ mod tests {
                 &mut generation_state,
                 &material_config,
                 &mut material_state,
+                &stage_config,
+                &mut stage_state,
             ),
             1.0,
         );
@@ -2125,6 +2333,8 @@ mod tests {
                 &generation_state,
                 &material_config,
                 &material_state,
+                &stage_config,
+                &stage_state,
             ))
         );
         assert_eq!(
@@ -2145,13 +2355,21 @@ mod tests {
         );
         assert_eq!(material_state.saturation, material_config.saturation);
         assert_eq!(material_state.surface_mode, material_config.surface_mode);
+        assert_eq!(stage_state.enabled, stage_config.enabled);
+        assert_eq!(stage_state.floor_enabled, stage_config.floor.enabled);
     }
 
     #[test]
     fn enum_scene_parameter_cycles_with_adjustment() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        let (generation_config, mut generation_state, material_config, mut material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            stage_config,
+            mut stage_state,
+        ) = default_scene_state();
         select_parameter(
             &mut effect_tuner,
             EffectTunerParameter::Scene(EffectTunerSceneParameter::SpawnAddMode),
@@ -2174,6 +2392,8 @@ mod tests {
                 &mut generation_state,
                 &material_config,
                 &mut material_state,
+                &stage_config,
+                &mut stage_state,
             ),
             1.0,
         ));
@@ -2187,8 +2407,14 @@ mod tests {
     #[test]
     fn enum_scene_parameter_ignores_numeric_entry() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        let (generation_config, mut generation_state, material_config, mut material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            stage_config,
+            mut stage_state,
+        ) = default_scene_state();
         select_parameter(
             &mut effect_tuner,
             EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildKind),
@@ -2202,6 +2428,8 @@ mod tests {
                 &mut generation_state,
                 &material_config,
                 &mut material_state,
+                &stage_config,
+                &mut stage_state,
             ),
             1.0,
         ));
@@ -2211,8 +2439,14 @@ mod tests {
     #[test]
     fn material_numeric_parameter_updates_runtime_state() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        let (generation_config, mut generation_state, material_config, mut material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            stage_config,
+            mut stage_state,
+        ) = default_scene_state();
         select_parameter(
             &mut effect_tuner,
             EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialMetallic),
@@ -2225,6 +2459,8 @@ mod tests {
                 &mut generation_state,
                 &material_config,
                 &mut material_state,
+                &stage_config,
+                &mut stage_state,
             ),
             1.0,
         ));
@@ -2235,8 +2471,14 @@ mod tests {
     #[test]
     fn material_enum_parameter_cycles_with_adjustment() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        let (generation_config, mut generation_state, material_config, mut material_state) =
-            default_scene_state();
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            stage_config,
+            mut stage_state,
+        ) = default_scene_state();
         select_parameter(
             &mut effect_tuner,
             EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialSurfaceMode),
@@ -2259,10 +2501,54 @@ mod tests {
                 &mut generation_state,
                 &material_config,
                 &mut material_state,
+                &stage_config,
+                &mut stage_state,
             ),
             1.0,
         ));
 
         assert_eq!(material_state.surface_mode, MaterialSurfaceMode::Procedural);
+    }
+
+    #[test]
+    fn stage_enum_parameter_cycles_with_adjustment() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            stage_config,
+            mut stage_state,
+        ) = default_scene_state();
+        select_parameter(
+            &mut effect_tuner,
+            EffectTunerParameter::Scene(EffectTunerSceneParameter::StageEnabled),
+        );
+
+        assert!(effect_tuner.step_adjustment(
+            1.0,
+            HoldInput {
+                just_pressed: true,
+                pressed: true,
+                just_released: false,
+                delta_secs: 0.0,
+            },
+            crate::effect_tuner::state::AdjustmentModifiers {
+                shift_pressed: false,
+                alt_pressed: false,
+            },
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+                &stage_config,
+                &mut stage_state,
+            ),
+            1.0,
+        ));
+
+        assert!(stage_state.enabled);
     }
 }
