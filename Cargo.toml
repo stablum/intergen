@@ -1,6 +1,6 @@
 [package]
 name = "intergen"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 authors = ["Francesco Stablum"]
 license = "GPL-3.0-or-later"
@@ -36,5 +36,4 @@ debug = false
 [profile.dev.package.bevy_dylib]
 opt-level = 0
 debug = false
-
 
