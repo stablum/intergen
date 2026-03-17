@@ -22,6 +22,7 @@ const KEYBOARD_HELP_KEY_WIDTH: f32 = 44.0;
 const KEYBOARD_HELP_KEY_HEIGHT: f32 = 42.0;
 const KEYBOARD_HELP_KEY_GAP: f32 = 6.0;
 const KEYBOARD_HELP_KEY_BORDER: f32 = 1.5;
+const KEYBOARD_HELP_PANEL_MAX_WIDTH: f32 = 980.0;
 
 #[derive(Clone, Copy)]
 struct KeyboardHelpKeySpec {
@@ -31,7 +32,7 @@ struct KeyboardHelpKeySpec {
     message: &'static str,
 }
 
-const KEYBOARD_FUNCTION_ROW: [KeyboardHelpKeySpec; 6] = [
+const KEYBOARD_FUNCTION_ROW: [KeyboardHelpKeySpec; 13] = [
     keyboard_help_key("Esc", 1.2, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("F1", 1.0, true, "Cycle the help overlay views."),
     keyboard_help_key("F2", 1.0, true, "Toggle the live control page."),
@@ -42,6 +43,13 @@ const KEYBOARD_FUNCTION_ROW: [KeyboardHelpKeySpec; 6] = [
         true,
         "Export the current scene as a Blender .blend.",
     ),
+    keyboard_help_key("F5", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
+    keyboard_help_key("F6", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
+    keyboard_help_key("F7", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
+    keyboard_help_key("F8", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
+    keyboard_help_key("F9", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
+    keyboard_help_key("F10", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
+    keyboard_help_key("F11", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("F12", 1.2, true, "Save a screenshot."),
 ];
 
@@ -75,10 +83,10 @@ const KEYBOARD_TOP_LETTER_ROW: [KeyboardHelpKeySpec; 14] = [
     keyboard_help_key("P", 1.0, true, "Increase global opacity."),
     keyboard_help_key("[", 1.0, true, "Decrease the child twist angle."),
     keyboard_help_key("]", 1.0, true, "Increase the child twist angle."),
-    keyboard_help_key("Enter", 1.8, false, KEYBOARD_HELP_UNUSED_TEXT),
+    keyboard_help_key("\\", 1.5, false, KEYBOARD_HELP_UNUSED_TEXT),
 ];
 
-const KEYBOARD_HOME_ROW: [KeyboardHelpKeySpec; 12] = [
+const KEYBOARD_HOME_ROW: [KeyboardHelpKeySpec; 13] = [
     keyboard_help_key("Caps", 1.8, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("A", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("S", 1.0, true, "Zoom out."),
@@ -91,6 +99,7 @@ const KEYBOARD_HOME_ROW: [KeyboardHelpKeySpec; 12] = [
     keyboard_help_key("L", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key(";", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("'", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
+    keyboard_help_key("Enter", 2.4, false, KEYBOARD_HELP_UNUSED_TEXT),
 ];
 
 const KEYBOARD_BOTTOM_LETTER_ROW: [KeyboardHelpKeySpec; 12] = [
@@ -542,6 +551,20 @@ fn keyboard_help_key_width(width_units: f32) -> f32 {
     KEYBOARD_HELP_KEY_WIDTH * width_units + KEYBOARD_HELP_KEY_GAP * (width_units - 1.0).max(0.0)
 }
 
+fn keyboard_help_row_width(row: &[KeyboardHelpKeySpec]) -> f32 {
+    row.iter()
+        .map(|spec| keyboard_help_key_width(spec.width_units))
+        .sum::<f32>()
+        + KEYBOARD_HELP_KEY_GAP * row.len().saturating_sub(1) as f32
+}
+
+fn keyboard_help_block_width() -> f32 {
+    KEYBOARD_HELP_ROWS
+        .iter()
+        .map(|row| keyboard_help_row_width(row))
+        .fold(0.0, f32::max)
+}
+
 fn keyboard_help_outline_color() -> Color {
     Color::srgba(1.0, 1.0, 1.0, 0.92)
 }
@@ -551,7 +574,7 @@ fn keyboard_help_active_text_color() -> Color {
 }
 
 fn keyboard_help_inactive_text_color() -> Color {
-    Color::srgb(0.58, 0.58, 0.58)
+    Color::srgb(0.32, 0.32, 0.32)
 }
 
 fn spawn_effect_tuner_label(
@@ -700,6 +723,7 @@ fn spawn_keyboard_help_overlay(
     let title_color = keyboard_help_active_text_color();
     let outline_color = keyboard_help_outline_color();
     let keyboard_font_size = (ui_config.body_font_size - 1.0).max(14.0);
+    let keyboard_block_width = keyboard_help_block_width();
 
     commands
         .spawn((
@@ -724,7 +748,7 @@ fn spawn_keyboard_help_overlay(
                 .spawn((
                     Node {
                         width: percent(100),
-                        max_width: px((ui_config.panel_max_width + 200.0).max(940.0)),
+                        max_width: px(KEYBOARD_HELP_PANEL_MAX_WIDTH.max(ui_config.panel_max_width)),
                         flex_direction: FlexDirection::Column,
                         align_items: AlignItems::Center,
                         row_gap: px(18.0),
@@ -732,7 +756,7 @@ fn spawn_keyboard_help_overlay(
                         border: UiRect::all(px(KEYBOARD_HELP_KEY_BORDER)),
                         ..default()
                     },
-                    BackgroundColor(srgba(ui_config.panel_background)),
+                    BackgroundColor(Color::NONE),
                     BorderColor::all(outline_color),
                     BorderRadius::all(px(ui_config.panel_radius)),
                 ))
@@ -754,9 +778,9 @@ fn spawn_keyboard_help_overlay(
                     ));
                     panel
                         .spawn(Node {
-                            width: percent(100),
+                            width: px(keyboard_block_width),
                             flex_direction: FlexDirection::Column,
-                            align_items: AlignItems::Center,
+                            align_items: AlignItems::FlexStart,
                             row_gap: px(KEYBOARD_HELP_KEY_GAP),
                             ..default()
                         })
@@ -764,8 +788,9 @@ fn spawn_keyboard_help_overlay(
                             for row in KEYBOARD_HELP_ROWS {
                                 keyboard
                                     .spawn(Node {
+                                        width: percent(100),
                                         flex_direction: FlexDirection::Row,
-                                        justify_content: JustifyContent::Center,
+                                        justify_content: JustifyContent::FlexStart,
                                         align_items: AlignItems::Center,
                                         column_gap: px(KEYBOARD_HELP_KEY_GAP),
                                         ..default()
@@ -793,7 +818,7 @@ fn spawn_keyboard_help_overlay(
                                 border: UiRect::all(px(KEYBOARD_HELP_KEY_BORDER)),
                                 ..default()
                             },
-                            BackgroundColor(Color::srgba(1.0, 1.0, 1.0, 0.06)),
+                            BackgroundColor(Color::NONE),
                             BorderColor::all(outline_color),
                             BorderRadius::all(px(12.0)),
                         ))
@@ -1191,8 +1216,9 @@ pub(crate) fn font_status_line(font_source: UiFontSource) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        HelpOverlayMode, KEYBOARD_HELP_ROWS, UiFontSource, control_page_bottom,
-        control_page_secondary_bottom, controls_overlay_text, effect_tuner_parameter_label_chars,
+        HelpOverlayMode, KEYBOARD_HELP_ROWS, KEYBOARD_HOME_ROW, KEYBOARD_TOP_LETTER_ROW,
+        UiFontSource, control_page_bottom, control_page_secondary_bottom,
+        controls_overlay_text, effect_tuner_parameter_label_chars,
         effect_tuner_shape_label_chars, font_status_line,
     };
 
@@ -1251,6 +1277,18 @@ mod tests {
 
         assert!(specs.iter().any(|spec| spec.label == "F1" && spec.used));
         assert!(specs.iter().any(|spec| spec.label == "A" && !spec.used));
+        assert!(specs.iter().any(|spec| spec.label == "F11" && !spec.used));
+        assert!(
+            KEYBOARD_TOP_LETTER_ROW
+                .iter()
+                .any(|spec| spec.label == "\\")
+        );
+        assert!(
+            !KEYBOARD_TOP_LETTER_ROW
+                .iter()
+                .any(|spec| spec.label == "Enter")
+        );
+        assert!(KEYBOARD_HOME_ROW.iter().any(|spec| spec.label == "Enter"));
     }
 
     #[test]
