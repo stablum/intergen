@@ -16,7 +16,6 @@ const EFFECT_TUNER_MIN_TEXT_WIDTH: f32 = 28.0;
 const EFFECT_TUNER_FIELD_PADDING_X: f32 = 10.0;
 const EFFECT_TUNER_FIELD_PADDING_Y: f32 = 4.0;
 const EFFECT_TUNER_NUMERIC_SLOT_CHARS: usize = 18;
-const KEYBOARD_HELP_HINT_TEXT: &str = "Hover a key to see its neutral-mode function. White labels are active; gray labels are unused.";
 const KEYBOARD_HELP_UNUSED_TEXT: &str = "Unused in neutral mode.";
 const KEYBOARD_HELP_KEY_WIDTH: f32 = 44.0;
 const KEYBOARD_HELP_KEY_HEIGHT: f32 = 42.0;
@@ -316,7 +315,7 @@ pub(crate) fn update_keyboard_help_overlay_system(
         }
     }
 
-    *tooltip_text = Text::new(hovered_message.unwrap_or(KEYBOARD_HELP_HINT_TEXT));
+    *tooltip_text = Text::new(hovered_message.unwrap_or(""));
 }
 
 pub(crate) fn update_effect_tuner_overlay_system(
@@ -721,7 +720,6 @@ fn spawn_keyboard_help_overlay(
     ui_config: &UiConfig,
 ) {
     let title_color = keyboard_help_active_text_color();
-    let outline_color = keyboard_help_outline_color();
     let keyboard_font_size = (ui_config.body_font_size - 1.0).max(14.0);
     let keyboard_block_width = keyboard_help_block_width();
 
@@ -753,11 +751,9 @@ fn spawn_keyboard_help_overlay(
                         align_items: AlignItems::Center,
                         row_gap: px(18.0),
                         padding: UiRect::all(px(ui_config.panel_padding)),
-                        border: UiRect::all(px(KEYBOARD_HELP_KEY_BORDER)),
                         ..default()
                     },
                     BackgroundColor(Color::NONE),
-                    BorderColor::all(outline_color),
                     BorderRadius::all(px(ui_config.panel_radius)),
                 ))
                 .with_children(|panel| {
@@ -815,16 +811,14 @@ fn spawn_keyboard_help_overlay(
                                 padding: UiRect::all(px(ui_config.hint_padding_x)),
                                 justify_content: JustifyContent::Center,
                                 align_items: AlignItems::Center,
-                                border: UiRect::all(px(KEYBOARD_HELP_KEY_BORDER)),
                                 ..default()
                             },
                             BackgroundColor(Color::NONE),
-                            BorderColor::all(outline_color),
                             BorderRadius::all(px(12.0)),
                         ))
                         .with_children(|tooltip| {
                             tooltip.spawn((
-                                Text::new(KEYBOARD_HELP_HINT_TEXT),
+                                Text::new(""),
                                 ui_theme.text_font(ui_config.body_font_size),
                                 TextColor(srgb(ui_config.body_text)),
                                 TextLayout::new_with_justify(Justify::Center),
