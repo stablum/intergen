@@ -183,6 +183,20 @@ pub(crate) struct GenerationState {
 
 #[cfg_attr(not(test), allow(dead_code))]
 impl GenerationState {
+    pub(crate) fn from_config(generation_config: &GenerationConfig) -> Self {
+        let shape_catalog = ShapeCatalog::new();
+        let root = root_generation_node(&shape_catalog, generation_config);
+
+        Self {
+            nodes: vec![root],
+            selected_kind: generation_config.default_child_kind,
+            spawn_placement_mode: generation_config.default_spawn_placement_mode,
+            spawn_add_mode: SpawnAddMode::default(),
+            parameters: GenerationParameters::from_config(generation_config),
+            spawn_hold: HoldRepeatState::default(),
+        }
+    }
+
     pub(crate) fn parameter(&self, parameter: GenerationParameter) -> &ScalarParameterState {
         self.parameters.parameter(parameter)
     }

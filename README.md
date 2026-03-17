@@ -24,7 +24,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - selectable child shape type
 - adjustable child scale ratio
 - toggleable in-app keybinding overlay
-- compact bottom FX strip for effect toggles, per-parameter LFOs, and numeric effect parameters
+- compact bottom live-control strip for shader FX toggles/LFOs plus scene and material runtime parameters
 - built-in screenshot capture for manual and scripted verification
 - Blender `.blend` export with compositor reconstruction and embedded effect/LFO metadata
 - containment rejection so obviously hidden fully-inside spawns are skipped
@@ -132,14 +132,14 @@ Camera-output edge detection uses these `effects.edge_detection` settings:
 - `mix`: blends the edge color over the processed image
 - `color`: RGB edge overlay color
 
-The in-app FX tuner starts from the values loaded from `config.toml` at launch.
+The in-app F2 control page starts from the values loaded from `config.toml` at launch.
 - Live edits affect the running app only.
 - `Tab` toggles the selected effect on or off.
 - `L` toggles the selected parameter LFO on or off.
 - `M` cycles the tuner edit target between parameter value, LFO amplitude, LFO frequency, and LFO shape.
 - LFO shapes currently available are `sine`, `triangle`, `saw`, `square`, `stepped random`, and `brownian motion`.
-- `Enter` resets the selected FX field.
-- `Shift + Enter` resets all FX settings and LFOs to their startup defaults.
+- `Enter` resets the selected F2 field.
+- `Shift + Enter` resets all F2 controls to their startup defaults.
 - The tuner does not write changes back to `config.toml` automatically.
 
 Live opacity controls use these `materials` settings:
@@ -231,16 +231,16 @@ cargo test-plain
 - `W` / `S`: zoom in / out
 - `Backspace`: stop camera rotation momentum
 - `F1` or `H`: toggle the keybinding overlay
-- `F2`: pin or unpin the bottom FX strip
-- `Ctrl + Up` / `Ctrl + Down`: select the active FX parameter
-- `Ctrl + Left` / `Ctrl + Right`: adjust the active FX field, with hold-to-repeat
+- `F2`: pin or unpin the bottom live-control strip
+- `Ctrl + Up` / `Ctrl + Down`: select the active F2 control
+- `Ctrl + Left` / `Ctrl + Right`: adjust the active F2 field, with hold-to-repeat
 - `Tab`: toggle the selected effect on or off
 - `L`: toggle the selected parameter LFO on or off
-- `M`: cycle FX tuner edit mode between value, LFO amplitude, LFO frequency, and LFO shape, including the new random drift shapes
-- `Shift`: coarse FX adjustment modifier
-- `Alt`: fine FX adjustment modifier
-- `Enter`: reset the active FX field
-- `Shift + Enter`: reset all FX settings and LFOs to their startup defaults
+- `M`: cycle F2 tuner edit mode between value, LFO amplitude, LFO frequency, and LFO shape, including the new random drift shapes
+- `Shift`: coarse F2 adjustment modifier
+- `Alt`: fine F2 adjustment modifier
+- `Enter`: reset the active F2 field
+- `Shift + Enter`: reset all F2 controls to their startup defaults
 - `F4`: export the current scene to `blend-exports/` as a Blender `.blend`
 - `F12`: save a screenshot to `screenshots/`
 - `R`: reset the scene with the currently selected polyhedron as the new root
@@ -294,4 +294,3 @@ Not implemented yet:
 Copyright (C) 2026 Francesco Stablum.
 
 See [LICENSE](LICENSE) for the project notice and [COPYING](COPYING) for the full GNU General Public License text.
-

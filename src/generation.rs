@@ -285,7 +285,7 @@ fn handle_generation_parameter_input(
     transform_changed
 }
 
-fn recompute_generation_tree(scene: &mut GenerationSceneAccess<'_, '_>) {
+pub(crate) fn recompute_generation_tree(scene: &mut GenerationSceneAccess<'_, '_>) {
     let twist_per_vertex_radians = scene
         .generation_state
         .twist_per_vertex_radians(&scene.app_config.generation);
@@ -428,7 +428,7 @@ fn adjust_clamped_value(current: f32, delta: f32, min: f32, max: f32) -> f32 {
     (current + delta).clamp(min, max)
 }
 
-fn apply_global_opacity(
+pub(crate) fn apply_global_opacity(
     opacity: f32,
     materials: &mut Assets<StandardMaterial>,
     polyhedron_materials: &Query<&MeshMaterial3d<StandardMaterial>, With<PolyhedronEntity>>,

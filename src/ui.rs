@@ -2,11 +2,14 @@ use std::path::Path;
 
 use bevy::{ecs::hierarchy::ChildSpawnerCommands, prelude::*};
 
-use crate::config::{AppConfig, EffectNumericParameter, UiConfig, srgb, srgba};
+use crate::config::{AppConfig, UiConfig, srgb, srgba};
 use crate::control_page::{ControlPage, ControlPageState};
-use crate::effect_tuner::{EffectOverlayField, EffectTunerState};
+use crate::effect_tuner::{
+    EffectOverlayField, EffectTunerParameter, EffectTunerState, EffectTunerViewContext,
+};
 use crate::help_text::overlay_controls_text as shared_overlay_controls_text;
 use crate::presets::PresetBrowserState;
+use crate::scene::{GenerationState, MaterialState};
 
 const EFFECT_TUNER_CHAR_WIDTH_FACTOR: f32 = 0.72;
 const EFFECT_TUNER_MIN_TEXT_WIDTH: f32 = 28.0;
@@ -109,6 +112,8 @@ pub(crate) fn update_effect_tuner_overlay_system(
     app_config: Res<AppConfig>,
     control_page: Res<ControlPageState>,
     effect_tuner: Res<EffectTunerState>,
+    generation_state: Res<GenerationState>,
+    material_state: Res<MaterialState>,
     mut overlay_query: Query<&mut Visibility, With<EffectTunerOverlay>>,
     mut pinned_badge_query: Query<
         &mut Visibility,
@@ -123,7 +128,15 @@ pub(crate) fn update_effect_tuner_overlay_system(
     mut field_query: Query<(&EffectTunerEditableField, &mut BackgroundColor)>,
 ) {
     let now_secs = time.elapsed_secs();
-    let snapshot = effect_tuner.overlay_snapshot(now_secs);
+    let snapshot = effect_tuner.overlay_snapshot(
+        &EffectTunerViewContext {
+            generation_config: &app_config.generation,
+            generation_state: &generation_state,
+            material_config: &app_config.materials,
+            material_state: &material_state,
+        },
+        now_secs,
+    );
     let ui_config = &app_config.ui;
 
     let Ok(mut overlay_visibility) = overlay_query.single_mut() else {
@@ -159,15 +172,11 @@ pub(crate) fn update_effect_tuner_overlay_system(
         let value = match text_kind {
             EffectTunerTextKind::Pin => "PIN".to_string(),
             EffectTunerTextKind::EffectLabel => snapshot.effect_label.to_string(),
-            EffectTunerTextKind::EffectState => {
-                if snapshot.effect_enabled { "ON" } else { "OFF" }.to_string()
-            }
+            EffectTunerTextKind::EffectState => snapshot.effect_state_text.to_string(),
             EffectTunerTextKind::ParameterLabel => snapshot.parameter_label.to_string(),
             EffectTunerTextKind::Value => snapshot.value_text.clone(),
             EffectTunerTextKind::LiveValue => snapshot.live_value_text.clone(),
-            EffectTunerTextKind::LfoState => {
-                if snapshot.lfo_enabled { "ON" } else { "OFF" }.to_string()
-            }
+            EffectTunerTextKind::LfoState => snapshot.lfo_state_text.to_string(),
             EffectTunerTextKind::Amplitude => snapshot.amplitude_text.clone(),
             EffectTunerTextKind::Frequency => snapshot.frequency_text.clone(),
             EffectTunerTextKind::Shape => snapshot.shape_text.to_string(),
@@ -187,14 +196,14 @@ pub(crate) fn update_effect_tuner_overlay_system(
                     srgb(ui_config.title_text)
                 }
                 EffectTunerTextKind::EffectState => {
-                    if snapshot.effect_enabled {
+                    if snapshot.effect_state_emphasized {
                         srgb(ui_config.title_text)
                     } else {
                         srgb(ui_config.body_text)
                     }
                 }
                 EffectTunerTextKind::LfoState => {
-                    if snapshot.lfo_enabled {
+                    if snapshot.lfo_state_emphasized {
                         srgb(ui_config.title_text)
                     } else {
                         srgb(ui_config.body_text)
@@ -271,15 +280,15 @@ fn effect_tuner_text_width(chars: usize, font_size: f32) -> f32 {
 }
 
 fn effect_tuner_effect_label_chars() -> usize {
-    ["wavefolder", "lens", "blur", "bloom", "edge"]
-        .into_iter()
-        .map(str::len)
+    EffectTunerParameter::all()
+        .iter()
+        .map(|parameter| parameter.group_label().chars().count())
         .max()
         .unwrap_or(1)
 }
 
 fn effect_tuner_parameter_label_chars() -> usize {
-    EffectNumericParameter::all()
+    EffectTunerParameter::all()
         .iter()
         .map(|parameter| parameter.short_label().chars().count())
         .max()
@@ -574,7 +583,7 @@ pub(crate) fn spawn_help_ui(
                         strip,
                         ui_theme,
                         strip_font_size,
-                        "FX",
+                        "CTL",
                         srgb(ui_config.body_text),
                     );
                     strip
@@ -802,20 +811,20 @@ mod tests {
         let text = controls_overlay_text(UiFontSource::CarbonPlus);
 
         assert!(text.contains("F1 / H: Toggle this overlay"));
-        assert!(text.contains("F2: Toggle the FX control page"));
+        assert!(text.contains("F2: Toggle the live control page"));
         assert!(text.contains("F3: Toggle the scene preset page"));
         assert!(text.contains("Esc: Close the current control page"));
         assert!(text.contains("F4: Export the current scene as a Blender .blend"));
-        assert!(text.contains("In FX page: Ctrl + Up / Down select parameter"));
+        assert!(text.contains("In F2 page: Ctrl + Up / Down select control"));
         assert!(
-            text.contains("In FX page: Left / Right or Tab / Shift+Tab switch the active field")
+            text.contains("In F2 page: Left / Right or Tab / Shift+Tab switch the active field")
         );
-        assert!(text.contains("In FX page: Up / Down adjust the active field"));
-        assert!(text.contains("In FX page: Space toggles the selected effect"));
-        assert!(text.contains("In FX page: L toggles the selected parameter LFO"));
-        assert!(text.contains("In FX page: Type digits / . / - / +"));
-        assert!(text.contains("In FX page: Backspace erases the typed numeric input"));
-        assert!(text.contains("Shift + Enter: Reset all FX settings and LFOs"));
+        assert!(text.contains("In F2 page: Up / Down adjust the active field"));
+        assert!(text.contains("In F2 page: Space toggles the selected shader effect"));
+        assert!(text.contains("In F2 page: L toggles the selected shader-effect parameter LFO"));
+        assert!(text.contains("In F2 page: Type digits / . / - / +"));
+        assert!(text.contains("In F2 page: Backspace erases the typed numeric input"));
+        assert!(text.contains("Shift + Enter: Reset all F2 controls"));
         assert!(text.contains(
             "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions"
         ));

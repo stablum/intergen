@@ -1,8 +1,11 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use crate::config::{EffectGroup, EffectNumericParameter, EffectsConfig};
-use crate::parameters::{HoldInput, HoldRepeatState};
+use crate::config::{
+    EffectGroup, EffectNumericParameter, EffectsConfig, GenerationConfig, MaterialConfig,
+};
+use crate::parameters::{GenerationParameter, HoldInput, HoldRepeatState};
+use crate::scene::{GenerationState, MaterialState, opacity_status_message};
 
 use super::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LFO_FREQUENCY_STEP_HZ, LfoShape, ParameterLfo};
 use super::metadata::{EffectEditMode, EffectOverlayField};
@@ -15,11 +18,13 @@ const REPEAT_INTERVAL_SECS: f32 = 0.08;
 pub(crate) struct EffectTunerOverlaySnapshot {
     pub(crate) pinned: bool,
     pub(crate) effect_label: &'static str,
-    pub(crate) effect_enabled: bool,
+    pub(crate) effect_state_text: &'static str,
+    pub(crate) effect_state_emphasized: bool,
     pub(crate) parameter_label: &'static str,
     pub(crate) value_text: String,
     pub(crate) live_value_text: String,
-    pub(crate) lfo_enabled: bool,
+    pub(crate) lfo_state_text: &'static str,
+    pub(crate) lfo_state_emphasized: bool,
     pub(crate) amplitude_text: String,
     pub(crate) frequency_text: String,
     pub(crate) shape_text: &'static str,
@@ -36,6 +41,325 @@ pub(crate) struct EffectRuntimeSnapshot {
 pub(crate) struct AdjustmentModifiers {
     pub(crate) shift_pressed: bool,
     pub(crate) alt_pressed: bool,
+}
+
+pub(crate) struct EffectTunerViewContext<'a> {
+    pub(crate) generation_config: &'a GenerationConfig,
+    pub(crate) generation_state: &'a GenerationState,
+    pub(crate) material_config: &'a MaterialConfig,
+    pub(crate) material_state: &'a MaterialState,
+}
+
+pub(crate) struct EffectTunerEditContext<'a> {
+    pub(crate) generation_config: &'a GenerationConfig,
+    pub(crate) generation_state: &'a mut GenerationState,
+    pub(crate) material_config: &'a MaterialConfig,
+    pub(crate) material_state: &'a mut MaterialState,
+}
+
+impl EffectTunerEditContext<'_> {
+    fn view(&self) -> EffectTunerViewContext<'_> {
+        EffectTunerViewContext {
+            generation_config: self.generation_config,
+            generation_state: &*self.generation_state,
+            material_config: self.material_config,
+            material_state: &*self.material_state,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum EffectTunerSceneParameter {
+    ChildScaleRatio,
+    ChildTwistPerVertexRadians,
+    ChildOutwardOffsetRatio,
+    ChildSpawnExclusionProbability,
+    GlobalOpacity,
+}
+
+impl EffectTunerSceneParameter {
+    fn label(self) -> &'static str {
+        match self {
+            Self::ChildScaleRatio => "generation.child_scale_ratio",
+            Self::ChildTwistPerVertexRadians => "generation.child_twist_per_vertex_radians",
+            Self::ChildOutwardOffsetRatio => "generation.child_outward_offset_ratio",
+            Self::ChildSpawnExclusionProbability => "generation.child_spawn_exclusion_probability",
+            Self::GlobalOpacity => "materials.opacity",
+        }
+    }
+
+    fn short_label(self) -> &'static str {
+        match self {
+            Self::ChildScaleRatio => "scale",
+            Self::ChildTwistPerVertexRadians => "twist",
+            Self::ChildOutwardOffsetRatio => "offset",
+            Self::ChildSpawnExclusionProbability => "spawn%",
+            Self::GlobalOpacity => "opacity",
+        }
+    }
+
+    pub(crate) fn group_label(self) -> &'static str {
+        match self {
+            Self::GlobalOpacity => "mat",
+            Self::ChildScaleRatio
+            | Self::ChildTwistPerVertexRadians
+            | Self::ChildOutwardOffsetRatio
+            | Self::ChildSpawnExclusionProbability => "scene",
+        }
+    }
+
+    fn generation_parameter(self) -> Option<GenerationParameter> {
+        match self {
+            Self::ChildScaleRatio => Some(GenerationParameter::ChildScaleRatio),
+            Self::ChildTwistPerVertexRadians => {
+                Some(GenerationParameter::ChildTwistPerVertexRadians)
+            }
+            Self::ChildOutwardOffsetRatio => Some(GenerationParameter::ChildOutwardOffsetRatio),
+            Self::ChildSpawnExclusionProbability => {
+                Some(GenerationParameter::ChildSpawnExclusionProbability)
+            }
+            Self::GlobalOpacity => None,
+        }
+    }
+
+    fn base_step(self, context: &EffectTunerViewContext<'_>) -> f32 {
+        match self.generation_parameter() {
+            Some(parameter) => context.generation_config.parameter_spec(parameter).step(),
+            None => context.material_config.opacity_adjust_step.abs(),
+        }
+    }
+
+    fn adjustment_step(
+        self,
+        context: &EffectTunerViewContext<'_>,
+        shift_pressed: bool,
+        alt_pressed: bool,
+    ) -> f32 {
+        let mut step = self.base_step(context);
+        if shift_pressed {
+            step *= 10.0;
+        }
+        if alt_pressed {
+            step *= 0.1;
+        }
+        step
+    }
+
+    fn value(self, context: &EffectTunerViewContext<'_>) -> f32 {
+        match self {
+            Self::ChildScaleRatio => context.generation_state.scale_ratio_base(),
+            Self::ChildTwistPerVertexRadians => {
+                context.generation_state.twist_per_vertex_radians_base()
+            }
+            Self::ChildOutwardOffsetRatio => context.generation_state.vertex_offset_ratio_base(),
+            Self::ChildSpawnExclusionProbability => {
+                context.generation_state.vertex_spawn_exclusion_probability_base()
+            }
+            Self::GlobalOpacity => context.material_state.opacity,
+        }
+    }
+
+    fn set_value(self, context: &mut EffectTunerEditContext<'_>, value: f32) -> f32 {
+        match self.generation_parameter() {
+            Some(parameter) => {
+                let spec = context.generation_config.parameter_spec(parameter);
+                let parameter_state = context.generation_state.parameter_mut(parameter);
+                let current = parameter_state.base_value();
+                parameter_state.adjust_clamped_base_value(value - current, spec)
+            }
+            None => {
+                let (min_opacity, max_opacity) = context.material_config.opacity_bounds();
+                context.material_state.opacity = value.clamp(min_opacity, max_opacity);
+                context.material_state.opacity
+            }
+        }
+    }
+
+    fn default_value(self, context: &EffectTunerViewContext<'_>) -> f32 {
+        match self.generation_parameter() {
+            Some(parameter) => context.generation_config.parameter_spec(parameter).default_value(),
+            None => context.material_config.default_opacity_clamped(),
+        }
+    }
+
+    fn display_value(self, context: &EffectTunerViewContext<'_>) -> String {
+        format!("{:.3}", self.value(context))
+    }
+
+    fn status_message(self, context: &EffectTunerViewContext<'_>) -> String {
+        match self {
+            Self::ChildScaleRatio => {
+                format!("Child scale ratio: {:.2}", self.value(context))
+            }
+            Self::ChildTwistPerVertexRadians => {
+                let radians = self.value(context);
+                format!(
+                    "Child twist angle: {:.3} rad ({:.1} deg)",
+                    radians,
+                    radians * 180.0 / std::f32::consts::PI
+                )
+            }
+            Self::ChildOutwardOffsetRatio => {
+                format!(
+                    "Child outward offset: {:.2}x child radius",
+                    self.value(context).max(0.0)
+                )
+            }
+            Self::ChildSpawnExclusionProbability => {
+                format!(
+                    "Global spawn exclusion probability: {:.0}%",
+                    self.value(context).clamp(0.0, 1.0) * 100.0
+                )
+            }
+            Self::GlobalOpacity => opacity_status_message(self.value(context)),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum EffectTunerParameter {
+    Effect(EffectNumericParameter),
+    Scene(EffectTunerSceneParameter),
+}
+
+impl EffectTunerParameter {
+    const ALL: [Self; 29] = [
+        Self::Effect(EffectNumericParameter::WavefolderGain),
+        Self::Effect(EffectNumericParameter::WavefolderModulus),
+        Self::Effect(EffectNumericParameter::LensStrength),
+        Self::Effect(EffectNumericParameter::LensRadialK2),
+        Self::Effect(EffectNumericParameter::LensRadialK3),
+        Self::Effect(EffectNumericParameter::LensCenterX),
+        Self::Effect(EffectNumericParameter::LensCenterY),
+        Self::Effect(EffectNumericParameter::LensScaleX),
+        Self::Effect(EffectNumericParameter::LensScaleY),
+        Self::Effect(EffectNumericParameter::LensTangentialX),
+        Self::Effect(EffectNumericParameter::LensTangentialY),
+        Self::Effect(EffectNumericParameter::LensZoom),
+        Self::Effect(EffectNumericParameter::LensChromaticAberration),
+        Self::Effect(EffectNumericParameter::GaussianBlurSigma),
+        Self::Effect(EffectNumericParameter::GaussianBlurRadius),
+        Self::Effect(EffectNumericParameter::BloomThreshold),
+        Self::Effect(EffectNumericParameter::BloomIntensity),
+        Self::Effect(EffectNumericParameter::BloomRadius),
+        Self::Effect(EffectNumericParameter::EdgeStrength),
+        Self::Effect(EffectNumericParameter::EdgeThreshold),
+        Self::Effect(EffectNumericParameter::EdgeMix),
+        Self::Effect(EffectNumericParameter::EdgeColorR),
+        Self::Effect(EffectNumericParameter::EdgeColorG),
+        Self::Effect(EffectNumericParameter::EdgeColorB),
+        Self::Scene(EffectTunerSceneParameter::ChildScaleRatio),
+        Self::Scene(EffectTunerSceneParameter::ChildTwistPerVertexRadians),
+        Self::Scene(EffectTunerSceneParameter::ChildOutwardOffsetRatio),
+        Self::Scene(EffectTunerSceneParameter::ChildSpawnExclusionProbability),
+        Self::Scene(EffectTunerSceneParameter::GlobalOpacity),
+    ];
+
+    pub(crate) fn all() -> &'static [Self] {
+        &Self::ALL
+    }
+
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Effect(parameter) => parameter.label(),
+            Self::Scene(parameter) => parameter.label(),
+        }
+    }
+
+    pub(crate) fn short_label(self) -> &'static str {
+        match self {
+            Self::Effect(parameter) => parameter.short_label(),
+            Self::Scene(parameter) => parameter.short_label(),
+        }
+    }
+
+    pub(crate) fn group_label(self) -> &'static str {
+        match self {
+            Self::Effect(parameter) => parameter.effect_group().compact_label(),
+            Self::Scene(parameter) => parameter.group_label(),
+        }
+    }
+
+    fn effect_group(self) -> Option<EffectGroup> {
+        match self {
+            Self::Effect(parameter) => Some(parameter.effect_group()),
+            Self::Scene(_) => None,
+        }
+    }
+
+    fn supports_lfo(self) -> bool {
+        matches!(self, Self::Effect(_))
+    }
+
+    fn adjustment_step(
+        self,
+        context: &EffectTunerViewContext<'_>,
+        shift_pressed: bool,
+        alt_pressed: bool,
+    ) -> f32 {
+        match self {
+            Self::Effect(parameter) => parameter.adjustment_step(shift_pressed, alt_pressed),
+            Self::Scene(parameter) => parameter.adjustment_step(context, shift_pressed, alt_pressed),
+        }
+    }
+
+    fn default_lfo_amplitude(self) -> f32 {
+        match self {
+            Self::Effect(parameter) => parameter.default_lfo_amplitude(),
+            Self::Scene(_) => 0.0,
+        }
+    }
+
+    fn value(self, effects: &EffectsConfig, context: &EffectTunerViewContext<'_>) -> f32 {
+        match self {
+            Self::Effect(parameter) => parameter.value(effects),
+            Self::Scene(parameter) => parameter.value(context),
+        }
+    }
+
+    fn set_value(
+        self,
+        effects: &mut EffectsConfig,
+        context: &mut EffectTunerEditContext<'_>,
+        value: f32,
+    ) -> f32 {
+        match self {
+            Self::Effect(parameter) => {
+                parameter.set_value(effects, value);
+                parameter.value(effects)
+            }
+            Self::Scene(parameter) => parameter.set_value(context, value),
+        }
+    }
+
+    fn default_value(
+        self,
+        effects: &EffectsConfig,
+        context: &EffectTunerViewContext<'_>,
+    ) -> f32 {
+        match self {
+            Self::Effect(parameter) => parameter.value(effects),
+            Self::Scene(parameter) => parameter.default_value(context),
+        }
+    }
+
+    fn display_value(self, effects: &EffectsConfig, context: &EffectTunerViewContext<'_>) -> String {
+        match self {
+            Self::Effect(parameter) => parameter.display_value(effects),
+            Self::Scene(parameter) => parameter.display_value(context),
+        }
+    }
+
+    fn status_message(self, effects: &EffectsConfig, context: &EffectTunerViewContext<'_>) -> String {
+        match self {
+            Self::Effect(parameter) => format!(
+                "{} = {}",
+                parameter.label(),
+                parameter.display_value(effects)
+            ),
+            Self::Scene(parameter) => parameter.status_message(context),
+        }
+    }
 }
 
 #[derive(Default, Clone)]
@@ -128,16 +452,16 @@ impl EffectTunerState {
         }
     }
 
-    pub(crate) fn selected_parameter(&self) -> EffectNumericParameter {
-        EffectNumericParameter::all()[self.selected_index]
+    pub(crate) fn selected_parameter(&self) -> EffectTunerParameter {
+        EffectTunerParameter::all()[self.selected_index]
     }
 
-    pub(crate) fn selected_effect(&self) -> EffectGroup {
+    pub(crate) fn selected_effect_group(&self) -> Option<EffectGroup> {
         self.selected_parameter().effect_group()
     }
 
     pub(crate) fn active_field(&self) -> EffectOverlayField {
-        self.edit_mode.overlay_field()
+        self.displayed_edit_mode().overlay_field()
     }
 
     pub(crate) fn is_visible(&self, now_secs: f32) -> bool {
@@ -187,38 +511,62 @@ impl EffectTunerState {
         effects
     }
 
-    pub(crate) fn overlay_snapshot(&self, now_secs: f32) -> EffectTunerOverlaySnapshot {
+    pub(crate) fn overlay_snapshot(
+        &self,
+        context: &EffectTunerViewContext<'_>,
+        now_secs: f32,
+    ) -> EffectTunerOverlaySnapshot {
         let parameter = self.selected_parameter();
-        let effect = self.selected_effect();
-        let lfo = self.selected_lfo();
         let live_effects = self.evaluated_effects(now_secs);
+        let (effect_state_text, effect_state_emphasized) = match parameter.effect_group() {
+            Some(effect) => {
+                let enabled = effect.is_enabled(&self.current);
+                (if enabled { "ON" } else { "OFF" }, enabled)
+            }
+            None => ("VAL", false),
+        };
+        let (lfo_state_text, lfo_state_emphasized, amplitude_text, frequency_text, shape_text) =
+            if parameter.supports_lfo() {
+                let lfo = self.selected_lfo();
+                (
+                    if lfo.enabled { "ON" } else { "OFF" },
+                    lfo.enabled,
+                    self.overlay_numeric_text(
+                        EffectOverlayField::LfoAmplitude,
+                        format!("{:.3}", lfo.amplitude),
+                    ),
+                    self.overlay_numeric_text(
+                        EffectOverlayField::LfoFrequency,
+                        format!("{:.3}", lfo.frequency_hz),
+                    ),
+                    lfo.shape.label(),
+                )
+            } else {
+                ("--", false, "--".to_string(), "--".to_string(), "--")
+            };
 
         EffectTunerOverlaySnapshot {
             pinned: self.pinned,
-            effect_label: effect.compact_label(),
-            effect_enabled: effect.is_enabled(&self.current),
+            effect_label: parameter.group_label(),
+            effect_state_text,
+            effect_state_emphasized,
             parameter_label: parameter.short_label(),
             value_text: self.overlay_numeric_text(
                 EffectOverlayField::Value,
-                parameter.display_value(&self.current),
+                parameter.display_value(&self.current, context),
             ),
-            live_value_text: parameter.display_value(&live_effects),
-            lfo_enabled: lfo.enabled,
-            amplitude_text: self.overlay_numeric_text(
-                EffectOverlayField::LfoAmplitude,
-                format!("{:.3}", lfo.amplitude),
-            ),
-            frequency_text: self.overlay_numeric_text(
-                EffectOverlayField::LfoFrequency,
-                format!("{:.3}", lfo.frequency_hz),
-            ),
-            shape_text: lfo.shape.label(),
+            live_value_text: parameter.display_value(&live_effects, context),
+            lfo_state_text,
+            lfo_state_emphasized,
+            amplitude_text,
+            frequency_text,
+            shape_text,
             active_field: self.active_field(),
         }
     }
 
     pub(crate) fn edit_mode_label(&self) -> &'static str {
-        self.edit_mode.label()
+        self.displayed_edit_mode().label()
     }
 
     pub(crate) fn open_page(&mut self, now_secs: f32) {
@@ -233,28 +581,41 @@ impl EffectTunerState {
         self.reset_hold_states();
     }
 
-    pub(crate) fn toggle_selected_effect(&mut self, now_secs: f32) -> bool {
+    pub(crate) fn toggle_selected_effect(&mut self, now_secs: f32) -> Option<bool> {
         self.clear_numeric_entry();
-        let effect = self.selected_effect();
+        let effect = self.selected_effect_group()?;
         let next_enabled = !effect.is_enabled(&self.current);
         effect.set_enabled(&mut self.current, next_enabled);
         self.note_interaction(now_secs);
-        next_enabled
+        Some(next_enabled)
     }
 
-    pub(crate) fn toggle_selected_lfo(&mut self, now_secs: f32) -> bool {
+    pub(crate) fn toggle_selected_lfo(&mut self, now_secs: f32) -> Option<bool> {
+        if !self.selected_parameter().supports_lfo() {
+            return None;
+        }
+
         self.clear_numeric_entry();
         let lfo = self.selected_lfo_mut();
         lfo.enabled = !lfo.enabled;
         let enabled = lfo.enabled;
         self.note_interaction(now_secs);
-        enabled
+        Some(enabled)
     }
 
-    pub(crate) fn step_edit_mode(&mut self, direction: isize, now_secs: f32) {
+    pub(crate) fn step_edit_mode(&mut self, direction: isize, now_secs: f32) -> bool {
         self.clear_numeric_entry();
-        self.edit_mode = self.edit_mode.step(direction);
+        let previous_mode = self.edit_mode;
+        let mut next_mode = self.edit_mode;
+        for _ in 0..4 {
+            next_mode = next_mode.step(direction);
+            if self.mode_supported_for_parameter(next_mode, self.selected_parameter()) {
+                break;
+            }
+        }
+        self.edit_mode = next_mode;
         self.note_interaction(now_secs);
+        self.edit_mode != previous_mode
     }
 
     pub(crate) fn step_selection(
@@ -282,6 +643,7 @@ impl EffectTunerState {
         direction: f32,
         input: HoldInput,
         modifiers: AdjustmentModifiers,
+        context: &mut EffectTunerEditContext<'_>,
         now_secs: f32,
     ) -> bool {
         let hold = if direction < 0.0 {
@@ -291,14 +653,19 @@ impl EffectTunerState {
         };
 
         if hold.update_with_input(input, HOLD_DELAY_SECS, REPEAT_INTERVAL_SECS) {
-            self.adjust_selected(direction, modifiers, now_secs);
+            self.adjust_selected(direction, modifiers, context, now_secs);
             true
         } else {
             false
         }
     }
 
-    pub(crate) fn append_numeric_input(&mut self, character: char, now_secs: f32) -> bool {
+    pub(crate) fn append_numeric_input(
+        &mut self,
+        character: char,
+        context: &mut EffectTunerEditContext<'_>,
+        now_secs: f32,
+    ) -> bool {
         if !self.active_field().accepts_numeric_entry() {
             return false;
         }
@@ -307,27 +674,36 @@ impl EffectTunerState {
             return false;
         }
 
-        self.apply_numeric_entry_to_selected();
+        self.apply_numeric_entry_to_selected(context);
         self.note_interaction(now_secs);
         true
     }
 
-    pub(crate) fn backspace_numeric_input(&mut self, now_secs: f32) -> bool {
+    pub(crate) fn backspace_numeric_input(
+        &mut self,
+        context: &mut EffectTunerEditContext<'_>,
+        now_secs: f32,
+    ) -> bool {
         if !self.numeric_entry.backspace() {
             return false;
         }
 
-        self.apply_numeric_entry_to_selected();
+        self.apply_numeric_entry_to_selected(context);
         self.note_interaction(now_secs);
         true
     }
 
-    pub(crate) fn reset_selected(&mut self, now_secs: f32) {
+    pub(crate) fn reset_selected(
+        &mut self,
+        context: &mut EffectTunerEditContext<'_>,
+        now_secs: f32,
+    ) {
         self.clear_numeric_entry();
         let parameter = self.selected_parameter();
-        match self.edit_mode {
+        match self.displayed_edit_mode() {
             EffectEditMode::Value => {
-                parameter.set_value(&mut self.current, parameter.value(&self.defaults));
+                let default_value = parameter.default_value(&self.defaults, &context.view());
+                let _ = parameter.set_value(&mut self.current, context, default_value);
             }
             EffectEditMode::LfoAmplitude => {
                 self.selected_lfo_mut().amplitude = parameter.default_lfo_amplitude();
@@ -342,29 +718,47 @@ impl EffectTunerState {
         self.note_interaction(now_secs);
     }
 
-    pub(crate) fn reset_all(&mut self, now_secs: f32) {
+    pub(crate) fn reset_all(&mut self, context: &mut EffectTunerEditContext<'_>, now_secs: f32) {
         self.current = self.defaults.clone();
         self.lfos = default_lfos();
         self.edit_mode = EffectEditMode::Value;
         self.clear_numeric_entry();
+        for parameter in [
+            EffectTunerSceneParameter::ChildScaleRatio,
+            EffectTunerSceneParameter::ChildTwistPerVertexRadians,
+            EffectTunerSceneParameter::ChildOutwardOffsetRatio,
+            EffectTunerSceneParameter::ChildSpawnExclusionProbability,
+            EffectTunerSceneParameter::GlobalOpacity,
+        ] {
+            let default_value = parameter.default_value(&context.view());
+            let _ = parameter.set_value(context, default_value);
+        }
         self.note_interaction(now_secs);
     }
 
-    pub(crate) fn selected_status_message(&self, now_secs: f32) -> String {
+    pub(crate) fn selected_status_message(
+        &self,
+        context: &EffectTunerViewContext<'_>,
+        now_secs: f32,
+    ) -> String {
         let parameter = self.selected_parameter();
-        let lfo = self.selected_lfo();
         let live_effects = self.evaluated_effects(now_secs);
-        match self.edit_mode {
-            EffectEditMode::Value => format!(
-                "{} = {} (live {})",
-                parameter.label(),
-                parameter.display_value(&self.current),
-                parameter.display_value(&live_effects)
-            ),
+        match self.displayed_edit_mode() {
+            EffectEditMode::Value => match parameter {
+                EffectTunerParameter::Effect(effect_parameter) => format!(
+                    "{} = {} (live {})",
+                    effect_parameter.label(),
+                    effect_parameter.display_value(&self.current),
+                    effect_parameter.display_value(&live_effects)
+                ),
+                EffectTunerParameter::Scene(_) => parameter.status_message(&self.current, context),
+            },
             EffectEditMode::LfoAmplitude => {
+                let lfo = self.selected_lfo();
                 format!("{} lfo amplitude = {:.3}", parameter.label(), lfo.amplitude)
             }
             EffectEditMode::LfoFrequency => {
+                let lfo = self.selected_lfo();
                 format!(
                     "{} lfo frequency = {:.3}Hz",
                     parameter.label(),
@@ -372,6 +766,7 @@ impl EffectTunerState {
                 )
             }
             EffectEditMode::LfoShape => {
+                let lfo = self.selected_lfo();
                 format!("{} lfo shape = {}", parameter.label(), lfo.shape.label())
             }
         }
@@ -383,27 +778,41 @@ impl EffectTunerState {
 
     fn cycle_selection(&mut self, direction: isize, now_secs: f32) {
         self.clear_numeric_entry();
-        let parameter_count = EffectNumericParameter::all().len() as isize;
+        let parameter_count = EffectTunerParameter::all().len() as isize;
         let next_index =
             (self.selected_index as isize + direction).rem_euclid(parameter_count) as usize;
         self.selected_index = next_index;
+        self.coerce_edit_mode_for_selected();
         self.note_interaction(now_secs);
     }
 
-    fn adjust_selected(&mut self, direction: f32, modifiers: AdjustmentModifiers, now_secs: f32) {
+    fn adjust_selected(
+        &mut self,
+        direction: f32,
+        modifiers: AdjustmentModifiers,
+        context: &mut EffectTunerEditContext<'_>,
+        now_secs: f32,
+    ) {
         self.clear_numeric_entry();
         let parameter = self.selected_parameter();
-        match self.edit_mode {
+        match self.displayed_edit_mode() {
             EffectEditMode::Value => {
-                let current_value = parameter.value(&self.current);
+                let current_value = parameter.value(&self.current, &context.view());
                 let next_value = current_value
                     + direction
-                        * parameter.adjustment_step(modifiers.shift_pressed, modifiers.alt_pressed);
-                parameter.set_value(&mut self.current, next_value);
+                        * parameter.adjustment_step(
+                            &context.view(),
+                            modifiers.shift_pressed,
+                            modifiers.alt_pressed,
+                        );
+                let _ = parameter.set_value(&mut self.current, context, next_value);
             }
             EffectEditMode::LfoAmplitude => {
-                let step =
-                    parameter.adjustment_step(modifiers.shift_pressed, modifiers.alt_pressed);
+                let step = parameter.adjustment_step(
+                    &context.view(),
+                    modifiers.shift_pressed,
+                    modifiers.alt_pressed,
+                );
                 let lfo = self.selected_lfo_mut();
                 lfo.amplitude = (lfo.amplitude + direction * step).max(0.0);
             }
@@ -427,11 +836,19 @@ impl EffectTunerState {
     }
 
     fn selected_lfo(&self) -> ParameterLfo {
-        self.lfos[self.selected_index]
+        let index = self
+            .selected_effect_parameter()
+            .and_then(effect_parameter_index)
+            .expect("selected parameter should support LFOs");
+        self.lfos[index]
     }
 
     fn selected_lfo_mut(&mut self) -> &mut ParameterLfo {
-        &mut self.lfos[self.selected_index]
+        let index = self
+            .selected_effect_parameter()
+            .and_then(effect_parameter_index)
+            .expect("selected parameter should support LFOs");
+        &mut self.lfos[index]
     }
 
     fn overlay_numeric_text(&self, field: EffectOverlayField, fallback: String) -> String {
@@ -444,20 +861,51 @@ impl EffectTunerState {
         fallback
     }
 
-    fn apply_numeric_entry_to_selected(&mut self) -> bool {
+    fn apply_numeric_entry_to_selected(&mut self, context: &mut EffectTunerEditContext<'_>) -> bool {
         let Some(value) = self.numeric_entry.parsed_value() else {
             return false;
         };
 
         let parameter = self.selected_parameter();
-        match self.edit_mode {
-            EffectEditMode::Value => parameter.set_value(&mut self.current, value),
+        match self.displayed_edit_mode() {
+            EffectEditMode::Value => {
+                let _ = parameter.set_value(&mut self.current, context, value);
+            }
             EffectEditMode::LfoAmplitude => self.selected_lfo_mut().amplitude = value.max(0.0),
             EffectEditMode::LfoFrequency => self.selected_lfo_mut().frequency_hz = value.max(0.0),
             EffectEditMode::LfoShape => return false,
         }
 
         true
+    }
+
+    fn selected_effect_parameter(&self) -> Option<EffectNumericParameter> {
+        match self.selected_parameter() {
+            EffectTunerParameter::Effect(parameter) => Some(parameter),
+            EffectTunerParameter::Scene(_) => None,
+        }
+    }
+
+    fn mode_supported_for_parameter(
+        &self,
+        edit_mode: EffectEditMode,
+        parameter: EffectTunerParameter,
+    ) -> bool {
+        matches!(edit_mode, EffectEditMode::Value) || parameter.supports_lfo()
+    }
+
+    fn displayed_edit_mode(&self) -> EffectEditMode {
+        if self.mode_supported_for_parameter(self.edit_mode, self.selected_parameter()) {
+            self.edit_mode
+        } else {
+            EffectEditMode::Value
+        }
+    }
+
+    fn coerce_edit_mode_for_selected(&mut self) {
+        if !self.mode_supported_for_parameter(self.edit_mode, self.selected_parameter()) {
+            self.edit_mode = EffectEditMode::Value;
+        }
     }
 
     fn clear_numeric_entry(&mut self) {
@@ -480,20 +928,78 @@ fn default_lfos() -> Vec<ParameterLfo> {
         .collect()
 }
 
+fn effect_parameter_index(parameter: EffectNumericParameter) -> Option<usize> {
+    EffectNumericParameter::all()
+        .iter()
+        .position(|candidate| *candidate == parameter)
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::config::{EffectGroup, EffectsConfig};
-
-    use super::{EffectTunerState, HoldInput};
+    use crate::config::{EffectGroup, EffectsConfig, GenerationConfig, MaterialConfig};
     use crate::effect_tuner::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LfoShape};
     use crate::effect_tuner::metadata::{EffectEditMode, EffectOverlayField};
+    use crate::scene::{GenerationState, MaterialState};
+
+    use super::{
+        EffectTunerEditContext, EffectTunerSceneParameter, EffectTunerState,
+        EffectTunerViewContext, HoldInput,
+    };
+
+    fn default_scene_state() -> (
+        GenerationConfig,
+        GenerationState,
+        MaterialConfig,
+        MaterialState,
+    ) {
+        let generation_config = GenerationConfig::default();
+        let generation_state = GenerationState::from_config(&generation_config);
+        let material_config = MaterialConfig::default();
+        let material_state = MaterialState {
+            opacity: material_config.default_opacity_clamped(),
+        };
+        (
+            generation_config,
+            generation_state,
+            material_config,
+            material_state,
+        )
+    }
+
+    fn view_context<'a>(
+        generation_config: &'a GenerationConfig,
+        generation_state: &'a GenerationState,
+        material_config: &'a MaterialConfig,
+        material_state: &'a MaterialState,
+    ) -> EffectTunerViewContext<'a> {
+        EffectTunerViewContext {
+            generation_config,
+            generation_state,
+            material_config,
+            material_state,
+        }
+    }
+
+    fn edit_context<'a>(
+        generation_config: &'a GenerationConfig,
+        generation_state: &'a mut GenerationState,
+        material_config: &'a MaterialConfig,
+        material_state: &'a mut MaterialState,
+    ) -> EffectTunerEditContext<'a> {
+        EffectTunerEditContext {
+            generation_config,
+            generation_state,
+            material_config,
+            material_state,
+        }
+    }
 
     #[test]
     fn selected_effect_matches_parameter_group() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
         effect_tuner.selected_index = 17;
 
-        assert_eq!(effect_tuner.selected_effect(), EffectGroup::Bloom);
+        assert_eq!(effect_tuner.selected_effect_group(), Some(EffectGroup::Bloom));
     }
 
     #[test]
@@ -503,7 +1009,7 @@ mod tests {
 
         let enabled = effect_tuner.toggle_selected_lfo(1.0);
 
-        assert!(enabled);
+        assert_eq!(enabled, Some(true));
         assert!(effect_tuner.selected_lfo().enabled);
     }
 
@@ -526,11 +1032,21 @@ mod tests {
     #[test]
     fn overlay_snapshot_uses_compact_labels_and_active_field() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (generation_config, generation_state, material_config, material_state) =
+            default_scene_state();
         effect_tuner.selected_index = 3;
         effect_tuner.edit_mode = EffectEditMode::LfoShape;
         effect_tuner.pinned = true;
 
-        let snapshot = effect_tuner.overlay_snapshot(0.0);
+        let snapshot = effect_tuner.overlay_snapshot(
+            &view_context(
+                &generation_config,
+                &generation_state,
+                &material_config,
+                &material_state,
+            ),
+            0.0,
+        );
 
         assert_eq!(snapshot.effect_label, "lens");
         assert_eq!(snapshot.parameter_label, "k2");
@@ -541,11 +1057,21 @@ mod tests {
     #[test]
     fn reset_selected_restores_lfo_frequency_default() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (generation_config, mut generation_state, material_config, mut material_state) =
+            default_scene_state();
         effect_tuner.selected_index = 16;
         effect_tuner.edit_mode = EffectEditMode::LfoFrequency;
         effect_tuner.selected_lfo_mut().frequency_hz = 3.0;
 
-        effect_tuner.reset_selected(1.0);
+        effect_tuner.reset_selected(
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+            ),
+            1.0,
+        );
 
         assert_eq!(
             effect_tuner.selected_lfo().frequency_hz,
@@ -556,6 +1082,8 @@ mod tests {
     #[test]
     fn reset_all_restores_effect_enable_defaults_and_disables_lfos() {
         let mut defaults = EffectsConfig::default();
+        let (generation_config, mut generation_state, material_config, mut material_state) =
+            default_scene_state();
         defaults.edge_detection.enabled = true;
         let mut effect_tuner = EffectTunerState::from_config(&defaults);
         effect_tuner.current.edge_detection.enabled = false;
@@ -563,7 +1091,15 @@ mod tests {
         effect_tuner.selected_lfo_mut().enabled = true;
         effect_tuner.selected_lfo_mut().shape = LfoShape::Square;
 
-        effect_tuner.reset_all(1.0);
+        effect_tuner.reset_all(
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+            ),
+            1.0,
+        );
 
         assert!(effect_tuner.current.edge_detection.enabled);
         assert!(!effect_tuner.selected_lfo().enabled);
@@ -595,12 +1131,31 @@ mod tests {
     #[test]
     fn numeric_entry_updates_selected_value() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (generation_config, mut generation_state, material_config, mut material_state) =
+            default_scene_state();
 
         for character in ['0', '.', '1', '5', '7'] {
-            assert!(effect_tuner.append_numeric_input(character, 1.0));
+            assert!(effect_tuner.append_numeric_input(
+                character,
+                &mut edit_context(
+                    &generation_config,
+                    &mut generation_state,
+                    &material_config,
+                    &mut material_state,
+                ),
+                1.0,
+            ));
         }
 
-        let snapshot = effect_tuner.overlay_snapshot(1.0);
+        let snapshot = effect_tuner.overlay_snapshot(
+            &view_context(
+                &generation_config,
+                &generation_state,
+                &material_config,
+                &material_state,
+            ),
+            1.0,
+        );
         assert_eq!(snapshot.value_text, "0.157");
         assert!((effect_tuner.current.color_wavefolder.gain - 0.157).abs() < 1.0e-6);
     }
@@ -608,14 +1163,41 @@ mod tests {
     #[test]
     fn numeric_entry_updates_lfo_frequency_and_backspace_reparses() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (generation_config, mut generation_state, material_config, mut material_state) =
+            default_scene_state();
         effect_tuner.edit_mode = EffectEditMode::LfoFrequency;
 
         for character in ['0', '.', '1', '5', '7'] {
-            assert!(effect_tuner.append_numeric_input(character, 1.0));
+            assert!(effect_tuner.append_numeric_input(
+                character,
+                &mut edit_context(
+                    &generation_config,
+                    &mut generation_state,
+                    &material_config,
+                    &mut material_state,
+                ),
+                1.0,
+            ));
         }
-        assert!(effect_tuner.backspace_numeric_input(1.2));
+        assert!(effect_tuner.backspace_numeric_input(
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+            ),
+            1.2,
+        ));
 
-        let snapshot = effect_tuner.overlay_snapshot(1.2);
+        let snapshot = effect_tuner.overlay_snapshot(
+            &view_context(
+                &generation_config,
+                &generation_state,
+                &material_config,
+                &material_state,
+            ),
+            1.2,
+        );
         assert_eq!(snapshot.frequency_text, "0.15");
         assert!((effect_tuner.selected_lfo().frequency_hz - 0.15).abs() < 1.0e-6);
     }
@@ -623,24 +1205,50 @@ mod tests {
     #[test]
     fn switching_field_clears_numeric_entry_highlight_text() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        assert!(effect_tuner.append_numeric_input('0', 1.0));
+        let (generation_config, mut generation_state, material_config, mut material_state) =
+            default_scene_state();
+        assert!(effect_tuner.append_numeric_input(
+            '0',
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+            ),
+            1.0,
+        ));
 
-        effect_tuner.step_edit_mode(1, 1.1);
+        assert!(effect_tuner.step_edit_mode(1, 1.1));
 
-        let snapshot = effect_tuner.overlay_snapshot(1.1);
+        let view = view_context(
+            &generation_config,
+            &generation_state,
+            &material_config,
+            &material_state,
+        );
+        let snapshot = effect_tuner.overlay_snapshot(&view, 1.1);
         assert_eq!(snapshot.active_field, EffectOverlayField::LfoAmplitude);
         assert_eq!(
             snapshot.value_text,
-            effect_tuner
-                .selected_parameter()
-                .display_value(&effect_tuner.current)
+            effect_tuner.selected_parameter().display_value(&effect_tuner.current, &view)
         );
     }
 
     #[test]
     fn selecting_another_parameter_clears_numeric_entry() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-        assert!(effect_tuner.append_numeric_input('0', 1.0));
+        let (generation_config, mut generation_state, material_config, mut material_state) =
+            default_scene_state();
+        assert!(effect_tuner.append_numeric_input(
+            '0',
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+            ),
+            1.0,
+        ));
 
         assert!(effect_tuner.step_selection(
             1,
@@ -653,22 +1261,94 @@ mod tests {
             1.1,
         ));
 
-        let snapshot = effect_tuner.overlay_snapshot(1.1);
+        let view = view_context(
+            &generation_config,
+            &generation_state,
+            &material_config,
+            &material_state,
+        );
+        let snapshot = effect_tuner.overlay_snapshot(&view, 1.1);
         assert_eq!(snapshot.parameter_label, "mod");
         assert_eq!(
             snapshot.value_text,
-            effect_tuner
-                .selected_parameter()
-                .display_value(&effect_tuner.current)
+            effect_tuner.selected_parameter().display_value(&effect_tuner.current, &view)
         );
     }
 
     #[test]
     fn shape_field_ignores_numeric_entry() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (generation_config, mut generation_state, material_config, mut material_state) =
+            default_scene_state();
         effect_tuner.edit_mode = EffectEditMode::LfoShape;
 
-        assert!(!effect_tuner.append_numeric_input('1', 1.0));
+        assert!(!effect_tuner.append_numeric_input(
+            '1',
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+            ),
+            1.0,
+        ));
         assert_eq!(effect_tuner.selected_lfo().shape, LfoShape::Sine);
+    }
+
+    #[test]
+    fn scene_parameters_only_expose_the_value_field() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (generation_config, generation_state, material_config, material_state) =
+            default_scene_state();
+        effect_tuner.selected_index = 24;
+        effect_tuner.edit_mode = EffectEditMode::LfoShape;
+
+        let snapshot = effect_tuner.overlay_snapshot(
+            &view_context(
+                &generation_config,
+                &generation_state,
+                &material_config,
+                &material_state,
+            ),
+            0.0,
+        );
+
+        assert_eq!(snapshot.effect_label, "scene");
+        assert_eq!(snapshot.effect_state_text, "VAL");
+        assert_eq!(snapshot.lfo_state_text, "--");
+        assert_eq!(snapshot.amplitude_text, "--");
+        assert_eq!(snapshot.active_field, EffectOverlayField::Value);
+    }
+
+    #[test]
+    fn reset_all_restores_scene_defaults() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (generation_config, mut generation_state, material_config, mut material_state) =
+            default_scene_state();
+        generation_state
+            .parameter_mut(crate::parameters::GenerationParameter::ChildOutwardOffsetRatio)
+            .adjust_clamped_base_value(1.5, generation_config.parameter_spec(crate::parameters::GenerationParameter::ChildOutwardOffsetRatio));
+        material_state.opacity = 0.25;
+
+        effect_tuner.reset_all(
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+            ),
+            1.0,
+        );
+
+        assert_eq!(
+            generation_state.vertex_offset_ratio_base(),
+            EffectTunerSceneParameter::ChildOutwardOffsetRatio.default_value(&view_context(
+                &generation_config,
+                &generation_state,
+                &material_config,
+                &material_state,
+            ))
+        );
+        assert_eq!(material_state.opacity, material_config.default_opacity_clamped());
     }
 }

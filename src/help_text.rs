@@ -10,8 +10,8 @@ const TOP_LEVEL_HELP: [HelpEntry; 5] = [
         overlay: "F1 / H: Toggle this overlay",
     },
     HelpEntry {
-        startup: "F2 FX page",
-        overlay: "F2: Toggle the FX control page",
+        startup: "F2 live control page",
+        overlay: "F2: Toggle the live control page",
     },
     HelpEntry {
         startup: "F3 scene preset page",
@@ -29,48 +29,48 @@ const TOP_LEVEL_HELP: [HelpEntry; 5] = [
 
 const FX_HELP: [HelpEntry; 11] = [
     HelpEntry {
-        startup: "Ctrl+Up/Down selects a parameter",
-        overlay: "In FX page: Ctrl + Up / Down select parameter",
+        startup: "Ctrl+Up/Down selects a control",
+        overlay: "In F2 page: Ctrl + Up / Down select control",
     },
     HelpEntry {
         startup: "Left/Right or Tab/Shift+Tab switch the active field",
-        overlay: "In FX page: Left / Right or Tab / Shift+Tab switch the active field",
+        overlay: "In F2 page: Left / Right or Tab / Shift+Tab switch the active field",
     },
     HelpEntry {
         startup: "Up/Down adjust the active field",
-        overlay: "In FX page: Up / Down adjust the active field",
+        overlay: "In F2 page: Up / Down adjust the active field",
     },
     HelpEntry {
-        startup: "Space toggles the effect",
-        overlay: "In FX page: Space toggles the selected effect",
+        startup: "Space toggles the selected shader effect",
+        overlay: "In F2 page: Space toggles the selected shader effect",
     },
     HelpEntry {
-        startup: "L toggles the selected parameter LFO",
-        overlay: "In FX page: L toggles the selected parameter LFO",
+        startup: "L toggles the selected shader-effect parameter LFO",
+        overlay: "In F2 page: L toggles the selected shader-effect parameter LFO",
     },
     HelpEntry {
         startup: "typing a number sets the active numeric field",
-        overlay: "In FX page: Type digits / . / - / + (for example 0.157) to set the active numeric field",
+        overlay: "In F2 page: Type digits / . / - / + (for example 0.157) to set the active numeric field",
     },
     HelpEntry {
-        startup: "Backspace erases typed FX input",
-        overlay: "In FX page: Backspace erases the typed numeric input",
+        startup: "Backspace erases typed F2 input",
+        overlay: "In F2 page: Backspace erases the typed numeric input",
     },
     HelpEntry {
         startup: "Shift is coarse",
-        overlay: "Shift: Coarse FX adjustment",
+        overlay: "Shift: Coarse F2 adjustment",
     },
     HelpEntry {
         startup: "Alt is fine",
-        overlay: "Alt: Fine FX adjustment",
+        overlay: "Alt: Fine F2 adjustment",
     },
     HelpEntry {
         startup: "Enter resets the field",
-        overlay: "Enter: Reset the selected FX field",
+        overlay: "Enter: Reset the selected F2 field",
     },
     HelpEntry {
-        startup: "Shift+Enter resets all FX settings and LFOs",
-        overlay: "Shift + Enter: Reset all FX settings and LFOs",
+        startup: "Shift+Enter resets all F2 controls",
+        overlay: "Shift + Enter: Reset all F2 controls",
     },
 ];
 
@@ -179,7 +179,7 @@ pub(crate) fn startup_controls_message() -> String {
 }
 
 pub(crate) fn startup_fx_message() -> String {
-    startup_message("FX page", &[&FX_HELP])
+    startup_message("F2 page", &[&FX_HELP])
 }
 
 pub(crate) fn overlay_controls_text(font_status_line: &str) -> String {

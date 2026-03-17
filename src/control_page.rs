@@ -82,7 +82,7 @@ pub(crate) enum ControlPage {
 impl ControlPage {
     fn closed_message(self) -> &'static str {
         match self {
-            Self::EffectTuner => "FX tuner closed.",
+            Self::EffectTuner => "F2 control page closed.",
             Self::ScenePresets => "Scene preset page closed.",
         }
     }
@@ -316,7 +316,7 @@ pub(crate) fn control_page_input_system(
             close_page(previous_page, &mut effect_tuner, &mut preset_browser);
         }
         effect_tuner.open_page(time.elapsed_secs());
-        println!("FX tuner pinned open.");
+        println!("F2 control page pinned open.");
         return;
     }
 
