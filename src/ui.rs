@@ -1211,9 +1211,8 @@ pub(crate) fn font_status_line(font_source: UiFontSource) -> &'static str {
 mod tests {
     use super::{
         HelpOverlayMode, KEYBOARD_HELP_ROWS, KEYBOARD_HOME_ROW, KEYBOARD_TOP_LETTER_ROW,
-        UiFontSource, control_page_bottom, control_page_secondary_bottom,
-        controls_overlay_text, effect_tuner_parameter_label_chars,
-        effect_tuner_shape_label_chars, font_status_line,
+        UiFontSource, control_page_bottom, control_page_secondary_bottom, controls_overlay_text,
+        effect_tuner_parameter_label_chars, effect_tuner_shape_label_chars, font_status_line,
     };
 
     #[test]
@@ -1298,7 +1297,7 @@ mod tests {
 
     #[test]
     fn effect_tuner_slot_helpers_cover_the_longest_labels() {
-        assert_eq!(effect_tuner_parameter_label_chars(), 9);
+        assert_eq!(effect_tuner_parameter_label_chars(), 10);
         assert_eq!(effect_tuner_shape_label_chars(), "brownian motion".len());
     }
 

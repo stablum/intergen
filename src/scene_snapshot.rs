@@ -95,10 +95,12 @@ impl SceneStateSnapshot {
         material_state: &MaterialState,
         effect_tuner: &EffectTunerState,
     ) -> Self {
+        let runtime_materials = material_state.runtime_material_config(&app_config.materials);
+
         Self {
             rendering: app_config.rendering.clone(),
             lighting: app_config.lighting.clone(),
-            materials: app_config.materials.clone(),
+            materials: runtime_materials,
             camera: CameraRigSnapshot::capture(camera_rig),
             generation: GenerationSnapshot::capture(generation_state),
             material_state: MaterialRuntimeSnapshot::capture(material_state),

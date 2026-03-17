@@ -10,8 +10,8 @@ use crate::polyhedra::{
 };
 use crate::runtime_scene::GenerationSceneAccess;
 use crate::scene::{
-    PolyhedronEntity, alpha_mode_for_opacity, opacity_status_message, reset_generation_state,
-    spawn_polyhedron_entity, sync_polyhedron_transforms,
+    PolyhedronEntity, alpha_mode_for_opacity, material_appearance, opacity_status_message,
+    reset_generation_state, spawn_polyhedron_entity, sync_polyhedron_transforms,
 };
 
 const RADIANS_TO_DEGREES: f32 = 180.0 / std::f32::consts::PI;
@@ -213,8 +213,10 @@ fn handle_opacity_input(
         );
     }
     if opacity_changed {
-        apply_global_opacity(
-            scene.material_state.opacity,
+        apply_live_material_state(
+            &scene.generation_state,
+            &scene.app_config.materials,
+            &scene.material_state,
             &mut scene.materials,
             &scene.polyhedron_materials,
         );
@@ -325,12 +327,15 @@ fn handle_scene_reset(
         &scene.shape_assets.catalog,
         &scene.app_config.generation,
     );
+    let material_config = scene
+        .material_state
+        .runtime_material_config(&scene.app_config.materials);
     spawn_polyhedron_entity(
         &mut scene.commands,
         &mut scene.materials,
         scene.shape_assets.mesh(root.kind),
         &root,
-        &scene.app_config.materials,
+        &material_config,
         scene.material_state.opacity,
         0,
     );
@@ -379,13 +384,16 @@ fn handle_spawn_input(
     }
 
     let first_new_index = scene.generation_state.nodes.len() - spawned.len();
+    let material_config = scene
+        .material_state
+        .runtime_material_config(&scene.app_config.materials);
     for (offset, spawn) in spawned.iter().enumerate() {
         spawn_polyhedron_entity(
             &mut scene.commands,
             &mut scene.materials,
             scene.shape_assets.mesh(spawn.kind),
             &spawn.node,
-            &scene.app_config.materials,
+            &material_config,
             scene.material_state.opacity,
             first_new_index + offset,
         );
@@ -431,16 +439,34 @@ fn adjust_clamped_value(current: f32, delta: f32, min: f32, max: f32) -> f32 {
     (current + delta).clamp(min, max)
 }
 
-pub(crate) fn apply_global_opacity(
-    opacity: f32,
+pub(crate) fn apply_live_material_state(
+    generation_state: &crate::scene::GenerationState,
+    defaults: &crate::config::MaterialConfig,
+    material_state: &crate::scene::MaterialState,
     materials: &mut Assets<StandardMaterial>,
-    polyhedron_materials: &Query<&MeshMaterial3d<StandardMaterial>, With<PolyhedronEntity>>,
+    polyhedron_materials: &Query<(&PolyhedronEntity, &MeshMaterial3d<StandardMaterial>)>,
 ) {
-    for material_handle in polyhedron_materials {
-        if let Some(material) = materials.get_mut(&material_handle.0) {
-            material.base_color.set_alpha(opacity);
-            material.alpha_mode = alpha_mode_for_opacity(opacity);
-        }
+    let material_config = material_state.runtime_material_config(defaults);
+
+    for (polyhedron_entity, material_handle) in polyhedron_materials {
+        let Some(node) = generation_state.nodes.get(polyhedron_entity.node_index) else {
+            continue;
+        };
+        let Some(material) = materials.get_mut(&material_handle.0) else {
+            continue;
+        };
+
+        let appearance = material_appearance(node, &material_config, material_state.opacity);
+        material.base_color = Color::srgba(
+            appearance.base_color[0],
+            appearance.base_color[1],
+            appearance.base_color[2],
+            appearance.base_color[3],
+        );
+        material.alpha_mode = alpha_mode_for_opacity(appearance.base_color[3]);
+        material.metallic = appearance.metallic;
+        material.perceptual_roughness = appearance.perceptual_roughness;
+        material.reflectance = appearance.reflectance;
     }
 }
 

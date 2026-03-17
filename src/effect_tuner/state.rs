@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{
     EffectGroup, EffectNumericParameter, EffectsConfig, GenerationConfig, MaterialConfig,
+    MaterialSurfaceFamily, MaterialSurfaceMode,
 };
 use crate::generation::{
     selected_child_shape_status_message, spawn_add_mode_status_message,
@@ -83,9 +84,64 @@ pub(crate) enum EffectTunerSceneParameter {
     ChildOutwardOffsetRatio,
     ChildSpawnExclusionProbability,
     GlobalOpacity,
+    MaterialHueStepPerLevel,
+    MaterialSaturation,
+    MaterialLightness,
+    MaterialMetallic,
+    MaterialPerceptualRoughness,
+    MaterialReflectance,
+    MaterialCubeHueBias,
+    MaterialTetrahedronHueBias,
+    MaterialOctahedronHueBias,
+    MaterialDodecahedronHueBias,
+    MaterialSurfaceMode,
+    MaterialBaseSurface,
+    MaterialRootSurface,
+    MaterialAccentSurface,
+    MaterialAccentEveryNLevels,
+    MaterialLevelLightnessShift,
+    MaterialLevelSaturationShift,
+    MaterialLevelMetallicShift,
+    MaterialLevelRoughnessShift,
+    MaterialLevelReflectanceShift,
 }
 
 impl EffectTunerSceneParameter {
+    const ALL: [Self; 28] = [
+        Self::ChildKind,
+        Self::SpawnPlacementMode,
+        Self::SpawnAddMode,
+        Self::ChildScaleRatio,
+        Self::ChildTwistPerVertexRadians,
+        Self::ChildOutwardOffsetRatio,
+        Self::ChildSpawnExclusionProbability,
+        Self::GlobalOpacity,
+        Self::MaterialHueStepPerLevel,
+        Self::MaterialSaturation,
+        Self::MaterialLightness,
+        Self::MaterialMetallic,
+        Self::MaterialPerceptualRoughness,
+        Self::MaterialReflectance,
+        Self::MaterialCubeHueBias,
+        Self::MaterialTetrahedronHueBias,
+        Self::MaterialOctahedronHueBias,
+        Self::MaterialDodecahedronHueBias,
+        Self::MaterialSurfaceMode,
+        Self::MaterialBaseSurface,
+        Self::MaterialRootSurface,
+        Self::MaterialAccentSurface,
+        Self::MaterialAccentEveryNLevels,
+        Self::MaterialLevelLightnessShift,
+        Self::MaterialLevelSaturationShift,
+        Self::MaterialLevelMetallicShift,
+        Self::MaterialLevelRoughnessShift,
+        Self::MaterialLevelReflectanceShift,
+    ];
+
+    pub(crate) fn all() -> &'static [Self] {
+        &Self::ALL
+    }
+
     fn label(self) -> &'static str {
         match self {
             Self::ChildKind => "generation.child_kind",
@@ -96,6 +152,26 @@ impl EffectTunerSceneParameter {
             Self::ChildOutwardOffsetRatio => "generation.child_outward_offset_ratio",
             Self::ChildSpawnExclusionProbability => "generation.child_spawn_exclusion_probability",
             Self::GlobalOpacity => "materials.opacity",
+            Self::MaterialHueStepPerLevel => "materials.hue_step_per_level",
+            Self::MaterialSaturation => "materials.saturation",
+            Self::MaterialLightness => "materials.lightness",
+            Self::MaterialMetallic => "materials.metallic",
+            Self::MaterialPerceptualRoughness => "materials.perceptual_roughness",
+            Self::MaterialReflectance => "materials.reflectance",
+            Self::MaterialCubeHueBias => "materials.cube_hue_bias",
+            Self::MaterialTetrahedronHueBias => "materials.tetrahedron_hue_bias",
+            Self::MaterialOctahedronHueBias => "materials.octahedron_hue_bias",
+            Self::MaterialDodecahedronHueBias => "materials.dodecahedron_hue_bias",
+            Self::MaterialSurfaceMode => "materials.surface_mode",
+            Self::MaterialBaseSurface => "materials.base_surface",
+            Self::MaterialRootSurface => "materials.root_surface",
+            Self::MaterialAccentSurface => "materials.accent_surface",
+            Self::MaterialAccentEveryNLevels => "materials.accent_every_n_levels",
+            Self::MaterialLevelLightnessShift => "materials.level_lightness_shift",
+            Self::MaterialLevelSaturationShift => "materials.level_saturation_shift",
+            Self::MaterialLevelMetallicShift => "materials.level_metallic_shift",
+            Self::MaterialLevelRoughnessShift => "materials.level_roughness_shift",
+            Self::MaterialLevelReflectanceShift => "materials.level_reflectance_shift",
         }
     }
 
@@ -109,12 +185,52 @@ impl EffectTunerSceneParameter {
             Self::ChildOutwardOffsetRatio => "offset",
             Self::ChildSpawnExclusionProbability => "spawn%",
             Self::GlobalOpacity => "opacity",
+            Self::MaterialHueStepPerLevel => "hue step",
+            Self::MaterialSaturation => "sat",
+            Self::MaterialLightness => "light",
+            Self::MaterialMetallic => "metallic",
+            Self::MaterialPerceptualRoughness => "roughness",
+            Self::MaterialReflectance => "reflect",
+            Self::MaterialCubeHueBias => "cube hue",
+            Self::MaterialTetrahedronHueBias => "tetra hue",
+            Self::MaterialOctahedronHueBias => "octa hue",
+            Self::MaterialDodecahedronHueBias => "dodec hue",
+            Self::MaterialSurfaceMode => "surface",
+            Self::MaterialBaseSurface => "base surf",
+            Self::MaterialRootSurface => "root surf",
+            Self::MaterialAccentSurface => "accent srf",
+            Self::MaterialAccentEveryNLevels => "accent nth",
+            Self::MaterialLevelLightnessShift => "lvl light",
+            Self::MaterialLevelSaturationShift => "lvl sat",
+            Self::MaterialLevelMetallicShift => "lvl metal",
+            Self::MaterialLevelRoughnessShift => "lvl rough",
+            Self::MaterialLevelReflectanceShift => "lvl refl",
         }
     }
 
     pub(crate) fn group_label(self) -> &'static str {
         match self {
-            Self::GlobalOpacity => "mat",
+            Self::GlobalOpacity
+            | Self::MaterialHueStepPerLevel
+            | Self::MaterialSaturation
+            | Self::MaterialLightness
+            | Self::MaterialMetallic
+            | Self::MaterialPerceptualRoughness
+            | Self::MaterialReflectance
+            | Self::MaterialCubeHueBias
+            | Self::MaterialTetrahedronHueBias
+            | Self::MaterialOctahedronHueBias
+            | Self::MaterialDodecahedronHueBias
+            | Self::MaterialSurfaceMode
+            | Self::MaterialBaseSurface
+            | Self::MaterialRootSurface
+            | Self::MaterialAccentSurface
+            | Self::MaterialAccentEveryNLevels
+            | Self::MaterialLevelLightnessShift
+            | Self::MaterialLevelSaturationShift
+            | Self::MaterialLevelMetallicShift
+            | Self::MaterialLevelRoughnessShift
+            | Self::MaterialLevelReflectanceShift => "mat",
             Self::ChildKind
             | Self::SpawnPlacementMode
             | Self::SpawnAddMode
@@ -133,12 +249,27 @@ impl EffectTunerSceneParameter {
                 | Self::ChildOutwardOffsetRatio
                 | Self::ChildSpawnExclusionProbability
                 | Self::GlobalOpacity
+                | Self::MaterialHueStepPerLevel
+                | Self::MaterialSaturation
+                | Self::MaterialLightness
+                | Self::MaterialMetallic
+                | Self::MaterialPerceptualRoughness
+                | Self::MaterialReflectance
+                | Self::MaterialCubeHueBias
+                | Self::MaterialTetrahedronHueBias
+                | Self::MaterialOctahedronHueBias
+                | Self::MaterialDodecahedronHueBias
+                | Self::MaterialAccentEveryNLevels
+                | Self::MaterialLevelLightnessShift
+                | Self::MaterialLevelSaturationShift
+                | Self::MaterialLevelMetallicShift
+                | Self::MaterialLevelRoughnessShift
+                | Self::MaterialLevelReflectanceShift
         )
     }
 
     fn generation_parameter(self) -> Option<GenerationParameter> {
         match self {
-            Self::ChildKind | Self::SpawnPlacementMode | Self::SpawnAddMode => None,
             Self::ChildScaleRatio => Some(GenerationParameter::ChildScaleRatio),
             Self::ChildTwistPerVertexRadians => {
                 Some(GenerationParameter::ChildTwistPerVertexRadians)
@@ -147,14 +278,66 @@ impl EffectTunerSceneParameter {
             Self::ChildSpawnExclusionProbability => {
                 Some(GenerationParameter::ChildSpawnExclusionProbability)
             }
-            Self::GlobalOpacity => None,
+            Self::ChildKind
+            | Self::SpawnPlacementMode
+            | Self::SpawnAddMode
+            | Self::GlobalOpacity
+            | Self::MaterialHueStepPerLevel
+            | Self::MaterialSaturation
+            | Self::MaterialLightness
+            | Self::MaterialMetallic
+            | Self::MaterialPerceptualRoughness
+            | Self::MaterialReflectance
+            | Self::MaterialCubeHueBias
+            | Self::MaterialTetrahedronHueBias
+            | Self::MaterialOctahedronHueBias
+            | Self::MaterialDodecahedronHueBias
+            | Self::MaterialSurfaceMode
+            | Self::MaterialBaseSurface
+            | Self::MaterialRootSurface
+            | Self::MaterialAccentSurface
+            | Self::MaterialAccentEveryNLevels
+            | Self::MaterialLevelLightnessShift
+            | Self::MaterialLevelSaturationShift
+            | Self::MaterialLevelMetallicShift
+            | Self::MaterialLevelRoughnessShift
+            | Self::MaterialLevelReflectanceShift => None,
         }
     }
 
     fn base_step(self, context: &EffectTunerViewContext<'_>) -> f32 {
         match self.generation_parameter() {
             Some(parameter) => context.generation_config.parameter_spec(parameter).step(),
-            None => context.material_config.opacity_adjust_step.abs(),
+            None => match self {
+                Self::GlobalOpacity => context.material_config.opacity_adjust_step.abs(),
+                Self::MaterialHueStepPerLevel
+                | Self::MaterialCubeHueBias
+                | Self::MaterialTetrahedronHueBias
+                | Self::MaterialOctahedronHueBias
+                | Self::MaterialDodecahedronHueBias => 5.0,
+                Self::MaterialAccentEveryNLevels => 1.0,
+                Self::MaterialSaturation
+                | Self::MaterialLightness
+                | Self::MaterialMetallic
+                | Self::MaterialPerceptualRoughness
+                | Self::MaterialReflectance
+                | Self::MaterialLevelLightnessShift
+                | Self::MaterialLevelSaturationShift
+                | Self::MaterialLevelMetallicShift
+                | Self::MaterialLevelRoughnessShift
+                | Self::MaterialLevelReflectanceShift => 0.05,
+                Self::ChildKind
+                | Self::SpawnPlacementMode
+                | Self::SpawnAddMode
+                | Self::MaterialSurfaceMode
+                | Self::MaterialBaseSurface
+                | Self::MaterialRootSurface
+                | Self::MaterialAccentSurface
+                | Self::ChildScaleRatio
+                | Self::ChildTwistPerVertexRadians
+                | Self::ChildOutwardOffsetRatio
+                | Self::ChildSpawnExclusionProbability => 1.0,
+            },
         }
     }
 
@@ -176,16 +359,38 @@ impl EffectTunerSceneParameter {
 
     fn value(self, context: &EffectTunerViewContext<'_>) -> f32 {
         match self {
-            Self::ChildKind | Self::SpawnPlacementMode | Self::SpawnAddMode => 0.0,
+            Self::ChildKind
+            | Self::SpawnPlacementMode
+            | Self::SpawnAddMode
+            | Self::MaterialSurfaceMode
+            | Self::MaterialBaseSurface
+            | Self::MaterialRootSurface
+            | Self::MaterialAccentSurface => 0.0,
             Self::ChildScaleRatio => context.generation_state.scale_ratio_base(),
             Self::ChildTwistPerVertexRadians => {
                 context.generation_state.twist_per_vertex_radians_base()
             }
             Self::ChildOutwardOffsetRatio => context.generation_state.vertex_offset_ratio_base(),
-            Self::ChildSpawnExclusionProbability => {
-                context.generation_state.vertex_spawn_exclusion_probability_base()
-            }
+            Self::ChildSpawnExclusionProbability => context
+                .generation_state
+                .vertex_spawn_exclusion_probability_base(),
             Self::GlobalOpacity => context.material_state.opacity,
+            Self::MaterialHueStepPerLevel => context.material_state.hue_step_per_level,
+            Self::MaterialSaturation => context.material_state.saturation,
+            Self::MaterialLightness => context.material_state.lightness,
+            Self::MaterialMetallic => context.material_state.metallic,
+            Self::MaterialPerceptualRoughness => context.material_state.perceptual_roughness,
+            Self::MaterialReflectance => context.material_state.reflectance,
+            Self::MaterialCubeHueBias => context.material_state.cube_hue_bias,
+            Self::MaterialTetrahedronHueBias => context.material_state.tetrahedron_hue_bias,
+            Self::MaterialOctahedronHueBias => context.material_state.octahedron_hue_bias,
+            Self::MaterialDodecahedronHueBias => context.material_state.dodecahedron_hue_bias,
+            Self::MaterialAccentEveryNLevels => context.material_state.accent_every_n_levels as f32,
+            Self::MaterialLevelLightnessShift => context.material_state.level_lightness_shift,
+            Self::MaterialLevelSaturationShift => context.material_state.level_saturation_shift,
+            Self::MaterialLevelMetallicShift => context.material_state.level_metallic_shift,
+            Self::MaterialLevelRoughnessShift => context.material_state.level_roughness_shift,
+            Self::MaterialLevelReflectanceShift => context.material_state.level_reflectance_shift,
         }
     }
 
@@ -197,29 +402,128 @@ impl EffectTunerSceneParameter {
                 let current = parameter_state.base_value();
                 parameter_state.adjust_clamped_base_value(value - current, spec)
             }
-            None => {
-                match self {
-                    Self::GlobalOpacity => {
-                        let (min_opacity, max_opacity) = context.material_config.opacity_bounds();
-                        context.material_state.opacity = value.clamp(min_opacity, max_opacity);
-                        context.material_state.opacity
-                    }
-                    Self::ChildKind | Self::SpawnPlacementMode | Self::SpawnAddMode => 0.0,
-                    Self::ChildScaleRatio
-                    | Self::ChildTwistPerVertexRadians
-                    | Self::ChildOutwardOffsetRatio
-                    | Self::ChildSpawnExclusionProbability => unreachable!(),
+            None => match self {
+                Self::GlobalOpacity => {
+                    let (min_opacity, max_opacity) = context.material_config.opacity_bounds();
+                    context.material_state.opacity = value.clamp(min_opacity, max_opacity);
+                    context.material_state.opacity
                 }
-            }
+                Self::MaterialHueStepPerLevel => {
+                    context.material_state.hue_step_per_level = value;
+                    context.material_state.hue_step_per_level
+                }
+                Self::MaterialSaturation => {
+                    context.material_state.saturation = value.clamp(0.0, 1.0);
+                    context.material_state.saturation
+                }
+                Self::MaterialLightness => {
+                    context.material_state.lightness = value.clamp(0.0, 1.0);
+                    context.material_state.lightness
+                }
+                Self::MaterialMetallic => {
+                    context.material_state.metallic = value.clamp(0.0, 1.0);
+                    context.material_state.metallic
+                }
+                Self::MaterialPerceptualRoughness => {
+                    context.material_state.perceptual_roughness = value.clamp(0.0, 1.0);
+                    context.material_state.perceptual_roughness
+                }
+                Self::MaterialReflectance => {
+                    context.material_state.reflectance = value.clamp(0.0, 1.0);
+                    context.material_state.reflectance
+                }
+                Self::MaterialCubeHueBias => {
+                    context.material_state.cube_hue_bias = value;
+                    context.material_state.cube_hue_bias
+                }
+                Self::MaterialTetrahedronHueBias => {
+                    context.material_state.tetrahedron_hue_bias = value;
+                    context.material_state.tetrahedron_hue_bias
+                }
+                Self::MaterialOctahedronHueBias => {
+                    context.material_state.octahedron_hue_bias = value;
+                    context.material_state.octahedron_hue_bias
+                }
+                Self::MaterialDodecahedronHueBias => {
+                    context.material_state.dodecahedron_hue_bias = value;
+                    context.material_state.dodecahedron_hue_bias
+                }
+                Self::MaterialAccentEveryNLevels => {
+                    context.material_state.accent_every_n_levels = value.round().max(0.0) as usize;
+                    context.material_state.accent_every_n_levels as f32
+                }
+                Self::MaterialLevelLightnessShift => {
+                    context.material_state.level_lightness_shift = value;
+                    context.material_state.level_lightness_shift
+                }
+                Self::MaterialLevelSaturationShift => {
+                    context.material_state.level_saturation_shift = value;
+                    context.material_state.level_saturation_shift
+                }
+                Self::MaterialLevelMetallicShift => {
+                    context.material_state.level_metallic_shift = value;
+                    context.material_state.level_metallic_shift
+                }
+                Self::MaterialLevelRoughnessShift => {
+                    context.material_state.level_roughness_shift = value;
+                    context.material_state.level_roughness_shift
+                }
+                Self::MaterialLevelReflectanceShift => {
+                    context.material_state.level_reflectance_shift = value;
+                    context.material_state.level_reflectance_shift
+                }
+                Self::ChildKind
+                | Self::SpawnPlacementMode
+                | Self::SpawnAddMode
+                | Self::MaterialSurfaceMode
+                | Self::MaterialBaseSurface
+                | Self::MaterialRootSurface
+                | Self::MaterialAccentSurface => 0.0,
+                Self::ChildScaleRatio
+                | Self::ChildTwistPerVertexRadians
+                | Self::ChildOutwardOffsetRatio
+                | Self::ChildSpawnExclusionProbability => unreachable!(),
+            },
         }
     }
 
     fn default_value(self, context: &EffectTunerViewContext<'_>) -> f32 {
         match self.generation_parameter() {
-            Some(parameter) => context.generation_config.parameter_spec(parameter).default_value(),
+            Some(parameter) => context
+                .generation_config
+                .parameter_spec(parameter)
+                .default_value(),
             None => match self {
                 Self::GlobalOpacity => context.material_config.default_opacity_clamped(),
-                Self::ChildKind | Self::SpawnPlacementMode | Self::SpawnAddMode => 0.0,
+                Self::MaterialHueStepPerLevel => context.material_config.hue_step_per_level,
+                Self::MaterialSaturation => context.material_config.saturation,
+                Self::MaterialLightness => context.material_config.lightness,
+                Self::MaterialMetallic => context.material_config.metallic,
+                Self::MaterialPerceptualRoughness => context.material_config.perceptual_roughness,
+                Self::MaterialReflectance => context.material_config.reflectance,
+                Self::MaterialCubeHueBias => context.material_config.cube_hue_bias,
+                Self::MaterialTetrahedronHueBias => context.material_config.tetrahedron_hue_bias,
+                Self::MaterialOctahedronHueBias => context.material_config.octahedron_hue_bias,
+                Self::MaterialDodecahedronHueBias => context.material_config.dodecahedron_hue_bias,
+                Self::MaterialAccentEveryNLevels => {
+                    context.material_config.accent_every_n_levels as f32
+                }
+                Self::MaterialLevelLightnessShift => context.material_config.level_lightness_shift,
+                Self::MaterialLevelSaturationShift => {
+                    context.material_config.level_saturation_shift
+                }
+                Self::MaterialLevelMetallicShift => context.material_config.level_metallic_shift,
+                Self::MaterialLevelRoughnessShift => context.material_config.level_roughness_shift,
+                Self::MaterialLevelReflectanceShift => {
+                    context.material_config.level_reflectance_shift
+                }
+                Self::ChildKind
+                | Self::SpawnPlacementMode
+                | Self::SpawnAddMode
+                | Self::MaterialSurfaceMode
+                | Self::MaterialBaseSurface
+                | Self::MaterialRootSurface
+                | Self::MaterialAccentSurface => 0.0,
                 Self::ChildScaleRatio
                 | Self::ChildTwistPerVertexRadians
                 | Self::ChildOutwardOffsetRatio
@@ -230,19 +534,51 @@ impl EffectTunerSceneParameter {
 
     fn display_value(self, context: &EffectTunerViewContext<'_>) -> String {
         match self {
-            Self::ChildKind => polyhedron_kind_value_text(context.generation_state.selected_kind)
-                .to_string(),
+            Self::ChildKind => {
+                polyhedron_kind_value_text(context.generation_state.selected_kind).to_string()
+            }
             Self::SpawnPlacementMode => context
                 .generation_state
                 .spawn_placement_mode
                 .plural_label()
                 .to_string(),
             Self::SpawnAddMode => context.generation_state.spawn_add_mode.label().to_string(),
+            Self::MaterialSurfaceMode => {
+                material_surface_mode_value_text(context.material_state.surface_mode).to_string()
+            }
+            Self::MaterialBaseSurface => {
+                material_surface_family_value_text(context.material_state.base_surface).to_string()
+            }
+            Self::MaterialRootSurface => {
+                material_surface_family_value_text(context.material_state.root_surface).to_string()
+            }
+            Self::MaterialAccentSurface => {
+                material_surface_family_value_text(context.material_state.accent_surface)
+                    .to_string()
+            }
+            Self::MaterialAccentEveryNLevels => {
+                context.material_state.accent_every_n_levels.to_string()
+            }
             Self::ChildScaleRatio
             | Self::ChildTwistPerVertexRadians
             | Self::ChildOutwardOffsetRatio
             | Self::ChildSpawnExclusionProbability
-            | Self::GlobalOpacity => format!("{:.3}", self.value(context)),
+            | Self::GlobalOpacity
+            | Self::MaterialHueStepPerLevel
+            | Self::MaterialSaturation
+            | Self::MaterialLightness
+            | Self::MaterialMetallic
+            | Self::MaterialPerceptualRoughness
+            | Self::MaterialReflectance
+            | Self::MaterialCubeHueBias
+            | Self::MaterialTetrahedronHueBias
+            | Self::MaterialOctahedronHueBias
+            | Self::MaterialDodecahedronHueBias
+            | Self::MaterialLevelLightnessShift
+            | Self::MaterialLevelSaturationShift
+            | Self::MaterialLevelMetallicShift
+            | Self::MaterialLevelRoughnessShift
+            | Self::MaterialLevelReflectanceShift => format!("{:.3}", self.value(context)),
         }
     }
 
@@ -264,8 +600,10 @@ impl EffectTunerSceneParameter {
     ) {
         match self {
             Self::ChildKind => {
-                context.generation_state.selected_kind =
-                    cycle_polyhedron_kind(context.generation_state.selected_kind, direction as isize);
+                context.generation_state.selected_kind = cycle_polyhedron_kind(
+                    context.generation_state.selected_kind,
+                    direction as isize,
+                );
             }
             Self::SpawnPlacementMode => {
                 context.generation_state.spawn_placement_mode = cycle_spawn_placement_mode(
@@ -274,17 +612,59 @@ impl EffectTunerSceneParameter {
                 );
             }
             Self::SpawnAddMode => {
-                context.generation_state.spawn_add_mode =
-                    cycle_spawn_add_mode(context.generation_state.spawn_add_mode, direction as isize);
+                context.generation_state.spawn_add_mode = cycle_spawn_add_mode(
+                    context.generation_state.spawn_add_mode,
+                    direction as isize,
+                );
+            }
+            Self::MaterialSurfaceMode => {
+                context.material_state.surface_mode = cycle_material_surface_mode(
+                    context.material_state.surface_mode,
+                    direction as isize,
+                );
+            }
+            Self::MaterialBaseSurface => {
+                context.material_state.base_surface = cycle_material_surface_family(
+                    context.material_state.base_surface,
+                    direction as isize,
+                );
+            }
+            Self::MaterialRootSurface => {
+                context.material_state.root_surface = cycle_material_surface_family(
+                    context.material_state.root_surface,
+                    direction as isize,
+                );
+            }
+            Self::MaterialAccentSurface => {
+                context.material_state.accent_surface = cycle_material_surface_family(
+                    context.material_state.accent_surface,
+                    direction as isize,
+                );
             }
             Self::ChildScaleRatio
             | Self::ChildTwistPerVertexRadians
             | Self::ChildOutwardOffsetRatio
             | Self::ChildSpawnExclusionProbability
-            | Self::GlobalOpacity => {
+            | Self::GlobalOpacity
+            | Self::MaterialHueStepPerLevel
+            | Self::MaterialSaturation
+            | Self::MaterialLightness
+            | Self::MaterialMetallic
+            | Self::MaterialPerceptualRoughness
+            | Self::MaterialReflectance
+            | Self::MaterialCubeHueBias
+            | Self::MaterialTetrahedronHueBias
+            | Self::MaterialOctahedronHueBias
+            | Self::MaterialDodecahedronHueBias
+            | Self::MaterialAccentEveryNLevels
+            | Self::MaterialLevelLightnessShift
+            | Self::MaterialLevelSaturationShift
+            | Self::MaterialLevelMetallicShift
+            | Self::MaterialLevelRoughnessShift
+            | Self::MaterialLevelReflectanceShift => {
                 let current_value = self.value(&context.view());
-                let next_value =
-                    current_value + direction * self.adjustment_step(&context.view(), shift_pressed, alt_pressed);
+                let next_value = current_value
+                    + direction * self.adjustment_step(&context.view(), shift_pressed, alt_pressed);
                 let _ = self.set_value(context, next_value);
             }
         }
@@ -293,7 +673,8 @@ impl EffectTunerSceneParameter {
     fn reset_value(self, context: &mut EffectTunerEditContext<'_>) {
         match self {
             Self::ChildKind => {
-                context.generation_state.selected_kind = context.generation_config.default_child_kind;
+                context.generation_state.selected_kind =
+                    context.generation_config.default_child_kind;
             }
             Self::SpawnPlacementMode => {
                 context.generation_state.spawn_placement_mode =
@@ -302,11 +683,39 @@ impl EffectTunerSceneParameter {
             Self::SpawnAddMode => {
                 context.generation_state.spawn_add_mode = SpawnAddMode::default();
             }
+            Self::MaterialSurfaceMode => {
+                context.material_state.surface_mode = context.material_config.surface_mode;
+            }
+            Self::MaterialBaseSurface => {
+                context.material_state.base_surface = context.material_config.base_surface;
+            }
+            Self::MaterialRootSurface => {
+                context.material_state.root_surface = context.material_config.root_surface;
+            }
+            Self::MaterialAccentSurface => {
+                context.material_state.accent_surface = context.material_config.accent_surface;
+            }
             Self::ChildScaleRatio
             | Self::ChildTwistPerVertexRadians
             | Self::ChildOutwardOffsetRatio
             | Self::ChildSpawnExclusionProbability
-            | Self::GlobalOpacity => {
+            | Self::GlobalOpacity
+            | Self::MaterialHueStepPerLevel
+            | Self::MaterialSaturation
+            | Self::MaterialLightness
+            | Self::MaterialMetallic
+            | Self::MaterialPerceptualRoughness
+            | Self::MaterialReflectance
+            | Self::MaterialCubeHueBias
+            | Self::MaterialTetrahedronHueBias
+            | Self::MaterialOctahedronHueBias
+            | Self::MaterialDodecahedronHueBias
+            | Self::MaterialAccentEveryNLevels
+            | Self::MaterialLevelLightnessShift
+            | Self::MaterialLevelSaturationShift
+            | Self::MaterialLevelMetallicShift
+            | Self::MaterialLevelRoughnessShift
+            | Self::MaterialLevelReflectanceShift => {
                 let default_value = self.default_value(&context.view());
                 let _ = self.set_value(context, default_value);
             }
@@ -315,7 +724,9 @@ impl EffectTunerSceneParameter {
 
     fn status_message(self, context: &EffectTunerViewContext<'_>) -> String {
         match self {
-            Self::ChildKind => selected_child_shape_status_message(context.generation_state.selected_kind),
+            Self::ChildKind => {
+                selected_child_shape_status_message(context.generation_state.selected_kind)
+            }
             Self::SpawnPlacementMode => {
                 spawn_placement_mode_status_message(context.generation_state.spawn_placement_mode)
             }
@@ -346,6 +757,72 @@ impl EffectTunerSceneParameter {
                 )
             }
             Self::GlobalOpacity => opacity_status_message(self.value(context)),
+            Self::MaterialHueStepPerLevel => {
+                format!(
+                    "Material hue step per level: {:.1} deg",
+                    self.value(context)
+                )
+            }
+            Self::MaterialSaturation => format!("Material saturation: {:.3}", self.value(context)),
+            Self::MaterialLightness => format!("Material lightness: {:.3}", self.value(context)),
+            Self::MaterialMetallic => format!("Material metallic: {:.3}", self.value(context)),
+            Self::MaterialPerceptualRoughness => {
+                format!("Material roughness: {:.3}", self.value(context))
+            }
+            Self::MaterialReflectance => {
+                format!("Material reflectance: {:.3}", self.value(context))
+            }
+            Self::MaterialCubeHueBias => {
+                format!("Cube hue bias: {:.1} deg", self.value(context))
+            }
+            Self::MaterialTetrahedronHueBias => {
+                format!("Tetrahedron hue bias: {:.1} deg", self.value(context))
+            }
+            Self::MaterialOctahedronHueBias => {
+                format!("Octahedron hue bias: {:.1} deg", self.value(context))
+            }
+            Self::MaterialDodecahedronHueBias => {
+                format!("Dodecahedron hue bias: {:.1} deg", self.value(context))
+            }
+            Self::MaterialSurfaceMode => format!(
+                "Material surface mode: {}",
+                material_surface_mode_value_text(context.material_state.surface_mode)
+            ),
+            Self::MaterialBaseSurface => format!(
+                "Base surface family: {}",
+                material_surface_family_value_text(context.material_state.base_surface)
+            ),
+            Self::MaterialRootSurface => format!(
+                "Root surface family: {}",
+                material_surface_family_value_text(context.material_state.root_surface)
+            ),
+            Self::MaterialAccentSurface => format!(
+                "Accent surface family: {}",
+                material_surface_family_value_text(context.material_state.accent_surface)
+            ),
+            Self::MaterialAccentEveryNLevels => {
+                let cadence = context.material_state.accent_every_n_levels;
+                if cadence == 0 {
+                    "Accent surface cadence: disabled".to_string()
+                } else {
+                    format!("Accent surface every {cadence} levels")
+                }
+            }
+            Self::MaterialLevelLightnessShift => {
+                format!("Level lightness shift: {:.3}", self.value(context))
+            }
+            Self::MaterialLevelSaturationShift => {
+                format!("Level saturation shift: {:.3}", self.value(context))
+            }
+            Self::MaterialLevelMetallicShift => {
+                format!("Level metallic shift: {:.3}", self.value(context))
+            }
+            Self::MaterialLevelRoughnessShift => {
+                format!("Level roughness shift: {:.3}", self.value(context))
+            }
+            Self::MaterialLevelReflectanceShift => {
+                format!("Level reflectance shift: {:.3}", self.value(context))
+            }
         }
     }
 }
@@ -357,7 +834,7 @@ pub(crate) enum EffectTunerParameter {
 }
 
 impl EffectTunerParameter {
-    const ALL: [Self; 32] = [
+    const ALL: [Self; 52] = [
         Self::Effect(EffectNumericParameter::WavefolderGain),
         Self::Effect(EffectNumericParameter::WavefolderModulus),
         Self::Effect(EffectNumericParameter::LensStrength),
@@ -390,6 +867,26 @@ impl EffectTunerParameter {
         Self::Scene(EffectTunerSceneParameter::ChildOutwardOffsetRatio),
         Self::Scene(EffectTunerSceneParameter::ChildSpawnExclusionProbability),
         Self::Scene(EffectTunerSceneParameter::GlobalOpacity),
+        Self::Scene(EffectTunerSceneParameter::MaterialHueStepPerLevel),
+        Self::Scene(EffectTunerSceneParameter::MaterialSaturation),
+        Self::Scene(EffectTunerSceneParameter::MaterialLightness),
+        Self::Scene(EffectTunerSceneParameter::MaterialMetallic),
+        Self::Scene(EffectTunerSceneParameter::MaterialPerceptualRoughness),
+        Self::Scene(EffectTunerSceneParameter::MaterialReflectance),
+        Self::Scene(EffectTunerSceneParameter::MaterialCubeHueBias),
+        Self::Scene(EffectTunerSceneParameter::MaterialTetrahedronHueBias),
+        Self::Scene(EffectTunerSceneParameter::MaterialOctahedronHueBias),
+        Self::Scene(EffectTunerSceneParameter::MaterialDodecahedronHueBias),
+        Self::Scene(EffectTunerSceneParameter::MaterialSurfaceMode),
+        Self::Scene(EffectTunerSceneParameter::MaterialBaseSurface),
+        Self::Scene(EffectTunerSceneParameter::MaterialRootSurface),
+        Self::Scene(EffectTunerSceneParameter::MaterialAccentSurface),
+        Self::Scene(EffectTunerSceneParameter::MaterialAccentEveryNLevels),
+        Self::Scene(EffectTunerSceneParameter::MaterialLevelLightnessShift),
+        Self::Scene(EffectTunerSceneParameter::MaterialLevelSaturationShift),
+        Self::Scene(EffectTunerSceneParameter::MaterialLevelMetallicShift),
+        Self::Scene(EffectTunerSceneParameter::MaterialLevelRoughnessShift),
+        Self::Scene(EffectTunerSceneParameter::MaterialLevelReflectanceShift),
     ];
 
     pub(crate) fn all() -> &'static [Self] {
@@ -443,7 +940,9 @@ impl EffectTunerParameter {
     ) -> f32 {
         match self {
             Self::Effect(parameter) => parameter.adjustment_step(shift_pressed, alt_pressed),
-            Self::Scene(parameter) => parameter.adjustment_step(context, shift_pressed, alt_pressed),
+            Self::Scene(parameter) => {
+                parameter.adjustment_step(context, shift_pressed, alt_pressed)
+            }
         }
     }
 
@@ -454,7 +953,11 @@ impl EffectTunerParameter {
         }
     }
 
-    fn display_value(self, effects: &EffectsConfig, context: &EffectTunerViewContext<'_>) -> String {
+    fn display_value(
+        self,
+        effects: &EffectsConfig,
+        context: &EffectTunerViewContext<'_>,
+    ) -> String {
         match self {
             Self::Effect(parameter) => parameter.display_value(effects),
             Self::Scene(parameter) => parameter.display_value(context),
@@ -487,7 +990,8 @@ impl EffectTunerParameter {
             Self::Effect(parameter) => {
                 let current_value = parameter.value(effects);
                 let next_value = current_value
-                    + direction * parameter.adjustment_step(modifiers.shift_pressed, modifiers.alt_pressed);
+                    + direction
+                        * parameter.adjustment_step(modifiers.shift_pressed, modifiers.alt_pressed);
                 parameter.set_value(effects, next_value);
             }
             Self::Scene(parameter) => parameter.adjust_value(
@@ -511,7 +1015,11 @@ impl EffectTunerParameter {
         }
     }
 
-    fn status_message(self, effects: &EffectsConfig, context: &EffectTunerViewContext<'_>) -> String {
+    fn status_message(
+        self,
+        effects: &EffectsConfig,
+        context: &EffectTunerViewContext<'_>,
+    ) -> String {
         match self {
             Self::Effect(parameter) => format!(
                 "{} = {}",
@@ -883,16 +1391,7 @@ impl EffectTunerState {
         self.lfos = default_lfos();
         self.edit_mode = EffectEditMode::Value;
         self.clear_numeric_entry();
-        for parameter in [
-            EffectTunerSceneParameter::ChildKind,
-            EffectTunerSceneParameter::SpawnPlacementMode,
-            EffectTunerSceneParameter::SpawnAddMode,
-            EffectTunerSceneParameter::ChildScaleRatio,
-            EffectTunerSceneParameter::ChildTwistPerVertexRadians,
-            EffectTunerSceneParameter::ChildOutwardOffsetRatio,
-            EffectTunerSceneParameter::ChildSpawnExclusionProbability,
-            EffectTunerSceneParameter::GlobalOpacity,
-        ] {
+        for parameter in EffectTunerSceneParameter::all() {
             parameter.reset_value(context);
         }
         self.note_interaction(now_secs);
@@ -1015,14 +1514,19 @@ impl EffectTunerState {
         fallback
     }
 
-    fn apply_numeric_entry_to_selected(&mut self, context: &mut EffectTunerEditContext<'_>) -> bool {
+    fn apply_numeric_entry_to_selected(
+        &mut self,
+        context: &mut EffectTunerEditContext<'_>,
+    ) -> bool {
         let Some(value) = self.numeric_entry.parsed_value() else {
             return false;
         };
 
         let parameter = self.selected_parameter();
         match self.displayed_edit_mode() {
-            EffectEditMode::Value => return parameter.apply_numeric_value_input(&mut self.current, context, value),
+            EffectEditMode::Value => {
+                return parameter.apply_numeric_value_input(&mut self.current, context, value);
+            }
             EffectEditMode::LfoAmplitude => self.selected_lfo_mut().amplitude = value.max(0.0),
             EffectEditMode::LfoFrequency => self.selected_lfo_mut().frequency_hz = value.max(0.0),
             EffectEditMode::LfoShape => return false,
@@ -1084,7 +1588,10 @@ fn cycle_from_all<T>(all: &[T], current: T, direction: isize) -> T
 where
     T: Copy + Eq,
 {
-    let current_index = all.iter().position(|candidate| *candidate == current).unwrap_or(0) as isize;
+    let current_index = all
+        .iter()
+        .position(|candidate| *candidate == current)
+        .unwrap_or(0) as isize;
     let next_index = (current_index + direction).rem_euclid(all.len() as isize) as usize;
     all[next_index]
 }
@@ -1099,10 +1606,7 @@ fn cycle_polyhedron_kind(current: PolyhedronKind, direction: isize) -> Polyhedro
     cycle_from_all(&ALL, current, direction)
 }
 
-fn cycle_spawn_placement_mode(
-    current: SpawnPlacementMode,
-    direction: isize,
-) -> SpawnPlacementMode {
+fn cycle_spawn_placement_mode(current: SpawnPlacementMode, direction: isize) -> SpawnPlacementMode {
     const ALL: [SpawnPlacementMode; 3] = [
         SpawnPlacementMode::Vertex,
         SpawnPlacementMode::Edge,
@@ -1116,12 +1620,54 @@ fn cycle_spawn_add_mode(current: SpawnAddMode, direction: isize) -> SpawnAddMode
     cycle_from_all(&ALL, current, direction)
 }
 
+fn cycle_material_surface_mode(
+    current: MaterialSurfaceMode,
+    direction: isize,
+) -> MaterialSurfaceMode {
+    const ALL: [MaterialSurfaceMode; 2] =
+        [MaterialSurfaceMode::Legacy, MaterialSurfaceMode::Procedural];
+    cycle_from_all(&ALL, current, direction)
+}
+
+fn cycle_material_surface_family(
+    current: MaterialSurfaceFamily,
+    direction: isize,
+) -> MaterialSurfaceFamily {
+    const ALL: [MaterialSurfaceFamily; 6] = [
+        MaterialSurfaceFamily::Legacy,
+        MaterialSurfaceFamily::Matte,
+        MaterialSurfaceFamily::Satin,
+        MaterialSurfaceFamily::Glossy,
+        MaterialSurfaceFamily::Metal,
+        MaterialSurfaceFamily::Frosted,
+    ];
+    cycle_from_all(&ALL, current, direction)
+}
+
 fn polyhedron_kind_value_text(kind: PolyhedronKind) -> &'static str {
     match kind {
         PolyhedronKind::Cube => "cube",
         PolyhedronKind::Tetrahedron => "tetrahedron",
         PolyhedronKind::Octahedron => "octahedron",
         PolyhedronKind::Dodecahedron => "dodecahedron",
+    }
+}
+
+fn material_surface_mode_value_text(mode: MaterialSurfaceMode) -> &'static str {
+    match mode {
+        MaterialSurfaceMode::Legacy => "legacy",
+        MaterialSurfaceMode::Procedural => "procedural",
+    }
+}
+
+fn material_surface_family_value_text(family: MaterialSurfaceFamily) -> &'static str {
+    match family {
+        MaterialSurfaceFamily::Legacy => "legacy",
+        MaterialSurfaceFamily::Matte => "matte",
+        MaterialSurfaceFamily::Satin => "satin",
+        MaterialSurfaceFamily::Glossy => "glossy",
+        MaterialSurfaceFamily::Metal => "metal",
+        MaterialSurfaceFamily::Frosted => "frosted",
     }
 }
 
@@ -1141,7 +1687,9 @@ fn effect_parameter_index(parameter: EffectNumericParameter) -> Option<usize> {
 
 #[cfg(test)]
 mod tests {
-    use crate::config::{EffectGroup, EffectsConfig, GenerationConfig, MaterialConfig};
+    use crate::config::{
+        EffectGroup, EffectsConfig, GenerationConfig, MaterialConfig, MaterialSurfaceMode,
+    };
     use crate::effect_tuner::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LfoShape};
     use crate::effect_tuner::metadata::{EffectEditMode, EffectOverlayField};
     use crate::scene::{GenerationState, MaterialState};
@@ -1160,9 +1708,7 @@ mod tests {
         let generation_config = GenerationConfig::default();
         let generation_state = GenerationState::from_config(&generation_config);
         let material_config = MaterialConfig::default();
-        let material_state = MaterialState {
-            opacity: material_config.default_opacity_clamped(),
-        };
+        let material_state = MaterialState::from_config(&material_config);
         (
             generation_config,
             generation_state,
@@ -1211,7 +1757,10 @@ mod tests {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
         effect_tuner.selected_index = 17;
 
-        assert_eq!(effect_tuner.selected_effect_group(), Some(EffectGroup::Bloom));
+        assert_eq!(
+            effect_tuner.selected_effect_group(),
+            Some(EffectGroup::Bloom)
+        );
     }
 
     #[test]
@@ -1442,7 +1991,9 @@ mod tests {
         assert_eq!(snapshot.active_field, EffectOverlayField::LfoAmplitude);
         assert_eq!(
             snapshot.value_text,
-            effect_tuner.selected_parameter().display_value(&effect_tuner.current, &view)
+            effect_tuner
+                .selected_parameter()
+                .display_value(&effect_tuner.current, &view)
         );
     }
 
@@ -1483,7 +2034,9 @@ mod tests {
         assert_eq!(snapshot.parameter_label, "mod");
         assert_eq!(
             snapshot.value_text,
-            effect_tuner.selected_parameter().display_value(&effect_tuner.current, &view)
+            effect_tuner
+                .selected_parameter()
+                .display_value(&effect_tuner.current, &view)
         );
     }
 
@@ -1545,8 +2098,15 @@ mod tests {
         generation_state.spawn_add_mode = crate::polyhedra::SpawnAddMode::FillLevel;
         generation_state
             .parameter_mut(crate::parameters::GenerationParameter::ChildOutwardOffsetRatio)
-            .adjust_clamped_base_value(1.5, generation_config.parameter_spec(crate::parameters::GenerationParameter::ChildOutwardOffsetRatio));
+            .adjust_clamped_base_value(
+                1.5,
+                generation_config.parameter_spec(
+                    crate::parameters::GenerationParameter::ChildOutwardOffsetRatio,
+                ),
+            );
         material_state.opacity = 0.25;
+        material_state.saturation = 0.12;
+        material_state.surface_mode = MaterialSurfaceMode::Procedural;
 
         effect_tuner.reset_all(
             &mut edit_context(
@@ -1567,7 +2127,10 @@ mod tests {
                 &material_state,
             ))
         );
-        assert_eq!(generation_state.selected_kind, generation_config.default_child_kind);
+        assert_eq!(
+            generation_state.selected_kind,
+            generation_config.default_child_kind
+        );
         assert_eq!(
             generation_state.spawn_placement_mode,
             generation_config.default_spawn_placement_mode
@@ -1576,7 +2139,12 @@ mod tests {
             generation_state.spawn_add_mode,
             crate::polyhedra::SpawnAddMode::default()
         );
-        assert_eq!(material_state.opacity, material_config.default_opacity_clamped());
+        assert_eq!(
+            material_state.opacity,
+            material_config.default_opacity_clamped()
+        );
+        assert_eq!(material_state.saturation, material_config.saturation);
+        assert_eq!(material_state.surface_mode, material_config.surface_mode);
     }
 
     #[test]
@@ -1638,5 +2206,63 @@ mod tests {
             1.0,
         ));
         assert_eq!(generation_state.selected_kind, before);
+    }
+
+    #[test]
+    fn material_numeric_parameter_updates_runtime_state() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (generation_config, mut generation_state, material_config, mut material_state) =
+            default_scene_state();
+        select_parameter(
+            &mut effect_tuner,
+            EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialMetallic),
+        );
+
+        assert!(effect_tuner.append_numeric_input(
+            '1',
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+            ),
+            1.0,
+        ));
+
+        assert_eq!(material_state.metallic, 1.0);
+    }
+
+    #[test]
+    fn material_enum_parameter_cycles_with_adjustment() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (generation_config, mut generation_state, material_config, mut material_state) =
+            default_scene_state();
+        select_parameter(
+            &mut effect_tuner,
+            EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialSurfaceMode),
+        );
+
+        assert!(effect_tuner.step_adjustment(
+            1.0,
+            HoldInput {
+                just_pressed: true,
+                pressed: true,
+                just_released: false,
+                delta_secs: 0.0,
+            },
+            crate::effect_tuner::state::AdjustmentModifiers {
+                shift_pressed: false,
+                alt_pressed: false,
+            },
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+            ),
+            1.0,
+        ));
+
+        assert_eq!(material_state.surface_mode, MaterialSurfaceMode::Procedural);
     }
 }

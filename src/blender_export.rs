@@ -202,6 +202,7 @@ impl BlendExportFile {
             material_state,
             effect_tuner,
         );
+        let live_material_config = state_snapshot.materials.clone();
         let effects = state_snapshot.effects.clone();
         let camera_position_bevy =
             camera_rig.orientation * Vec3::new(0.0, 0.0, camera_rig.distance);
@@ -267,7 +268,7 @@ impl BlendExportFile {
                         node_index,
                         node,
                         shape_assets,
-                        &app_config.materials,
+                        &live_material_config,
                         material_state.opacity,
                     )
                 })

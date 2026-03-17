@@ -261,6 +261,7 @@ fn apply_scene_preset(
         .effect_tuner
         .apply_runtime_snapshot(&prepared.effects);
     *runtime.generation_state = prepared.generation;
+    *runtime.material_state = MaterialState::from_config(&runtime.app_config.materials);
     runtime.material_state.opacity = prepared.material_opacity;
 
     for entity in runtime.light_entities.iter() {
@@ -280,6 +281,9 @@ fn apply_scene_preset(
         &mut runtime.materials,
         &runtime.app_config.rendering,
     );
+    let material_config = runtime
+        .material_state
+        .runtime_material_config(&runtime.app_config.materials);
 
     for (node_index, node) in runtime.generation_state.nodes.iter().enumerate() {
         spawn_polyhedron_entity(
@@ -287,7 +291,7 @@ fn apply_scene_preset(
             &mut runtime.materials,
             runtime.shape_assets.mesh(node.kind),
             node,
-            &runtime.app_config.materials,
+            &material_config,
             runtime.material_state.opacity,
             node_index,
         );

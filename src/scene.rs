@@ -4,8 +4,8 @@ use bevy::prelude::*;
 
 use crate::camera::{CameraRig, SceneCamera};
 use crate::config::{
-    AppConfig, GenerationConfig, MaterialConfig, MaterialSurfaceFamily, RenderingConfig,
-    StageSurfaceConfig,
+    AppConfig, GenerationConfig, MaterialConfig, MaterialSurfaceFamily, MaterialSurfaceMode,
+    RenderingConfig, StageSurfaceConfig,
 };
 use crate::effects::{camera_effects_from_config, effects_status_messages};
 use crate::generation::{
@@ -256,6 +256,79 @@ impl GenerationState {
 #[derive(Resource)]
 pub(crate) struct MaterialState {
     pub(crate) opacity: f32,
+    pub(crate) hue_step_per_level: f32,
+    pub(crate) saturation: f32,
+    pub(crate) lightness: f32,
+    pub(crate) metallic: f32,
+    pub(crate) perceptual_roughness: f32,
+    pub(crate) reflectance: f32,
+    pub(crate) cube_hue_bias: f32,
+    pub(crate) tetrahedron_hue_bias: f32,
+    pub(crate) octahedron_hue_bias: f32,
+    pub(crate) dodecahedron_hue_bias: f32,
+    pub(crate) surface_mode: MaterialSurfaceMode,
+    pub(crate) base_surface: MaterialSurfaceFamily,
+    pub(crate) root_surface: MaterialSurfaceFamily,
+    pub(crate) accent_surface: MaterialSurfaceFamily,
+    pub(crate) accent_every_n_levels: usize,
+    pub(crate) level_lightness_shift: f32,
+    pub(crate) level_saturation_shift: f32,
+    pub(crate) level_metallic_shift: f32,
+    pub(crate) level_roughness_shift: f32,
+    pub(crate) level_reflectance_shift: f32,
+}
+
+impl MaterialState {
+    pub(crate) fn from_config(material_config: &MaterialConfig) -> Self {
+        Self {
+            opacity: material_config.default_opacity_clamped(),
+            hue_step_per_level: material_config.hue_step_per_level,
+            saturation: material_config.saturation,
+            lightness: material_config.lightness,
+            metallic: material_config.metallic,
+            perceptual_roughness: material_config.perceptual_roughness,
+            reflectance: material_config.reflectance,
+            cube_hue_bias: material_config.cube_hue_bias,
+            tetrahedron_hue_bias: material_config.tetrahedron_hue_bias,
+            octahedron_hue_bias: material_config.octahedron_hue_bias,
+            dodecahedron_hue_bias: material_config.dodecahedron_hue_bias,
+            surface_mode: material_config.surface_mode,
+            base_surface: material_config.base_surface,
+            root_surface: material_config.root_surface,
+            accent_surface: material_config.accent_surface,
+            accent_every_n_levels: material_config.accent_every_n_levels,
+            level_lightness_shift: material_config.level_lightness_shift,
+            level_saturation_shift: material_config.level_saturation_shift,
+            level_metallic_shift: material_config.level_metallic_shift,
+            level_roughness_shift: material_config.level_roughness_shift,
+            level_reflectance_shift: material_config.level_reflectance_shift,
+        }
+    }
+
+    pub(crate) fn runtime_material_config(&self, defaults: &MaterialConfig) -> MaterialConfig {
+        let mut config = defaults.clone();
+        config.hue_step_per_level = self.hue_step_per_level;
+        config.saturation = self.saturation;
+        config.lightness = self.lightness;
+        config.metallic = self.metallic;
+        config.perceptual_roughness = self.perceptual_roughness;
+        config.reflectance = self.reflectance;
+        config.cube_hue_bias = self.cube_hue_bias;
+        config.tetrahedron_hue_bias = self.tetrahedron_hue_bias;
+        config.octahedron_hue_bias = self.octahedron_hue_bias;
+        config.dodecahedron_hue_bias = self.dodecahedron_hue_bias;
+        config.surface_mode = self.surface_mode;
+        config.base_surface = self.base_surface;
+        config.root_surface = self.root_surface;
+        config.accent_surface = self.accent_surface;
+        config.accent_every_n_levels = self.accent_every_n_levels;
+        config.level_lightness_shift = self.level_lightness_shift;
+        config.level_saturation_shift = self.level_saturation_shift;
+        config.level_metallic_shift = self.level_metallic_shift;
+        config.level_roughness_shift = self.level_roughness_shift;
+        config.level_reflectance_shift = self.level_reflectance_shift;
+        config
+    }
 }
 
 #[derive(Component)]
@@ -289,7 +362,9 @@ pub(crate) fn setup_scene(
     let ui_theme = load_ui_theme(&asset_server, &app_config.ui);
     let shape_assets = ShapeAssets::new(&mut meshes);
     let root = root_generation_node(&shape_assets.catalog, &app_config.generation);
-    let initial_opacity = app_config.materials.default_opacity_clamped();
+    let material_state = MaterialState::from_config(&app_config.materials);
+    let runtime_material_config = material_state.runtime_material_config(&app_config.materials);
+    let initial_opacity = material_state.opacity;
 
     spawn_scene_lights(&mut commands, &app_config);
     spawn_stage_entities(
@@ -304,7 +379,7 @@ pub(crate) fn setup_scene(
         &mut materials,
         shape_assets.mesh(root.kind),
         &root,
-        &app_config.materials,
+        &runtime_material_config,
         initial_opacity,
         0,
     );
@@ -343,9 +418,7 @@ pub(crate) fn setup_scene(
         parameters: initial_parameters,
         spawn_hold: HoldRepeatState::default(),
     });
-    commands.insert_resource(MaterialState {
-        opacity: initial_opacity,
-    });
+    commands.insert_resource(material_state);
 
     println!("{}", startup_controls_message());
     println!("{}", startup_fx_message());

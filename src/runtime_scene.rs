@@ -47,8 +47,14 @@ pub(crate) struct GenerationSceneAccess<'w, 's> {
     pub(crate) material_state: ResMut<'w, MaterialState>,
     pub(crate) materials: ResMut<'w, Assets<StandardMaterial>>,
     pub(crate) polyhedron_entities: Query<'w, 's, Entity, With<PolyhedronEntity>>,
-    pub(crate) polyhedron_materials:
-        Query<'w, 's, &'static MeshMaterial3d<StandardMaterial>, With<PolyhedronEntity>>,
+    pub(crate) polyhedron_materials: Query<
+        'w,
+        's,
+        (
+            &'static PolyhedronEntity,
+            &'static MeshMaterial3d<StandardMaterial>,
+        ),
+    >,
     pub(crate) polyhedron_transforms:
         Query<'w, 's, (&'static PolyhedronEntity, &'static mut Transform)>,
 }

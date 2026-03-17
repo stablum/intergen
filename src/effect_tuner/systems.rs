@@ -3,12 +3,12 @@ use bevy::{input::keyboard::KeyboardInput, prelude::*};
 use crate::camera::SceneCamera;
 use crate::control_page::{ControlPage, ControlPageState};
 use crate::effects::{CameraEffectsSettings, camera_effects_from_config};
-use crate::generation::{apply_global_opacity, recompute_generation_tree};
+use crate::generation::{apply_live_material_state, recompute_generation_tree};
 use crate::runtime_scene::GenerationSceneAccess;
 
 use super::state::{
-    AdjustmentModifiers, EffectTunerEditContext, EffectTunerParameter,
-    EffectTunerSceneParameter, EffectTunerState, EffectTunerViewContext,
+    AdjustmentModifiers, EffectTunerEditContext, EffectTunerParameter, EffectTunerSceneParameter,
+    EffectTunerState, EffectTunerViewContext,
 };
 use crate::parameters::HoldInput;
 
@@ -84,7 +84,10 @@ pub(crate) fn effect_tuner_input_system(
         },
         now_secs,
     ) {
-        println!("Selected control: {}", effect_tuner.selected_parameter().label());
+        println!(
+            "Selected control: {}",
+            effect_tuner.selected_parameter().label()
+        );
     }
 
     if effect_tuner.step_selection(
@@ -97,7 +100,10 @@ pub(crate) fn effect_tuner_input_system(
         },
         now_secs,
     ) {
-        println!("Selected control: {}", effect_tuner.selected_parameter().label());
+        println!(
+            "Selected control: {}",
+            effect_tuner.selected_parameter().label()
+        );
     }
 
     let adjusted_up = {
@@ -318,9 +324,31 @@ fn apply_selected_parameter_side_effects(
         | EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildOutwardOffsetRatio) => {
             recompute_generation_tree(scene);
         }
-        EffectTunerParameter::Scene(EffectTunerSceneParameter::GlobalOpacity) => {
-            apply_global_opacity(
-                scene.material_state.opacity,
+        EffectTunerParameter::Scene(EffectTunerSceneParameter::GlobalOpacity)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialHueStepPerLevel)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialSaturation)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialLightness)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialMetallic)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialPerceptualRoughness)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialReflectance)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialCubeHueBias)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialTetrahedronHueBias)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialOctahedronHueBias)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialDodecahedronHueBias)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialSurfaceMode)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialBaseSurface)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialRootSurface)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialAccentSurface)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialAccentEveryNLevels)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialLevelLightnessShift)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialLevelSaturationShift)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialLevelMetallicShift)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialLevelRoughnessShift)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialLevelReflectanceShift) => {
+            apply_live_material_state(
+                &scene.generation_state,
+                &scene.app_config.materials,
+                &scene.material_state,
                 &mut scene.materials,
                 &scene.polyhedron_materials,
             );
@@ -330,16 +358,17 @@ fn apply_selected_parameter_side_effects(
         | EffectTunerParameter::Scene(EffectTunerSceneParameter::SpawnPlacementMode)
         | EffectTunerParameter::Scene(EffectTunerSceneParameter::SpawnAddMode)
         | EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildScaleRatio)
-        | EffectTunerParameter::Scene(
-            EffectTunerSceneParameter::ChildSpawnExclusionProbability,
-        ) => {}
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildSpawnExclusionProbability) => {
+        }
     }
 }
 
 fn apply_reset_all_side_effects(scene: &mut GenerationSceneAccess<'_, '_>) {
     recompute_generation_tree(scene);
-    apply_global_opacity(
-        scene.material_state.opacity,
+    apply_live_material_state(
+        &scene.generation_state,
+        &scene.app_config.materials,
+        &scene.material_state,
         &mut scene.materials,
         &scene.polyhedron_materials,
     );
