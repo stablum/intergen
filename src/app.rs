@@ -47,7 +47,7 @@ pub fn run() {
 
     let mut app = App::new();
     app.insert_resource(ClearColor(app_config.rendering.clear_color()))
-        .insert_resource(AmbientLight {
+        .insert_resource(GlobalAmbientLight {
             color: app_config.rendering.ambient_light_color(),
             brightness: app_config.rendering.ambient_light_brightness,
             ..default()

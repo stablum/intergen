@@ -647,11 +647,11 @@ fn spawn_effect_tuner_editable_slot(
                     px(EFFECT_TUNER_FIELD_PADDING_Y),
                 ),
                 align_items: AlignItems::Center,
+                border_radius: BorderRadius::all(px(999.0)),
                 flex_shrink: 0.0,
                 ..default()
             },
             BackgroundColor(Color::NONE),
-            BorderRadius::all(px(999.0)),
             EffectTunerEditableField(field),
         ))
         .with_children(|slot| {
@@ -695,12 +695,12 @@ fn spawn_keyboard_help_key(
                 justify_content: JustifyContent::Center,
                 align_items: AlignItems::Center,
                 border: UiRect::all(px(KEYBOARD_HELP_KEY_BORDER)),
+                border_radius: BorderRadius::all(px(8.0)),
                 flex_shrink: 0.0,
                 ..default()
             },
             BackgroundColor(Color::NONE),
             BorderColor::all(keyboard_help_outline_color()),
-            BorderRadius::all(px(8.0)),
             KeyboardHelpKey {
                 message: spec.message,
             },
@@ -753,10 +753,10 @@ fn spawn_keyboard_help_overlay(
                         align_items: AlignItems::Center,
                         row_gap: px(18.0),
                         padding: UiRect::all(px(ui_config.panel_padding)),
+                        border_radius: BorderRadius::all(px(ui_config.panel_radius)),
                         ..default()
                     },
                     BackgroundColor(Color::NONE),
-                    BorderRadius::all(px(ui_config.panel_radius)),
                 ))
                 .with_children(|panel| {
                     panel.spawn((
@@ -813,10 +813,10 @@ fn spawn_keyboard_help_overlay(
                                 padding: UiRect::all(px(ui_config.hint_padding_x)),
                                 justify_content: JustifyContent::Center,
                                 align_items: AlignItems::Center,
+                                border_radius: BorderRadius::all(px(12.0)),
                                 ..default()
                             },
                             BackgroundColor(Color::NONE),
-                            BorderRadius::all(px(12.0)),
                         ))
                         .with_children(|tooltip| {
                             tooltip.spawn((
@@ -865,10 +865,10 @@ fn spawn_preset_ui(
                             px(ui_config.hint_padding_x),
                             px((ui_config.hint_padding_y - 1.0).max(4.0)),
                         ),
+                        border_radius: BorderRadius::all(px(999.0)),
                         ..default()
                     },
                     BackgroundColor(srgba(ui_config.panel_background)),
-                    BorderRadius::all(px(999.0)),
                 ))
                 .with_children(|panel| {
                     panel.spawn((
@@ -901,10 +901,10 @@ fn spawn_preset_ui(
                     Node {
                         max_width: px(ui_config.panel_max_width),
                         padding: UiRect::all(px(ui_config.panel_padding * 0.7)),
+                        border_radius: BorderRadius::all(px(ui_config.panel_radius)),
                         ..default()
                     },
                     BackgroundColor(srgba(ui_config.panel_background)),
-                    BorderRadius::all(px(ui_config.panel_radius)),
                 ))
                 .with_children(|panel| {
                     panel.spawn((
@@ -983,10 +983,10 @@ pub(crate) fn spawn_help_ui(
                             px(ui_config.hint_padding_x),
                             px((ui_config.hint_padding_y - 1.0).max(4.0)),
                         ),
+                        border_radius: BorderRadius::all(px(999.0)),
                         ..default()
                     },
                     BackgroundColor(srgba(ui_config.panel_background)),
-                    BorderRadius::all(px(999.0)),
                 ))
                 .with_children(|strip| {
                     spawn_effect_tuner_label(
@@ -1000,10 +1000,10 @@ pub(crate) fn spawn_help_ui(
                         .spawn((
                             Node {
                                 padding: UiRect::axes(px(7.0), px(3.0)),
+                                border_radius: BorderRadius::all(px(999.0)),
                                 ..default()
                             },
                             BackgroundColor(srgba(ui_config.hint_background)),
-                            BorderRadius::all(px(999.0)),
                             Visibility::Hidden,
                             EffectTunerPinnedBadge,
                         ))
@@ -1172,10 +1172,10 @@ pub(crate) fn spawn_help_ui(
                         flex_direction: FlexDirection::Column,
                         row_gap: px(ui_config.panel_row_gap),
                         padding: UiRect::all(px(ui_config.panel_padding)),
+                        border_radius: BorderRadius::all(px(ui_config.panel_radius)),
                         ..default()
                     },
                     BackgroundColor(srgba(ui_config.panel_background)),
-                    BorderRadius::all(px(ui_config.panel_radius)),
                 ))
                 .with_children(|panel| {
                     panel.spawn((

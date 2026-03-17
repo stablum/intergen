@@ -15,11 +15,11 @@ use bevy::{
             NodeRunError, RenderGraphContext, RenderGraphExt, RenderLabel, ViewNode, ViewNodeRunner,
         },
         render_resource::{
-            BindGroupEntries, BindGroupLayout, BindGroupLayoutEntries, CachedRenderPipelineId,
-            ColorTargetState, ColorWrites, FragmentState, Operations, PipelineCache,
-            RenderPassColorAttachment, RenderPassDescriptor, RenderPipelineDescriptor, Sampler,
-            SamplerBindingType, SamplerDescriptor, ShaderStages, ShaderType, TextureFormat,
-            TextureSampleType,
+            BindGroupEntries, BindGroupLayout, BindGroupLayoutDescriptor,
+            BindGroupLayoutEntries, CachedRenderPipelineId, ColorTargetState, ColorWrites,
+            FragmentState, Operations, PipelineCache, RenderPassColorAttachment,
+            RenderPassDescriptor, RenderPipelineDescriptor, Sampler, SamplerBindingType,
+            SamplerDescriptor, ShaderStages, ShaderType, TextureFormat, TextureSampleType,
             binding_types::{sampler, texture_2d, uniform_buffer},
         },
         renderer::{RenderContext, RenderDevice},
@@ -137,7 +137,7 @@ fn init_camera_effects_pipeline(
     fullscreen_shader: Res<FullscreenShader>,
     pipeline_cache: Res<PipelineCache>,
 ) {
-    let layout = render_device.create_bind_group_layout(
+    let layout_descriptor = BindGroupLayoutDescriptor::new(
         "camera_effects_bind_group_layout",
         &BindGroupLayoutEntries::sequential(
             ShaderStages::FRAGMENT,
@@ -148,11 +148,15 @@ fn init_camera_effects_pipeline(
             ),
         ),
     );
+    let layout = render_device.create_bind_group_layout(
+        "camera_effects_bind_group_layout",
+        &layout_descriptor.entries,
+    );
     let sampler = render_device.create_sampler(&SamplerDescriptor::default());
     let shader = asset_server.load(CAMERA_EFFECTS_SHADER_PATH);
     let pipeline_id = pipeline_cache.queue_render_pipeline(RenderPipelineDescriptor {
         label: Some("camera_effects_pipeline".into()),
-        layout: vec![layout.clone()],
+        layout: vec![layout_descriptor],
         vertex: fullscreen_shader.to_vertex_state(),
         fragment: Some(FragmentState {
             shader,
