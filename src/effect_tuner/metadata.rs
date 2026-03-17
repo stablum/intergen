@@ -46,9 +46,3 @@ pub(crate) enum EffectOverlayField {
     LfoFrequency,
     LfoShape,
 }
-
-impl EffectOverlayField {
-    pub(crate) fn accepts_numeric_entry(self) -> bool {
-        !matches!(self, Self::LfoShape)
-    }
-}

@@ -15,7 +15,7 @@ const EFFECT_TUNER_CHAR_WIDTH_FACTOR: f32 = 0.72;
 const EFFECT_TUNER_MIN_TEXT_WIDTH: f32 = 28.0;
 const EFFECT_TUNER_FIELD_PADDING_X: f32 = 10.0;
 const EFFECT_TUNER_FIELD_PADDING_Y: f32 = 4.0;
-const EFFECT_TUNER_NUMERIC_SLOT_CHARS: usize = 12;
+const EFFECT_TUNER_NUMERIC_SLOT_CHARS: usize = 18;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum UiFontSource {

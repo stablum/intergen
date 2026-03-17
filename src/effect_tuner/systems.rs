@@ -326,6 +326,9 @@ fn apply_selected_parameter_side_effects(
             );
         }
         EffectTunerParameter::Effect(_)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildKind)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::SpawnPlacementMode)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::SpawnAddMode)
         | EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildScaleRatio)
         | EffectTunerParameter::Scene(
             EffectTunerSceneParameter::ChildSpawnExclusionProbability,

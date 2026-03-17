@@ -24,7 +24,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - selectable child shape type
 - adjustable child scale ratio
 - toggleable in-app keybinding overlay
-- compact bottom live-control strip for shader FX toggles/LFOs plus scene and material runtime parameters
+- compact bottom live-control strip for shader FX toggles/LFOs plus numeric and enum-like scene/material runtime parameters
 - built-in screenshot capture for manual and scripted verification
 - Blender `.blend` export with compositor reconstruction and embedded effect/LFO metadata
 - containment rejection so obviously hidden fully-inside spawns are skipped
@@ -134,6 +134,7 @@ Camera-output edge detection uses these `effects.edge_detection` settings:
 
 The in-app F2 control page starts from the values loaded from `config.toml` at launch.
 - Live edits affect the running app only.
+- The F2 control list now includes enum-like scene controls such as child shape, spawn placement mode, and add mode.
 - `Tab` toggles the selected effect on or off.
 - `L` toggles the selected parameter LFO on or off.
 - `M` cycles the tuner edit target between parameter value, LFO amplitude, LFO frequency, and LFO shape.

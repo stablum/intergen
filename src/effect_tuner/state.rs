@@ -4,7 +4,12 @@ use serde::{Deserialize, Serialize};
 use crate::config::{
     EffectGroup, EffectNumericParameter, EffectsConfig, GenerationConfig, MaterialConfig,
 };
+use crate::generation::{
+    selected_child_shape_status_message, spawn_add_mode_status_message,
+    spawn_placement_mode_status_message,
+};
 use crate::parameters::{GenerationParameter, HoldInput, HoldRepeatState};
+use crate::polyhedra::{PolyhedronKind, SpawnAddMode, SpawnPlacementMode};
 use crate::scene::{GenerationState, MaterialState, opacity_status_message};
 
 use super::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LFO_FREQUENCY_STEP_HZ, LfoShape, ParameterLfo};
@@ -70,6 +75,9 @@ impl EffectTunerEditContext<'_> {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum EffectTunerSceneParameter {
+    ChildKind,
+    SpawnPlacementMode,
+    SpawnAddMode,
     ChildScaleRatio,
     ChildTwistPerVertexRadians,
     ChildOutwardOffsetRatio,
@@ -80,6 +88,9 @@ pub(crate) enum EffectTunerSceneParameter {
 impl EffectTunerSceneParameter {
     fn label(self) -> &'static str {
         match self {
+            Self::ChildKind => "generation.child_kind",
+            Self::SpawnPlacementMode => "generation.spawn_placement_mode",
+            Self::SpawnAddMode => "generation.spawn_add_mode",
             Self::ChildScaleRatio => "generation.child_scale_ratio",
             Self::ChildTwistPerVertexRadians => "generation.child_twist_per_vertex_radians",
             Self::ChildOutwardOffsetRatio => "generation.child_outward_offset_ratio",
@@ -90,6 +101,9 @@ impl EffectTunerSceneParameter {
 
     fn short_label(self) -> &'static str {
         match self {
+            Self::ChildKind => "shape",
+            Self::SpawnPlacementMode => "placement",
+            Self::SpawnAddMode => "add mode",
             Self::ChildScaleRatio => "scale",
             Self::ChildTwistPerVertexRadians => "twist",
             Self::ChildOutwardOffsetRatio => "offset",
@@ -101,15 +115,30 @@ impl EffectTunerSceneParameter {
     pub(crate) fn group_label(self) -> &'static str {
         match self {
             Self::GlobalOpacity => "mat",
-            Self::ChildScaleRatio
+            Self::ChildKind
+            | Self::SpawnPlacementMode
+            | Self::SpawnAddMode
+            | Self::ChildScaleRatio
             | Self::ChildTwistPerVertexRadians
             | Self::ChildOutwardOffsetRatio
             | Self::ChildSpawnExclusionProbability => "scene",
         }
     }
 
+    fn is_numeric(self) -> bool {
+        matches!(
+            self,
+            Self::ChildScaleRatio
+                | Self::ChildTwistPerVertexRadians
+                | Self::ChildOutwardOffsetRatio
+                | Self::ChildSpawnExclusionProbability
+                | Self::GlobalOpacity
+        )
+    }
+
     fn generation_parameter(self) -> Option<GenerationParameter> {
         match self {
+            Self::ChildKind | Self::SpawnPlacementMode | Self::SpawnAddMode => None,
             Self::ChildScaleRatio => Some(GenerationParameter::ChildScaleRatio),
             Self::ChildTwistPerVertexRadians => {
                 Some(GenerationParameter::ChildTwistPerVertexRadians)
@@ -147,6 +176,7 @@ impl EffectTunerSceneParameter {
 
     fn value(self, context: &EffectTunerViewContext<'_>) -> f32 {
         match self {
+            Self::ChildKind | Self::SpawnPlacementMode | Self::SpawnAddMode => 0.0,
             Self::ChildScaleRatio => context.generation_state.scale_ratio_base(),
             Self::ChildTwistPerVertexRadians => {
                 context.generation_state.twist_per_vertex_radians_base()
@@ -168,9 +198,18 @@ impl EffectTunerSceneParameter {
                 parameter_state.adjust_clamped_base_value(value - current, spec)
             }
             None => {
-                let (min_opacity, max_opacity) = context.material_config.opacity_bounds();
-                context.material_state.opacity = value.clamp(min_opacity, max_opacity);
-                context.material_state.opacity
+                match self {
+                    Self::GlobalOpacity => {
+                        let (min_opacity, max_opacity) = context.material_config.opacity_bounds();
+                        context.material_state.opacity = value.clamp(min_opacity, max_opacity);
+                        context.material_state.opacity
+                    }
+                    Self::ChildKind | Self::SpawnPlacementMode | Self::SpawnAddMode => 0.0,
+                    Self::ChildScaleRatio
+                    | Self::ChildTwistPerVertexRadians
+                    | Self::ChildOutwardOffsetRatio
+                    | Self::ChildSpawnExclusionProbability => unreachable!(),
+                }
             }
         }
     }
@@ -178,16 +217,111 @@ impl EffectTunerSceneParameter {
     fn default_value(self, context: &EffectTunerViewContext<'_>) -> f32 {
         match self.generation_parameter() {
             Some(parameter) => context.generation_config.parameter_spec(parameter).default_value(),
-            None => context.material_config.default_opacity_clamped(),
+            None => match self {
+                Self::GlobalOpacity => context.material_config.default_opacity_clamped(),
+                Self::ChildKind | Self::SpawnPlacementMode | Self::SpawnAddMode => 0.0,
+                Self::ChildScaleRatio
+                | Self::ChildTwistPerVertexRadians
+                | Self::ChildOutwardOffsetRatio
+                | Self::ChildSpawnExclusionProbability => unreachable!(),
+            },
         }
     }
 
     fn display_value(self, context: &EffectTunerViewContext<'_>) -> String {
-        format!("{:.3}", self.value(context))
+        match self {
+            Self::ChildKind => polyhedron_kind_value_text(context.generation_state.selected_kind)
+                .to_string(),
+            Self::SpawnPlacementMode => context
+                .generation_state
+                .spawn_placement_mode
+                .plural_label()
+                .to_string(),
+            Self::SpawnAddMode => context.generation_state.spawn_add_mode.label().to_string(),
+            Self::ChildScaleRatio
+            | Self::ChildTwistPerVertexRadians
+            | Self::ChildOutwardOffsetRatio
+            | Self::ChildSpawnExclusionProbability
+            | Self::GlobalOpacity => format!("{:.3}", self.value(context)),
+        }
+    }
+
+    fn apply_numeric_input(&self, context: &mut EffectTunerEditContext<'_>, value: f32) -> bool {
+        if !self.is_numeric() {
+            return false;
+        }
+
+        let _ = self.set_value(context, value);
+        true
+    }
+
+    fn adjust_value(
+        self,
+        context: &mut EffectTunerEditContext<'_>,
+        direction: f32,
+        shift_pressed: bool,
+        alt_pressed: bool,
+    ) {
+        match self {
+            Self::ChildKind => {
+                context.generation_state.selected_kind =
+                    cycle_polyhedron_kind(context.generation_state.selected_kind, direction as isize);
+            }
+            Self::SpawnPlacementMode => {
+                context.generation_state.spawn_placement_mode = cycle_spawn_placement_mode(
+                    context.generation_state.spawn_placement_mode,
+                    direction as isize,
+                );
+            }
+            Self::SpawnAddMode => {
+                context.generation_state.spawn_add_mode =
+                    cycle_spawn_add_mode(context.generation_state.spawn_add_mode, direction as isize);
+            }
+            Self::ChildScaleRatio
+            | Self::ChildTwistPerVertexRadians
+            | Self::ChildOutwardOffsetRatio
+            | Self::ChildSpawnExclusionProbability
+            | Self::GlobalOpacity => {
+                let current_value = self.value(&context.view());
+                let next_value =
+                    current_value + direction * self.adjustment_step(&context.view(), shift_pressed, alt_pressed);
+                let _ = self.set_value(context, next_value);
+            }
+        }
+    }
+
+    fn reset_value(self, context: &mut EffectTunerEditContext<'_>) {
+        match self {
+            Self::ChildKind => {
+                context.generation_state.selected_kind = context.generation_config.default_child_kind;
+            }
+            Self::SpawnPlacementMode => {
+                context.generation_state.spawn_placement_mode =
+                    context.generation_config.default_spawn_placement_mode;
+            }
+            Self::SpawnAddMode => {
+                context.generation_state.spawn_add_mode = SpawnAddMode::default();
+            }
+            Self::ChildScaleRatio
+            | Self::ChildTwistPerVertexRadians
+            | Self::ChildOutwardOffsetRatio
+            | Self::ChildSpawnExclusionProbability
+            | Self::GlobalOpacity => {
+                let default_value = self.default_value(&context.view());
+                let _ = self.set_value(context, default_value);
+            }
+        }
     }
 
     fn status_message(self, context: &EffectTunerViewContext<'_>) -> String {
         match self {
+            Self::ChildKind => selected_child_shape_status_message(context.generation_state.selected_kind),
+            Self::SpawnPlacementMode => {
+                spawn_placement_mode_status_message(context.generation_state.spawn_placement_mode)
+            }
+            Self::SpawnAddMode => {
+                spawn_add_mode_status_message(context.generation_state.spawn_add_mode)
+            }
             Self::ChildScaleRatio => {
                 format!("Child scale ratio: {:.2}", self.value(context))
             }
@@ -223,7 +357,7 @@ pub(crate) enum EffectTunerParameter {
 }
 
 impl EffectTunerParameter {
-    const ALL: [Self; 29] = [
+    const ALL: [Self; 32] = [
         Self::Effect(EffectNumericParameter::WavefolderGain),
         Self::Effect(EffectNumericParameter::WavefolderModulus),
         Self::Effect(EffectNumericParameter::LensStrength),
@@ -248,6 +382,9 @@ impl EffectTunerParameter {
         Self::Effect(EffectNumericParameter::EdgeColorR),
         Self::Effect(EffectNumericParameter::EdgeColorG),
         Self::Effect(EffectNumericParameter::EdgeColorB),
+        Self::Scene(EffectTunerSceneParameter::ChildKind),
+        Self::Scene(EffectTunerSceneParameter::SpawnPlacementMode),
+        Self::Scene(EffectTunerSceneParameter::SpawnAddMode),
         Self::Scene(EffectTunerSceneParameter::ChildScaleRatio),
         Self::Scene(EffectTunerSceneParameter::ChildTwistPerVertexRadians),
         Self::Scene(EffectTunerSceneParameter::ChildOutwardOffsetRatio),
@@ -291,6 +428,13 @@ impl EffectTunerParameter {
         matches!(self, Self::Effect(_))
     }
 
+    fn value_accepts_numeric_input(self) -> bool {
+        match self {
+            Self::Effect(_) => true,
+            Self::Scene(parameter) => parameter.is_numeric(),
+        }
+    }
+
     fn adjustment_step(
         self,
         context: &EffectTunerViewContext<'_>,
@@ -310,43 +454,60 @@ impl EffectTunerParameter {
         }
     }
 
-    fn value(self, effects: &EffectsConfig, context: &EffectTunerViewContext<'_>) -> f32 {
-        match self {
-            Self::Effect(parameter) => parameter.value(effects),
-            Self::Scene(parameter) => parameter.value(context),
-        }
-    }
-
-    fn set_value(
-        self,
-        effects: &mut EffectsConfig,
-        context: &mut EffectTunerEditContext<'_>,
-        value: f32,
-    ) -> f32 {
-        match self {
-            Self::Effect(parameter) => {
-                parameter.set_value(effects, value);
-                parameter.value(effects)
-            }
-            Self::Scene(parameter) => parameter.set_value(context, value),
-        }
-    }
-
-    fn default_value(
-        self,
-        effects: &EffectsConfig,
-        context: &EffectTunerViewContext<'_>,
-    ) -> f32 {
-        match self {
-            Self::Effect(parameter) => parameter.value(effects),
-            Self::Scene(parameter) => parameter.default_value(context),
-        }
-    }
-
     fn display_value(self, effects: &EffectsConfig, context: &EffectTunerViewContext<'_>) -> String {
         match self {
             Self::Effect(parameter) => parameter.display_value(effects),
             Self::Scene(parameter) => parameter.display_value(context),
+        }
+    }
+
+    fn apply_numeric_value_input(
+        self,
+        effects: &mut EffectsConfig,
+        context: &mut EffectTunerEditContext<'_>,
+        value: f32,
+    ) -> bool {
+        match self {
+            Self::Effect(parameter) => {
+                parameter.set_value(effects, value);
+                true
+            }
+            Self::Scene(parameter) => parameter.apply_numeric_input(context, value),
+        }
+    }
+
+    fn adjust_value(
+        self,
+        effects: &mut EffectsConfig,
+        context: &mut EffectTunerEditContext<'_>,
+        direction: f32,
+        modifiers: AdjustmentModifiers,
+    ) {
+        match self {
+            Self::Effect(parameter) => {
+                let current_value = parameter.value(effects);
+                let next_value = current_value
+                    + direction * parameter.adjustment_step(modifiers.shift_pressed, modifiers.alt_pressed);
+                parameter.set_value(effects, next_value);
+            }
+            Self::Scene(parameter) => parameter.adjust_value(
+                context,
+                direction,
+                modifiers.shift_pressed,
+                modifiers.alt_pressed,
+            ),
+        }
+    }
+
+    fn reset_value(
+        self,
+        defaults: &EffectsConfig,
+        effects: &mut EffectsConfig,
+        context: &mut EffectTunerEditContext<'_>,
+    ) {
+        match self {
+            Self::Effect(parameter) => parameter.set_value(effects, parameter.value(defaults)),
+            Self::Scene(parameter) => parameter.reset_value(context),
         }
     }
 
@@ -666,7 +827,7 @@ impl EffectTunerState {
         context: &mut EffectTunerEditContext<'_>,
         now_secs: f32,
     ) -> bool {
-        if !self.active_field().accepts_numeric_entry() {
+        if !self.active_field_accepts_numeric_entry() {
             return false;
         }
 
@@ -702,8 +863,7 @@ impl EffectTunerState {
         let parameter = self.selected_parameter();
         match self.displayed_edit_mode() {
             EffectEditMode::Value => {
-                let default_value = parameter.default_value(&self.defaults, &context.view());
-                let _ = parameter.set_value(&mut self.current, context, default_value);
+                parameter.reset_value(&self.defaults, &mut self.current, context);
             }
             EffectEditMode::LfoAmplitude => {
                 self.selected_lfo_mut().amplitude = parameter.default_lfo_amplitude();
@@ -724,14 +884,16 @@ impl EffectTunerState {
         self.edit_mode = EffectEditMode::Value;
         self.clear_numeric_entry();
         for parameter in [
+            EffectTunerSceneParameter::ChildKind,
+            EffectTunerSceneParameter::SpawnPlacementMode,
+            EffectTunerSceneParameter::SpawnAddMode,
             EffectTunerSceneParameter::ChildScaleRatio,
             EffectTunerSceneParameter::ChildTwistPerVertexRadians,
             EffectTunerSceneParameter::ChildOutwardOffsetRatio,
             EffectTunerSceneParameter::ChildSpawnExclusionProbability,
             EffectTunerSceneParameter::GlobalOpacity,
         ] {
-            let default_value = parameter.default_value(&context.view());
-            let _ = parameter.set_value(context, default_value);
+            parameter.reset_value(context);
         }
         self.note_interaction(now_secs);
     }
@@ -797,15 +959,7 @@ impl EffectTunerState {
         let parameter = self.selected_parameter();
         match self.displayed_edit_mode() {
             EffectEditMode::Value => {
-                let current_value = parameter.value(&self.current, &context.view());
-                let next_value = current_value
-                    + direction
-                        * parameter.adjustment_step(
-                            &context.view(),
-                            modifiers.shift_pressed,
-                            modifiers.alt_pressed,
-                        );
-                let _ = parameter.set_value(&mut self.current, context, next_value);
+                parameter.adjust_value(&mut self.current, context, direction, modifiers);
             }
             EffectEditMode::LfoAmplitude => {
                 let step = parameter.adjustment_step(
@@ -868,9 +1022,7 @@ impl EffectTunerState {
 
         let parameter = self.selected_parameter();
         match self.displayed_edit_mode() {
-            EffectEditMode::Value => {
-                let _ = parameter.set_value(&mut self.current, context, value);
-            }
+            EffectEditMode::Value => return parameter.apply_numeric_value_input(&mut self.current, context, value),
             EffectEditMode::LfoAmplitude => self.selected_lfo_mut().amplitude = value.max(0.0),
             EffectEditMode::LfoFrequency => self.selected_lfo_mut().frequency_hz = value.max(0.0),
             EffectEditMode::LfoShape => return false,
@@ -902,6 +1054,14 @@ impl EffectTunerState {
         }
     }
 
+    fn active_field_accepts_numeric_entry(&self) -> bool {
+        match self.displayed_edit_mode() {
+            EffectEditMode::Value => self.selected_parameter().value_accepts_numeric_input(),
+            EffectEditMode::LfoAmplitude | EffectEditMode::LfoFrequency => true,
+            EffectEditMode::LfoShape => false,
+        }
+    }
+
     fn coerce_edit_mode_for_selected(&mut self) {
         if !self.mode_supported_for_parameter(self.edit_mode, self.selected_parameter()) {
             self.edit_mode = EffectEditMode::Value;
@@ -917,6 +1077,51 @@ impl EffectTunerState {
         self.select_next_hold.reset();
         self.decrease_hold.reset();
         self.increase_hold.reset();
+    }
+}
+
+fn cycle_from_all<T>(all: &[T], current: T, direction: isize) -> T
+where
+    T: Copy + Eq,
+{
+    let current_index = all.iter().position(|candidate| *candidate == current).unwrap_or(0) as isize;
+    let next_index = (current_index + direction).rem_euclid(all.len() as isize) as usize;
+    all[next_index]
+}
+
+fn cycle_polyhedron_kind(current: PolyhedronKind, direction: isize) -> PolyhedronKind {
+    const ALL: [PolyhedronKind; 4] = [
+        PolyhedronKind::Cube,
+        PolyhedronKind::Tetrahedron,
+        PolyhedronKind::Octahedron,
+        PolyhedronKind::Dodecahedron,
+    ];
+    cycle_from_all(&ALL, current, direction)
+}
+
+fn cycle_spawn_placement_mode(
+    current: SpawnPlacementMode,
+    direction: isize,
+) -> SpawnPlacementMode {
+    const ALL: [SpawnPlacementMode; 3] = [
+        SpawnPlacementMode::Vertex,
+        SpawnPlacementMode::Edge,
+        SpawnPlacementMode::Face,
+    ];
+    cycle_from_all(&ALL, current, direction)
+}
+
+fn cycle_spawn_add_mode(current: SpawnAddMode, direction: isize) -> SpawnAddMode {
+    const ALL: [SpawnAddMode; 2] = [SpawnAddMode::Single, SpawnAddMode::FillLevel];
+    cycle_from_all(&ALL, current, direction)
+}
+
+fn polyhedron_kind_value_text(kind: PolyhedronKind) -> &'static str {
+    match kind {
+        PolyhedronKind::Cube => "cube",
+        PolyhedronKind::Tetrahedron => "tetrahedron",
+        PolyhedronKind::Octahedron => "octahedron",
+        PolyhedronKind::Dodecahedron => "dodecahedron",
     }
 }
 
@@ -942,7 +1147,7 @@ mod tests {
     use crate::scene::{GenerationState, MaterialState};
 
     use super::{
-        EffectTunerEditContext, EffectTunerSceneParameter, EffectTunerState,
+        EffectTunerEditContext, EffectTunerParameter, EffectTunerSceneParameter, EffectTunerState,
         EffectTunerViewContext, HoldInput,
     };
 
@@ -992,6 +1197,13 @@ mod tests {
             material_config,
             material_state,
         }
+    }
+
+    fn select_parameter(effect_tuner: &mut EffectTunerState, parameter: EffectTunerParameter) {
+        effect_tuner.selected_index = EffectTunerParameter::all()
+            .iter()
+            .position(|candidate| *candidate == parameter)
+            .expect("parameter should exist in the F2 parameter list");
     }
 
     #[test]
@@ -1300,7 +1512,10 @@ mod tests {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
         let (generation_config, generation_state, material_config, material_state) =
             default_scene_state();
-        effect_tuner.selected_index = 24;
+        select_parameter(
+            &mut effect_tuner,
+            EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildKind),
+        );
         effect_tuner.edit_mode = EffectEditMode::LfoShape;
 
         let snapshot = effect_tuner.overlay_snapshot(
@@ -1325,6 +1540,9 @@ mod tests {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
         let (generation_config, mut generation_state, material_config, mut material_state) =
             default_scene_state();
+        generation_state.selected_kind = crate::polyhedra::PolyhedronKind::Cube;
+        generation_state.spawn_placement_mode = crate::polyhedra::SpawnPlacementMode::Face;
+        generation_state.spawn_add_mode = crate::polyhedra::SpawnAddMode::FillLevel;
         generation_state
             .parameter_mut(crate::parameters::GenerationParameter::ChildOutwardOffsetRatio)
             .adjust_clamped_base_value(1.5, generation_config.parameter_spec(crate::parameters::GenerationParameter::ChildOutwardOffsetRatio));
@@ -1349,6 +1567,76 @@ mod tests {
                 &material_state,
             ))
         );
+        assert_eq!(generation_state.selected_kind, generation_config.default_child_kind);
+        assert_eq!(
+            generation_state.spawn_placement_mode,
+            generation_config.default_spawn_placement_mode
+        );
+        assert_eq!(
+            generation_state.spawn_add_mode,
+            crate::polyhedra::SpawnAddMode::default()
+        );
         assert_eq!(material_state.opacity, material_config.default_opacity_clamped());
+    }
+
+    #[test]
+    fn enum_scene_parameter_cycles_with_adjustment() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (generation_config, mut generation_state, material_config, mut material_state) =
+            default_scene_state();
+        select_parameter(
+            &mut effect_tuner,
+            EffectTunerParameter::Scene(EffectTunerSceneParameter::SpawnAddMode),
+        );
+
+        assert!(effect_tuner.step_adjustment(
+            1.0,
+            HoldInput {
+                just_pressed: true,
+                pressed: true,
+                just_released: false,
+                delta_secs: 0.0,
+            },
+            crate::effect_tuner::state::AdjustmentModifiers {
+                shift_pressed: false,
+                alt_pressed: false,
+            },
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+            ),
+            1.0,
+        ));
+
+        assert_eq!(
+            generation_state.spawn_add_mode,
+            crate::polyhedra::SpawnAddMode::FillLevel
+        );
+    }
+
+    #[test]
+    fn enum_scene_parameter_ignores_numeric_entry() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (generation_config, mut generation_state, material_config, mut material_state) =
+            default_scene_state();
+        select_parameter(
+            &mut effect_tuner,
+            EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildKind),
+        );
+        let before = generation_state.selected_kind;
+
+        assert!(!effect_tuner.append_numeric_input(
+            '1',
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+            ),
+            1.0,
+        ));
+        assert_eq!(generation_state.selected_kind, before);
     }
 }

@@ -116,7 +116,10 @@ fn handle_shape_selection(
         }
 
         generation_state.selected_kind = kind;
-        println!("Selected child shape: {:?}", generation_state.selected_kind);
+        println!(
+            "{}",
+            selected_child_shape_status_message(generation_state.selected_kind)
+        );
     }
 }
 
@@ -469,6 +472,10 @@ pub(crate) fn spawn_add_mode_status_message(mode: SpawnAddMode) -> String {
 
 pub(crate) fn spawn_placement_mode_status_message(mode: SpawnPlacementMode) -> String {
     format!("Spawn placement mode: {}", mode.plural_label())
+}
+
+pub(crate) fn selected_child_shape_status_message(kind: PolyhedronKind) -> String {
+    format!("Selected child shape: {:?}", kind)
 }
 
 fn spawn_summary_status_message(spawned: &[SpawnedNode], add_mode: SpawnAddMode) -> String {
