@@ -23,7 +23,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - recursive polyhedron spawning from parent vertices, edges, or faces
 - selectable child shape type
 - adjustable child scale ratio
-- toggleable in-app keybinding overlay
+- two-step in-app help overlay with text controls plus a hoverable neutral-mode keyboard map
 - compact bottom live-control strip for shader FX toggles/LFOs plus numeric and enum-like scene/material runtime parameters
 - built-in screenshot capture for manual and scripted verification
 - Blender `.blend` export with compositor reconstruction and embedded effect/LFO metadata

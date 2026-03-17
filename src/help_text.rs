@@ -6,8 +6,8 @@ struct HelpEntry {
 
 const TOP_LEVEL_HELP: [HelpEntry; 5] = [
     HelpEntry {
-        startup: "F1/H help",
-        overlay: "F1 / H: Toggle this overlay",
+        startup: "F1/H cycles help views",
+        overlay: "F1 / H: Cycle help views",
     },
     HelpEntry {
         startup: "F2 live control page",
