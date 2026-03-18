@@ -24,8 +24,9 @@ The current prototype focuses on a fast local development loop and a usable vert
 - selectable child shape type
 - adjustable child scale ratio
 - two-step in-app help overlay with text controls plus a hoverable neutral-mode keyboard map
-- compact bottom live-control strip for shader FX toggles/LFOs plus numeric and enum-like scene/material runtime parameters
+- pinned F2 control page for shader FX toggles/LFOs plus scene, stage, and material runtime parameters, including direct numeric entry for numeric fields
 - built-in screenshot capture for manual and scripted verification
+- scene preset save/load/free workflow with 100 slots and collision resolution
 - Blender `.blend` export with compositor reconstruction and embedded effect/LFO metadata
 - containment rejection so obviously hidden fully-inside spawns are skipped
 - camera-output shader stack with hard-wrap wavefolder, lens distortion, gaussian blur, bloom, and edge detection
@@ -134,13 +135,18 @@ Camera-output edge detection uses these `effects.edge_detection` settings:
 
 The in-app F2 control page starts from the values loaded from `config.toml` at launch.
 - Live edits affect the running app only.
-- The F2 control list now includes enum-like scene controls such as child shape, spawn placement mode, and add mode.
-- `Tab` toggles the selected effect on or off.
-- `L` toggles the selected parameter LFO on or off.
-- `M` cycles the tuner edit target between parameter value, LFO amplitude, LFO frequency, and LFO shape.
+- The F2 control list covers shader effects plus scene, stage, and material runtime controls, including enum-like fields such as child shape, spawn placement mode, add mode, stage toggles, and procedural surface families.
+- `Ctrl + Up` / `Ctrl + Down` select the active F2 control, with hold-to-repeat.
+- `Left` / `Right` or `Tab` / `Shift + Tab` switch the active F2 field between value, LFO amplitude, LFO frequency, and LFO shape when the selected parameter supports LFOs.
+- `Up` / `Down` adjust the active F2 field. `Shift` makes the step coarser and `Alt` makes it finer.
+- `Space` toggles the selected shader effect on or off.
+- `L` toggles the selected parameter LFO on or off when the selected parameter supports LFOs.
+- Type digits, `.`, `-`, or `+` to set the active numeric field directly. `Backspace` erases the typed numeric input.
 - LFO shapes currently available are `sine`, `triangle`, `saw`, `square`, `stepped random`, and `brownian motion`.
 - `Enter` resets the selected F2 field.
 - `Shift + Enter` resets all F2 controls to their startup defaults.
+- Scene, stage, and material controls are value-only. Only shader-effect parameters expose LFO fields.
+- `Esc` closes the active control page.
 - The tuner does not write changes back to `config.toml` automatically.
 
 Live opacity controls use these `materials` settings:
@@ -157,7 +163,7 @@ Preset behavior:
 - two digits (`00` to `99`) load the assigned scene preset for that bank and slot
 - `S` arms saving, then the next two digits choose the bank and slot assignment
 - `Delete` arms freeing, then the next two digits clear that slot assignment from any matching preset files
-- `Esc` cancels the pending preset command
+- `Esc` closes the preset page
 - if multiple preset files claim the same slot, a chooser appears; `Up` / `Down` selects which file keeps the slot and `Enter` confirms it
 
 Preset files are stored as TOML under `scene-presets/`. Filenames are unique and are not based on the bank and slot, so saving a new preset never overwrites an older file by name. The bank and slot assignment lives inside the preset file metadata.
@@ -165,10 +171,12 @@ Preset files are stored as TOML under `scene-presets/`. Filenames are unique and
 Current scene preset contents:
 - render clear color and ambient light
 - directional and point light settings
-- material palette/PBR settings and current global opacity
+- stage visibility plus floor/backdrop toggles
+- material palette/PBR settings, procedural surface-family settings, and current global opacity
 - camera position, distance, and momentum
 - current polyhedron tree, selected child shape, spawn placement mode, scale ratio, twist, outward offset, and global spawn-exclusion probability
 - live camera-output effect values plus all per-parameter LFO settings
+
 ## Blender Export
 
 Press `F4` during a normal interactive run to write a timestamped Blender scene under `blend-exports/`.
@@ -210,6 +218,12 @@ To save a verification screenshot and exit automatically:
 cargo run -- --capture screenshots\check.png --capture-delay-frames 120
 ```
 
+To load a scene preset on startup:
+
+```powershell
+cargo run -- --load-scene-preset scene-presets\example.toml
+```
+
 During a normal interactive run, press `F12` to save a screenshot under `screenshots/`.
 
 ## Test
@@ -230,22 +244,25 @@ cargo test-plain
 - `Arrow Left` / `Arrow Right`: yaw camera
 - `Q` / `E`: roll camera
 - `W` / `S`: zoom in / out
-- `Backspace`: stop camera rotation momentum
-- `F1` or `H`: toggle the keybinding overlay
-- `F2`: pin or unpin the bottom live-control strip
-- `Ctrl + Up` / `Ctrl + Down`: select the active F2 control
-- `Ctrl + Left` / `Ctrl + Right`: adjust the active F2 field, with hold-to-repeat
-- `Tab`: toggle the selected effect on or off
-- `L`: toggle the selected parameter LFO on or off
-- `M`: cycle F2 tuner edit mode between value, LFO amplitude, LFO frequency, and LFO shape, including the new random drift shapes
-- `Shift`: coarse F2 adjustment modifier
-- `Alt`: fine F2 adjustment modifier
-- `Enter`: reset the active F2 field
-- `Shift + Enter`: reset all F2 controls to their startup defaults
+- `Backspace`: stop camera rotation momentum, or erase typed numeric F2 input while the F2 page is focused
+- `F1` or `H`: cycle help views between hidden, text, and keyboard-map overlays
+- `F2`: open or close the pinned F2 control page
+- `F3`: open or close the scene preset page
+- `Esc`: close the active control page
+- `Ctrl + Up` / `Ctrl + Down` in F2: select the active F2 control, with hold-to-repeat
+- `Left` / `Right` or `Tab` / `Shift + Tab` in F2: switch the active F2 field
+- `Up` / `Down` in F2: adjust the active F2 field
+- `Space` in F2: toggle the selected shader effect on or off
+- `L` in F2: toggle the selected parameter LFO on or off when supported
+- `Shift` in F2: coarse adjustment modifier
+- `Alt` in F2: fine adjustment modifier
+- `Enter` in F2: reset the active F2 field
+- `Shift + Enter` in F2: reset all F2 controls to their startup defaults
 - `F4`: export the current scene to `blend-exports/` as a Blender `.blend`
 - `F12`: save a screenshot to `screenshots/`
 - `R`: reset the scene with the currently selected polyhedron as the new root
 - `Space`: spawn child polyhedra with the current placement mode, or hold to keep spawning
+- `Ctrl + Space`: cycle the add mode between single spawn and fill-current-level spawning
 - `G`: cycle the spawn placement mode between vertices, edges, and faces
 - `1`: select cube
 - `2`: select tetrahedron
@@ -279,7 +296,11 @@ Implemented now:
 - custom meshes for cube, tetrahedron, octahedron, and dodecahedron
 - recursive level-by-level spawning
 - metallic lit PBR scene
+- optional stage floor/backdrop plus procedural material surface families
+- F2 control page for shader effects, scene parameters, stage toggles, and material tuning
+- scene preset save/load/free support with slot-collision resolution
 - camera-output hard-wrap wavefolder, lens distortion, gaussian blur, bloom, and edge-detection post process
+- Blender export with embedded snapshot and effect/LFO metadata
 - unit tests for geometry counts and spawn ordering
 
 Not implemented yet:
