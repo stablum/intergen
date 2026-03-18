@@ -10,16 +10,13 @@ Runtime tuning lives in `config.toml` at the repository root.
 
 ![Recent Intergen screenshot 2](screenshots/intergen-1773391741-567-0001.png)
 
-![Recent Intergen screenshot 3](screenshots/intergen-2026-03-18_01-02-51-810-0001.png)
 
-![Recent Intergen screenshot 4](screenshots/intergen-2026-03-18_04-18-45-666-0000.png)
-
-| View 1 | View 2 |
 | --- | --- |
 | ![Intergen screenshot 0000](screenshots/intergen-0000.png) | ![Intergen screenshot 0001](screenshots/intergen-0001.png) |
 | ![Intergen screenshot 0002](screenshots/intergen-0002.png) | ![Intergen screenshot 0003](screenshots/intergen-0003.png) |
 | ![Intergen screenshot 0004](screenshots/intergen-0004.png) | ![Intergen screenshot 0005](screenshots/intergen-0005.png) |
 | ![Intergen screenshot 0006](screenshots/intergen-0006.png) | ![Intergen screenshot 0007](screenshots/intergen-0007.png) |
+| ![Recent Intergen screenshot 3](screenshots/intergen-2026-03-18_01-02-51-810-0001.png) | ![Recent Intergen screenshot 4](screenshots/intergen-2026-03-18_04-18-45-666-0000.png) |
 
 The current prototype focuses on a fast local development loop and a usable vertical slice:
 - inertial camera rotation on all 3 axes with preserved angular momentum
