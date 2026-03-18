@@ -10,6 +10,8 @@ Runtime tuning lives in `config.toml` at the repository root.
 
 ![Recent Intergen screenshot 2](screenshots/intergen-1773391741-567-0001.png)
 
+|  |   |
+| --- | --- |
 | ![Intergen screenshot 0000](screenshots/intergen-0000.png) | ![Intergen screenshot 0001](screenshots/intergen-0001.png) |
 | ![Intergen screenshot 0002](screenshots/intergen-0002.png) | ![Intergen screenshot 0003](screenshots/intergen-0003.png) |
 | ![Intergen screenshot 0004](screenshots/intergen-0004.png) | ![Intergen screenshot 0005](screenshots/intergen-0005.png) |
