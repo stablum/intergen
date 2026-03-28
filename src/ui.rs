@@ -504,7 +504,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
     generation_state: Res<GenerationState>,
     material_state: Res<MaterialState>,
     stage_state: Res<crate::scene::StageState>,
-    mut overlay_query: Query<&mut Visibility, With<EffectTunerListOverlay>>,
+    mut overlay_query: Query<(&mut Visibility, &mut Node), With<EffectTunerListOverlay>>,
     mut pinned_badge_query: Query<
         &mut Visibility,
         (
@@ -588,13 +588,18 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
         && effect_tuner.page_mode() == EffectTunerPageMode::List
         && effect_tuner.is_visible(now_secs);
 
-    let Ok(mut overlay_visibility) = overlay_query.single_mut() else {
+    let Ok((mut overlay_visibility, mut overlay_node)) = overlay_query.single_mut() else {
         return;
     };
     *overlay_visibility = if visible {
         Visibility::Visible
     } else {
         Visibility::Hidden
+    };
+    overlay_node.display = if visible {
+        Display::Flex
+    } else {
+        Display::None
     };
 
     let Ok(mut pinned_badge_visibility) = pinned_badge_query.single_mut() else {
@@ -1304,6 +1309,7 @@ fn spawn_effect_tuner_list_overlay(
     commands
         .spawn((
             Node {
+                display: Display::None,
                 position_type: PositionType::Absolute,
                 left: px(ui_config.hint_left),
                 right: px(ui_config.hint_left),
