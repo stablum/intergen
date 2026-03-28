@@ -3,3 +3,5 @@
 /blend-exports/
 /assets/fonts/*
 !/assets/fonts/README.md
+.env
+AGENTS.md

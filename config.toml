@@ -13,18 +13,18 @@ ambient_light_brightness = 3.5
 enabled = true
 
 [rendering.stage.floor]
-enabled = true
+enabled = false
 color = [0.11, 0.12, 0.14]
 translation = [0.0, -2.25, 0.0]
 rotation_degrees = [0.0, 0.0, 0.0]
 size = [32.0, 32.0]
 thickness = 0.3
 metallic = 0.08
-perceptual_roughness = 0.58
-reflectance = 0.28
+perceptual_roughness = 0.0
+reflectance = 1.0
 
 [rendering.stage.backdrop]
-enabled = true
+enabled = false
 color = [0.07, 0.08, 0.11]
 translation = [0.0, 2.0, -12.0]
 rotation_degrees = [0.0, 0.0, 0.0]
@@ -88,9 +88,9 @@ translation = [12.0, 2.0, 13.0]
 hue_step_per_level = 45.0
 saturation = 0.68
 lightness = 0.56
-metallic = 0.05
-perceptual_roughness = 0.86
-reflectance = 0.24
+metallic = 1.0
+perceptual_roughness = 0.0
+reflectance = 1.0
 default_opacity = 1.0
 opacity_adjust_step = 0.1
 min_opacity = 0.1
@@ -100,8 +100,8 @@ tetrahedron_hue_bias = 110.0
 octahedron_hue_bias = 205.0
 dodecahedron_hue_bias = 290.0
 surface_mode = "procedural"
-base_surface = "satin"
-root_surface = "glossy"
+base_surface = "metal"
+root_surface = "metal"
 accent_surface = "metal"
 accent_every_n_levels = 3
 level_lightness_shift = -0.012
@@ -151,7 +151,7 @@ gain = 10
 modulus = 3.0
 
 [effects.lens_distortion]
-enabled = true
+enabled = false
 strength = 0
 radial_k2 = 0
 radial_k3 = 0
