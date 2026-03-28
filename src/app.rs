@@ -24,7 +24,8 @@ use crate::presets::{
 use crate::scene::setup_scene;
 use crate::ui::{
     toggle_help_overlay_system, update_effect_tuner_list_overlay_system,
-    update_effect_tuner_overlay_system, update_preset_overlay_system, HelpOverlayState,
+    update_effect_tuner_overlay_system, update_keyboard_help_overlay_system,
+    update_preset_overlay_system, HelpOverlayState,
 };
 
 pub fn run() {
@@ -89,6 +90,7 @@ pub fn run() {
                 apply_effect_tuner_system,
                 update_effect_tuner_overlay_system,
                 update_effect_tuner_list_overlay_system,
+                update_keyboard_help_overlay_system,
                 update_preset_overlay_system,
             )
                 .chain(),
