@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-use crate::effect_tuner::EffectTunerState;
+use crate::effect_tuner::{EffectTunerPageMode, EffectTunerState};
 use crate::presets::PresetBrowserState;
 
 const EFFECT_TUNER_BINDINGS: [KeyBindingPattern; 10] = [
@@ -306,9 +306,17 @@ pub(crate) fn control_page_input_system(
 
     if keys.just_pressed(KeyCode::F2) {
         if control_page.is_active(ControlPage::EffectTuner) {
-            control_page.close_active_page();
-            effect_tuner.close_page();
-            println!("{}", ControlPage::EffectTuner.closed_message());
+            match effect_tuner.page_mode() {
+                EffectTunerPageMode::Compact => {
+                    effect_tuner.show_list_page(time.elapsed_secs());
+                    println!("F2 parameter list page pinned open.");
+                }
+                EffectTunerPageMode::List => {
+                    control_page.close_active_page();
+                    effect_tuner.close_page();
+                    println!("{}", ControlPage::EffectTuner.closed_message());
+                }
+            }
             return;
         }
 

@@ -2,10 +2,11 @@ use std::path::Path;
 
 use bevy::{ecs::hierarchy::ChildSpawnerCommands, prelude::*};
 
-use crate::config::{AppConfig, UiConfig, srgb, srgba};
+use crate::config::{srgb, srgba, AppConfig, UiConfig};
 use crate::control_page::{ControlPage, ControlPageState};
 use crate::effect_tuner::{
-    EffectOverlayField, EffectTunerParameter, EffectTunerState, EffectTunerViewContext,
+    EffectOverlayField, EffectTunerPageMode, EffectTunerParameter, EffectTunerState,
+    EffectTunerViewContext,
 };
 use crate::help_text::overlay_controls_text as shared_overlay_controls_text;
 use crate::presets::PresetBrowserState;
@@ -19,6 +20,8 @@ const EFFECT_TUNER_FIELD_PADDING_Y: f32 = 4.0;
 // slots tight while leaving a bit of headroom for manual numeric entry.
 const EFFECT_TUNER_LIVE_VALUE_CHARS: usize = 8;
 const EFFECT_TUNER_NUMERIC_INPUT_CHARS: usize = 10;
+const EFFECT_TUNER_LIST_VISIBLE_ROWS: usize = 9;
+const EFFECT_TUNER_LIST_PANEL_MAX_WIDTH: f32 = 1060.0;
 const KEYBOARD_HELP_UNUSED_TEXT: &str = "Unused in neutral mode.";
 const KEYBOARD_HELP_KEY_WIDTH: f32 = 44.0;
 const KEYBOARD_HELP_KEY_HEIGHT: f32 = 42.0;
@@ -37,7 +40,12 @@ struct KeyboardHelpKeySpec {
 const KEYBOARD_FUNCTION_ROW: [KeyboardHelpKeySpec; 13] = [
     keyboard_help_key("Esc", 1.2, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("F1", 1.0, true, "Cycle the help overlay views."),
-    keyboard_help_key("F2", 1.0, true, "Toggle the live control page."),
+    keyboard_help_key(
+        "F2",
+        1.0,
+        true,
+        "Open compact controls, second press opens the list, third press closes.",
+    ),
     keyboard_help_key("F3", 1.0, true, "Toggle the scene preset page."),
     keyboard_help_key(
         "F4",
@@ -223,6 +231,15 @@ pub(crate) struct EffectTunerOverlay;
 pub(crate) struct EffectTunerPinnedBadge;
 
 #[derive(Component)]
+pub(crate) struct EffectTunerListOverlay;
+
+#[derive(Component)]
+pub(crate) struct EffectTunerListPinnedBadge;
+
+#[derive(Component)]
+pub(crate) struct EffectTunerListWindowText;
+
+#[derive(Component)]
 pub(crate) struct PresetStripOverlay;
 
 #[derive(Component)]
@@ -253,6 +270,51 @@ pub(crate) struct EffectTunerEditableField(EffectOverlayField);
 
 #[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct EffectTunerEditableFieldText(EffectOverlayField);
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerListRow(usize);
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerListRowText {
+    slot: usize,
+    kind: EffectTunerListRowTextKind,
+}
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerListValueField(usize);
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerListDetailPanel(usize);
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerListDetailField {
+    slot: usize,
+    field: EffectOverlayField,
+}
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerListDetailText {
+    slot: usize,
+    kind: EffectTunerListDetailTextKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum EffectTunerListRowTextKind {
+    EffectLabel,
+    EffectState,
+    ParameterLabel,
+    Value,
+    LiveValue,
+    LfoState,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum EffectTunerListDetailTextKind {
+    State,
+    Amplitude,
+    Frequency,
+    Shape,
+}
 
 pub(crate) fn toggle_help_overlay_system(
     keys: Res<ButtonInput<KeyCode>>,
@@ -359,6 +421,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
         return;
     };
     *overlay_visibility = if control_page.page_has_focus(ControlPage::EffectTuner)
+        && effect_tuner.page_mode() == EffectTunerPageMode::Compact
         && effect_tuner.is_visible(now_secs)
     {
         Visibility::Visible
@@ -427,6 +490,274 @@ pub(crate) fn update_effect_tuner_overlay_system(
                 }
                 EffectTunerTextKind::LiveValue => srgb(ui_config.title_text),
                 _ => srgb(ui_config.body_text),
+            }
+        };
+        *text_color = TextColor(color);
+    }
+}
+
+pub(crate) fn update_effect_tuner_list_overlay_system(
+    time: Res<Time>,
+    app_config: Res<AppConfig>,
+    control_page: Res<ControlPageState>,
+    effect_tuner: Res<EffectTunerState>,
+    generation_state: Res<GenerationState>,
+    material_state: Res<MaterialState>,
+    stage_state: Res<crate::scene::StageState>,
+    mut overlay_query: Query<&mut Visibility, With<EffectTunerListOverlay>>,
+    mut pinned_badge_query: Query<
+        &mut Visibility,
+        (
+            With<EffectTunerListPinnedBadge>,
+            Without<EffectTunerListOverlay>,
+        ),
+    >,
+    mut window_text_query: Query<
+        &mut Text,
+        (
+            With<EffectTunerListWindowText>,
+            Without<EffectTunerListRowText>,
+            Without<EffectTunerListDetailText>,
+        ),
+    >,
+    mut row_query: Query<
+        (&EffectTunerListRow, &mut Visibility, &mut BackgroundColor),
+        (
+            Without<EffectTunerListOverlay>,
+            Without<EffectTunerListPinnedBadge>,
+            Without<EffectTunerListValueField>,
+            Without<EffectTunerListDetailPanel>,
+            Without<EffectTunerListDetailField>,
+        ),
+    >,
+    mut row_text_query: Query<
+        (&EffectTunerListRowText, &mut Text, &mut TextColor),
+        (
+            Without<EffectTunerListWindowText>,
+            Without<EffectTunerListDetailText>,
+        ),
+    >,
+    mut value_field_query: Query<
+        (&EffectTunerListValueField, &mut BackgroundColor),
+        (
+            Without<EffectTunerListOverlay>,
+            Without<EffectTunerListPinnedBadge>,
+            Without<EffectTunerListRow>,
+            Without<EffectTunerListDetailField>,
+        ),
+    >,
+    mut detail_panel_query: Query<
+        (&EffectTunerListDetailPanel, &mut Visibility),
+        (
+            Without<EffectTunerListOverlay>,
+            Without<EffectTunerListPinnedBadge>,
+            Without<EffectTunerListRow>,
+        ),
+    >,
+    mut detail_field_query: Query<
+        (&EffectTunerListDetailField, &mut BackgroundColor),
+        (
+            Without<EffectTunerListOverlay>,
+            Without<EffectTunerListPinnedBadge>,
+            Without<EffectTunerListRow>,
+            Without<EffectTunerListValueField>,
+        ),
+    >,
+    mut detail_text_query: Query<
+        (&EffectTunerListDetailText, &mut Text, &mut TextColor),
+        (
+            Without<EffectTunerListWindowText>,
+            Without<EffectTunerListRowText>,
+        ),
+    >,
+) {
+    let now_secs = time.elapsed_secs();
+    let snapshot = effect_tuner.list_overlay_snapshot(
+        &EffectTunerViewContext {
+            generation_config: &app_config.generation,
+            generation_state: &generation_state,
+            material_config: &app_config.materials,
+            material_state: &material_state,
+            stage_state: &stage_state,
+        },
+        now_secs,
+        EFFECT_TUNER_LIST_VISIBLE_ROWS,
+    );
+    let ui_config = &app_config.ui;
+    let visible = control_page.page_has_focus(ControlPage::EffectTuner)
+        && effect_tuner.page_mode() == EffectTunerPageMode::List
+        && effect_tuner.is_visible(now_secs);
+
+    let Ok(mut overlay_visibility) = overlay_query.single_mut() else {
+        return;
+    };
+    *overlay_visibility = if visible {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+
+    let Ok(mut pinned_badge_visibility) = pinned_badge_query.single_mut() else {
+        return;
+    };
+    *pinned_badge_visibility = if visible && snapshot.pinned {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+
+    let Ok(mut window_text) = window_text_query.single_mut() else {
+        return;
+    };
+    let visible_end = snapshot.window_start + snapshot.rows.len();
+    *window_text = Text::new(format!(
+        "LIST {}-{} / {}",
+        snapshot.window_start + 1,
+        visible_end,
+        snapshot.total_parameters
+    ));
+
+    for (row, mut visibility, mut background) in row_query.iter_mut() {
+        if let Some(row_snapshot) = snapshot.rows.get(row.0) {
+            *visibility = Visibility::Visible;
+            *background = if row_snapshot.selected {
+                BackgroundColor(srgba(ui_config.hint_background))
+            } else {
+                BackgroundColor(Color::NONE)
+            };
+        } else {
+            *visibility = Visibility::Hidden;
+            *background = BackgroundColor(Color::NONE);
+        }
+    }
+
+    for (text_meta, mut text, mut text_color) in row_text_query.iter_mut() {
+        let Some(row_snapshot) = snapshot.rows.get(text_meta.slot) else {
+            *text = Text::new("");
+            *text_color = TextColor(srgb(ui_config.body_text));
+            continue;
+        };
+
+        let value = match text_meta.kind {
+            EffectTunerListRowTextKind::EffectLabel => row_snapshot.effect_label.to_string(),
+            EffectTunerListRowTextKind::EffectState => row_snapshot.effect_state_text.to_string(),
+            EffectTunerListRowTextKind::ParameterLabel => row_snapshot.parameter_label.to_string(),
+            EffectTunerListRowTextKind::Value => row_snapshot.value_text.clone(),
+            EffectTunerListRowTextKind::LiveValue => row_snapshot.live_value_text.clone(),
+            EffectTunerListRowTextKind::LfoState => row_snapshot.lfo_state_text.to_string(),
+        };
+        *text = Text::new(value);
+
+        let color = match text_meta.kind {
+            EffectTunerListRowTextKind::EffectLabel
+            | EffectTunerListRowTextKind::ParameterLabel => srgb(ui_config.title_text),
+            EffectTunerListRowTextKind::EffectState => {
+                if row_snapshot.effect_state_emphasized {
+                    srgb(ui_config.title_text)
+                } else {
+                    srgb(ui_config.body_text)
+                }
+            }
+            EffectTunerListRowTextKind::Value => {
+                if row_snapshot.active_field == Some(EffectOverlayField::Value) {
+                    srgb(ui_config.focus_text)
+                } else {
+                    srgb(ui_config.body_text)
+                }
+            }
+            EffectTunerListRowTextKind::LiveValue => srgb(ui_config.title_text),
+            EffectTunerListRowTextKind::LfoState => {
+                if row_snapshot.lfo_state_emphasized {
+                    srgb(ui_config.title_text)
+                } else {
+                    srgb(ui_config.body_text)
+                }
+            }
+        };
+        *text_color = TextColor(color);
+    }
+
+    for (field, mut background) in value_field_query.iter_mut() {
+        let active = snapshot
+            .rows
+            .get(field.0)
+            .and_then(|row| row.active_field)
+            .is_some_and(|active_field| active_field == EffectOverlayField::Value);
+        *background = if active {
+            BackgroundColor(srgba(ui_config.focus_background))
+        } else {
+            BackgroundColor(Color::NONE)
+        };
+    }
+
+    for (panel, mut visibility) in detail_panel_query.iter_mut() {
+        *visibility = if snapshot.rows.get(panel.0).is_some_and(|row| row.selected) {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+    }
+
+    for (field, mut background) in detail_field_query.iter_mut() {
+        let selected_slot = snapshot
+            .rows
+            .get(field.slot)
+            .is_some_and(|row| row.selected);
+        let active = selected_slot && snapshot.detail.active_field == field.field;
+        *background = if active {
+            BackgroundColor(srgba(ui_config.focus_background))
+        } else {
+            BackgroundColor(Color::NONE)
+        };
+    }
+
+    for (text_meta, mut text, mut text_color) in detail_text_query.iter_mut() {
+        let selected_slot = snapshot
+            .rows
+            .get(text_meta.slot)
+            .is_some_and(|row| row.selected);
+        if !selected_slot {
+            *text = Text::new("");
+            *text_color = TextColor(srgb(ui_config.body_text));
+            continue;
+        }
+
+        let value = match text_meta.kind {
+            EffectTunerListDetailTextKind::State => snapshot.detail.lfo_state_text.to_string(),
+            EffectTunerListDetailTextKind::Amplitude => snapshot.detail.amplitude_text.clone(),
+            EffectTunerListDetailTextKind::Frequency => snapshot.detail.frequency_text.clone(),
+            EffectTunerListDetailTextKind::Shape => snapshot.detail.shape_text.to_string(),
+        };
+        *text = Text::new(value);
+
+        let color = match text_meta.kind {
+            EffectTunerListDetailTextKind::State => {
+                if snapshot.detail.lfo_state_emphasized {
+                    srgb(ui_config.title_text)
+                } else {
+                    srgb(ui_config.body_text)
+                }
+            }
+            EffectTunerListDetailTextKind::Amplitude => {
+                if snapshot.detail.active_field == EffectOverlayField::LfoAmplitude {
+                    srgb(ui_config.focus_text)
+                } else {
+                    srgb(ui_config.body_text)
+                }
+            }
+            EffectTunerListDetailTextKind::Frequency => {
+                if snapshot.detail.active_field == EffectOverlayField::LfoFrequency {
+                    srgb(ui_config.focus_text)
+                } else {
+                    srgb(ui_config.body_text)
+                }
+            }
+            EffectTunerListDetailTextKind::Shape => {
+                if snapshot.detail.active_field == EffectOverlayField::LfoShape {
+                    srgb(ui_config.focus_text)
+                } else {
+                    srgb(ui_config.body_text)
+                }
             }
         };
         *text_color = TextColor(color);
@@ -674,6 +1005,128 @@ fn spawn_effect_tuner_editable_slot(
         });
 }
 
+fn spawn_effect_tuner_list_text_slot(
+    parent: &mut ChildSpawnerCommands,
+    ui_theme: &UiTheme,
+    font_size: f32,
+    slot: usize,
+    kind: EffectTunerListRowTextKind,
+    width: f32,
+    justify: Justify,
+    color: Color,
+) {
+    parent
+        .spawn(Node {
+            width: px(width),
+            min_width: px(width),
+            max_width: px(width),
+            align_items: AlignItems::Center,
+            flex_shrink: 0.0,
+            ..default()
+        })
+        .with_children(|text_parent| {
+            text_parent.spawn((
+                Text::new(""),
+                ui_theme.text_font(font_size),
+                TextColor(color),
+                effect_tuner_text_layout(justify),
+                Node {
+                    width: percent(100),
+                    ..default()
+                },
+                EffectTunerListRowText { slot, kind },
+            ));
+        });
+}
+
+fn spawn_effect_tuner_list_value_slot(
+    parent: &mut ChildSpawnerCommands,
+    ui_theme: &UiTheme,
+    font_size: f32,
+    slot: usize,
+    width: f32,
+    color: Color,
+) {
+    parent
+        .spawn((
+            Node {
+                width: px(width),
+                min_width: px(width),
+                max_width: px(width),
+                padding: UiRect::axes(
+                    px(EFFECT_TUNER_FIELD_PADDING_X),
+                    px(EFFECT_TUNER_FIELD_PADDING_Y),
+                ),
+                align_items: AlignItems::Center,
+                border_radius: BorderRadius::all(px(999.0)),
+                flex_shrink: 0.0,
+                ..default()
+            },
+            BackgroundColor(Color::NONE),
+            EffectTunerListValueField(slot),
+        ))
+        .with_children(|slot_parent| {
+            slot_parent.spawn((
+                Text::new(""),
+                ui_theme.text_font(font_size),
+                TextColor(color),
+                effect_tuner_text_layout(Justify::Right),
+                Node {
+                    width: percent(100),
+                    ..default()
+                },
+                EffectTunerListRowText {
+                    slot,
+                    kind: EffectTunerListRowTextKind::Value,
+                },
+            ));
+        });
+}
+
+fn spawn_effect_tuner_list_detail_slot(
+    parent: &mut ChildSpawnerCommands,
+    ui_theme: &UiTheme,
+    font_size: f32,
+    slot: usize,
+    field: EffectOverlayField,
+    kind: EffectTunerListDetailTextKind,
+    width: f32,
+    justify: Justify,
+    color: Color,
+) {
+    parent
+        .spawn((
+            Node {
+                width: px(width),
+                min_width: px(width),
+                max_width: px(width),
+                padding: UiRect::axes(
+                    px(EFFECT_TUNER_FIELD_PADDING_X),
+                    px(EFFECT_TUNER_FIELD_PADDING_Y),
+                ),
+                align_items: AlignItems::Center,
+                border_radius: BorderRadius::all(px(999.0)),
+                flex_shrink: 0.0,
+                ..default()
+            },
+            BackgroundColor(Color::NONE),
+            EffectTunerListDetailField { slot, field },
+        ))
+        .with_children(|slot_parent| {
+            slot_parent.spawn((
+                Text::new(""),
+                ui_theme.text_font(font_size),
+                TextColor(color),
+                effect_tuner_text_layout(justify),
+                Node {
+                    width: percent(100),
+                    ..default()
+                },
+                EffectTunerListDetailText { slot, kind },
+            ));
+        });
+}
+
 fn spawn_keyboard_help_key(
     parent: &mut ChildSpawnerCommands,
     ui_theme: &UiTheme,
@@ -839,6 +1292,271 @@ fn spawn_keyboard_help_overlay(
         });
 }
 
+fn spawn_effect_tuner_list_overlay(
+    commands: &mut Commands,
+    ui_theme: &UiTheme,
+    scene_camera: Entity,
+    ui_config: &UiConfig,
+) {
+    let header_font_size = (ui_config.hint_font_size - 1.0).max(12.0);
+    let row_font_size = (ui_config.body_font_size - 1.0).max(14.0);
+
+    commands
+        .spawn((
+            Node {
+                position_type: PositionType::Absolute,
+                left: px(ui_config.hint_left),
+                right: px(ui_config.hint_left),
+                bottom: px(control_page_bottom(ui_config)),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            GlobalZIndex(22),
+            Visibility::Hidden,
+            EffectTunerListOverlay,
+            UiTargetCamera(scene_camera),
+        ))
+        .with_children(|parent| {
+            parent
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        max_width: px(
+                            EFFECT_TUNER_LIST_PANEL_MAX_WIDTH.max(ui_config.panel_max_width)
+                        ),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: px(8.0),
+                        padding: UiRect::all(px(ui_config.panel_padding * 0.7)),
+                        border_radius: BorderRadius::all(px(ui_config.panel_radius)),
+                        ..default()
+                    },
+                    BackgroundColor(srgba(ui_config.panel_background)),
+                ))
+                .with_children(|panel| {
+                    panel
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Row,
+                            align_items: AlignItems::Center,
+                            column_gap: px(8.0),
+                            ..default()
+                        })
+                        .with_children(|header| {
+                            spawn_effect_tuner_label(
+                                header,
+                                ui_theme,
+                                header_font_size,
+                                "CTL",
+                                srgb(ui_config.body_text),
+                            );
+                            header
+                                .spawn((
+                                    Node {
+                                        padding: UiRect::axes(px(7.0), px(3.0)),
+                                        border_radius: BorderRadius::all(px(999.0)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(srgba(ui_config.hint_background)),
+                                    Visibility::Hidden,
+                                    EffectTunerListPinnedBadge,
+                                ))
+                                .with_children(|badge| {
+                                    badge.spawn((
+                                        Text::new("PIN"),
+                                        ui_theme.text_font(header_font_size),
+                                        TextColor(srgb(ui_config.hint_text)),
+                                        effect_tuner_text_layout(Justify::Center),
+                                    ));
+                                });
+                            header.spawn((
+                                Text::new(""),
+                                ui_theme.text_font(header_font_size),
+                                TextColor(srgb(ui_config.title_text)),
+                                effect_tuner_text_layout(Justify::Left),
+                                EffectTunerListWindowText,
+                            ));
+                        });
+
+                    panel
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Column,
+                            row_gap: px(6.0),
+                            ..default()
+                        })
+                        .with_children(|rows| {
+                            for slot in 0..EFFECT_TUNER_LIST_VISIBLE_ROWS {
+                                rows.spawn((
+                                    Node {
+                                        flex_direction: FlexDirection::Row,
+                                        align_items: AlignItems::Center,
+                                        column_gap: px(8.0),
+                                        padding: UiRect::axes(px(8.0), px(4.0)),
+                                        border_radius: BorderRadius::all(px(14.0)),
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::NONE),
+                                    EffectTunerListRow(slot),
+                                ))
+                                .with_children(|row| {
+                                    spawn_effect_tuner_list_text_slot(
+                                        row,
+                                        ui_theme,
+                                        row_font_size,
+                                        slot,
+                                        EffectTunerListRowTextKind::EffectLabel,
+                                        effect_tuner_effect_label_width(row_font_size),
+                                        Justify::Left,
+                                        srgb(ui_config.title_text),
+                                    );
+                                    spawn_effect_tuner_list_text_slot(
+                                        row,
+                                        ui_theme,
+                                        row_font_size,
+                                        slot,
+                                        EffectTunerListRowTextKind::EffectState,
+                                        effect_tuner_state_width(row_font_size),
+                                        Justify::Center,
+                                        srgb(ui_config.body_text),
+                                    );
+                                    spawn_effect_tuner_list_text_slot(
+                                        row,
+                                        ui_theme,
+                                        row_font_size,
+                                        slot,
+                                        EffectTunerListRowTextKind::ParameterLabel,
+                                        effect_tuner_parameter_label_width(row_font_size),
+                                        Justify::Left,
+                                        srgb(ui_config.title_text),
+                                    );
+                                    spawn_effect_tuner_list_value_slot(
+                                        row,
+                                        ui_theme,
+                                        row_font_size,
+                                        slot,
+                                        effect_tuner_numeric_field_width(row_font_size),
+                                        srgb(ui_config.body_text),
+                                    );
+                                    spawn_effect_tuner_list_text_slot(
+                                        row,
+                                        ui_theme,
+                                        row_font_size,
+                                        slot,
+                                        EffectTunerListRowTextKind::LiveValue,
+                                        effect_tuner_live_value_width(row_font_size),
+                                        Justify::Right,
+                                        srgb(ui_config.title_text),
+                                    );
+                                    spawn_effect_tuner_list_text_slot(
+                                        row,
+                                        ui_theme,
+                                        row_font_size,
+                                        slot,
+                                        EffectTunerListRowTextKind::LfoState,
+                                        effect_tuner_state_width(row_font_size),
+                                        Justify::Center,
+                                        srgb(ui_config.body_text),
+                                    );
+
+                                    row.spawn((
+                                        Node {
+                                            flex_direction: FlexDirection::Row,
+                                            align_items: AlignItems::Center,
+                                            column_gap: px(6.0),
+                                            margin: UiRect::left(px(4.0)),
+                                            padding: UiRect::axes(px(8.0), px(4.0)),
+                                            border_radius: BorderRadius::all(px(999.0)),
+                                            ..default()
+                                        },
+                                        BackgroundColor(srgba(ui_config.hint_background)),
+                                        Visibility::Hidden,
+                                        EffectTunerListDetailPanel(slot),
+                                    ))
+                                    .with_children(|detail| {
+                                        spawn_effect_tuner_label(
+                                            detail,
+                                            ui_theme,
+                                            header_font_size,
+                                            "LFO",
+                                            srgb(ui_config.title_text),
+                                        );
+                                        spawn_effect_tuner_label(
+                                            detail,
+                                            ui_theme,
+                                            header_font_size,
+                                            "state",
+                                            srgb(ui_config.body_text),
+                                        );
+                                        detail.spawn((
+                                            Text::new(""),
+                                            ui_theme.text_font(header_font_size),
+                                            TextColor(srgb(ui_config.body_text)),
+                                            effect_tuner_text_layout(Justify::Center),
+                                            EffectTunerListDetailText {
+                                                slot,
+                                                kind: EffectTunerListDetailTextKind::State,
+                                            },
+                                        ));
+                                        spawn_effect_tuner_label(
+                                            detail,
+                                            ui_theme,
+                                            header_font_size,
+                                            "amp",
+                                            srgb(ui_config.body_text),
+                                        );
+                                        spawn_effect_tuner_list_detail_slot(
+                                            detail,
+                                            ui_theme,
+                                            header_font_size,
+                                            slot,
+                                            EffectOverlayField::LfoAmplitude,
+                                            EffectTunerListDetailTextKind::Amplitude,
+                                            effect_tuner_numeric_field_width(header_font_size),
+                                            Justify::Right,
+                                            srgb(ui_config.body_text),
+                                        );
+                                        spawn_effect_tuner_label(
+                                            detail,
+                                            ui_theme,
+                                            header_font_size,
+                                            "freq",
+                                            srgb(ui_config.body_text),
+                                        );
+                                        spawn_effect_tuner_list_detail_slot(
+                                            detail,
+                                            ui_theme,
+                                            header_font_size,
+                                            slot,
+                                            EffectOverlayField::LfoFrequency,
+                                            EffectTunerListDetailTextKind::Frequency,
+                                            effect_tuner_numeric_field_width(header_font_size),
+                                            Justify::Right,
+                                            srgb(ui_config.body_text),
+                                        );
+                                        spawn_effect_tuner_label(
+                                            detail,
+                                            ui_theme,
+                                            header_font_size,
+                                            "shape",
+                                            srgb(ui_config.body_text),
+                                        );
+                                        spawn_effect_tuner_list_detail_slot(
+                                            detail,
+                                            ui_theme,
+                                            header_font_size,
+                                            slot,
+                                            EffectOverlayField::LfoShape,
+                                            EffectTunerListDetailTextKind::Shape,
+                                            effect_tuner_shape_field_width(header_font_size),
+                                            Justify::Left,
+                                            srgb(ui_config.body_text),
+                                        );
+                                    });
+                                });
+                            }
+                        });
+                });
+        });
+}
+
 fn spawn_preset_ui(
     commands: &mut Commands,
     ui_theme: &UiTheme,
@@ -960,6 +1678,7 @@ pub(crate) fn spawn_help_ui(
 
     spawn_preset_ui(commands, ui_theme, scene_camera, ui_config, strip_font_size);
     spawn_keyboard_help_overlay(commands, ui_theme, scene_camera, ui_config);
+    spawn_effect_tuner_list_overlay(commands, ui_theme, scene_camera, ui_config);
 
     commands
         .spawn((
@@ -1216,10 +1935,11 @@ pub(crate) fn font_status_line(font_source: UiFontSource) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        HelpOverlayMode, KEYBOARD_HELP_ROWS, KEYBOARD_HOME_ROW, KEYBOARD_TOP_LETTER_ROW,
-        UiFontSource, control_page_bottom, control_page_secondary_bottom, controls_overlay_text,
+        control_page_bottom, control_page_secondary_bottom, controls_overlay_text,
         effect_tuner_live_value_width, effect_tuner_numeric_field_width,
         effect_tuner_parameter_label_chars, effect_tuner_shape_label_chars, font_status_line,
+        HelpOverlayMode, UiFontSource, KEYBOARD_HELP_ROWS, KEYBOARD_HOME_ROW,
+        KEYBOARD_TOP_LETTER_ROW,
     };
 
     #[test]
@@ -1227,11 +1947,14 @@ mod tests {
         let text = controls_overlay_text(UiFontSource::CarbonPlus);
 
         assert!(text.contains("F1 / H: Cycle help views"));
-        assert!(text.contains("F2: Toggle the live control page"));
+        assert!(text.contains(
+            "F2: Open compact controls, second press opens the list, third press closes"
+        ));
         assert!(text.contains("F3: Toggle the scene preset page"));
         assert!(text.contains("Esc: Close the current control page"));
         assert!(text.contains("F4: Export the current scene as a Blender .blend"));
         assert!(text.contains("In F2 page: Ctrl + Up / Down select control"));
+        assert!(text.contains("In F2 page: Second F2 press opens the scrolling parameter list"));
         assert!(
             text.contains("In F2 page: Left / Right or Tab / Shift+Tab switch the active field")
         );
@@ -1278,16 +2001,12 @@ mod tests {
         assert!(specs.iter().any(|spec| spec.label == "F1" && spec.used));
         assert!(specs.iter().any(|spec| spec.label == "A" && !spec.used));
         assert!(specs.iter().any(|spec| spec.label == "F11" && !spec.used));
-        assert!(
-            KEYBOARD_TOP_LETTER_ROW
-                .iter()
-                .any(|spec| spec.label == "\\")
-        );
-        assert!(
-            !KEYBOARD_TOP_LETTER_ROW
-                .iter()
-                .any(|spec| spec.label == "Enter")
-        );
+        assert!(KEYBOARD_TOP_LETTER_ROW
+            .iter()
+            .any(|spec| spec.label == "\\"));
+        assert!(!KEYBOARD_TOP_LETTER_ROW
+            .iter()
+            .any(|spec| spec.label == "Enter"));
         assert!(KEYBOARD_HOME_ROW.iter().any(|spec| spec.label == "Enter"));
     }
 

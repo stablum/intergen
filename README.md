@@ -25,7 +25,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - selectable child shape type
 - adjustable child scale ratio
 - two-step in-app help overlay with text controls plus a hoverable neutral-mode keyboard map
-- pinned F2 control page for shader FX toggles/LFOs plus scene, stage, and material runtime parameters, including direct numeric entry for numeric fields
+- pinned F2 control page with a compact strip plus a second-press scrolling list for shader FX toggles/LFOs and scene, stage, and material runtime parameters, including direct numeric entry for numeric fields
 - built-in screenshot capture for manual and scripted verification
 - scene preset save/load/free workflow with 100 slots and collision resolution
 - Blender `.blend` export with compositor reconstruction and embedded effect/LFO metadata
@@ -137,6 +137,7 @@ Camera-output edge detection uses these `effects.edge_detection` settings:
 The in-app F2 control page starts from the values loaded from `config.toml` at launch.
 - Live edits affect the running app only.
 - The F2 control list covers shader effects plus scene, stage, and material runtime controls, including enum-like fields such as child shape, spawn placement mode, add mode, stage toggles, and procedural surface families.
+- The first `F2` press opens the compact strip, the second `F2` press opens a scrolling parameter list with an LFO detail panel beside the selected row, and the third `F2` press closes the page.
 - `Ctrl + Up` / `Ctrl + Down` select the active F2 control, with hold-to-repeat.
 - `Left` / `Right` or `Tab` / `Shift + Tab` switch the active F2 field between value, LFO amplitude, LFO frequency, and LFO shape when the selected parameter supports LFOs.
 - `Up` / `Down` adjust the active F2 field. `Shift` makes the step coarser and `Alt` makes it finer.
@@ -247,7 +248,7 @@ cargo test-plain
 - `W` / `S`: zoom in / out
 - `Backspace`: stop camera rotation momentum, or erase typed numeric F2 input while the F2 page is focused
 - `F1` or `H`: cycle help views between hidden, text, and keyboard-map overlays
-- `F2`: open or close the pinned F2 control page
+- `F2`: open the compact F2 control page, second press opens the list page, third press closes it
 - `F3`: open or close the scene preset page
 - `Esc`: close the active control page
 - `Ctrl + Up` / `Ctrl + Down` in F2: select the active F2 control, with hold-to-repeat

@@ -2,29 +2,30 @@ use bevy::prelude::*;
 use bevy::window::PresentMode;
 
 use crate::blender_export::{
-    AutomatedBlendExport, automated_blend_export_system, blender_export_input_system,
+    automated_blend_export_system, blender_export_input_system, AutomatedBlendExport,
 };
-use crate::camera::{CameraRig, camera_input_system, camera_motion_system};
+use crate::camera::{camera_input_system, camera_motion_system, CameraRig};
 use crate::capture::{
-    AutomatedCapture, LaunchConfig, ScreenshotCounter, automated_capture_system,
-    manual_screenshot_input_system,
+    automated_capture_system, manual_screenshot_input_system, AutomatedCapture, LaunchConfig,
+    ScreenshotCounter,
 };
 use crate::config::AppConfig;
 use crate::control_page::{
-    ControlPageInputMask, ControlPageState, control_page_input_system,
-    sync_control_page_input_mask_system,
+    control_page_input_system, sync_control_page_input_mask_system, ControlPageInputMask,
+    ControlPageState,
 };
-use crate::effect_tuner::{EffectTunerState, apply_effect_tuner_system, effect_tuner_input_system};
+use crate::effect_tuner::{apply_effect_tuner_system, effect_tuner_input_system, EffectTunerState};
 use crate::effects::EffectsPlugin;
 use crate::generation::generation_input_system;
 use crate::presets::{
-    AutomatedScenePresetLoad, PresetBrowserState, automated_scene_preset_load_system,
-    preset_input_system,
+    automated_scene_preset_load_system, preset_input_system, AutomatedScenePresetLoad,
+    PresetBrowserState,
 };
 use crate::scene::setup_scene;
 use crate::ui::{
-    HelpOverlayState, toggle_help_overlay_system, update_effect_tuner_overlay_system,
-    update_keyboard_help_overlay_system, update_preset_overlay_system,
+    toggle_help_overlay_system, update_effect_tuner_list_overlay_system,
+    update_effect_tuner_overlay_system, update_keyboard_help_overlay_system,
+    update_preset_overlay_system, HelpOverlayState,
 };
 
 pub fn run() {
@@ -88,6 +89,7 @@ pub fn run() {
                 generation_input_system,
                 apply_effect_tuner_system,
                 update_effect_tuner_overlay_system,
+                update_effect_tuner_list_overlay_system,
                 update_keyboard_help_overlay_system,
                 update_preset_overlay_system,
             )

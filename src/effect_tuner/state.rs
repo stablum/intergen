@@ -10,10 +10,10 @@ use crate::generation::{
     spawn_placement_mode_status_message,
 };
 use crate::parameters::{GenerationParameter, HoldInput, HoldRepeatState};
-use crate::scene::{GenerationState, MaterialState, StageState, opacity_status_message};
+use crate::scene::{opacity_status_message, GenerationState, MaterialState, StageState};
 use crate::shapes::{ShapeKind, SpawnAddMode, SpawnPlacementMode};
 
-use super::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LFO_FREQUENCY_STEP_HZ, LfoShape, ParameterLfo};
+use super::lfo::{LfoShape, ParameterLfo, DEFAULT_LFO_FREQUENCY_HZ, LFO_FREQUENCY_STEP_HZ};
 use super::metadata::{EffectEditMode, EffectOverlayField};
 
 const OVERLAY_HOLD_SECS: f32 = 2.5;
@@ -35,6 +35,35 @@ pub(crate) struct EffectTunerOverlaySnapshot {
     pub(crate) frequency_text: String,
     pub(crate) shape_text: &'static str,
     pub(crate) active_field: EffectOverlayField,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum EffectTunerPageMode {
+    Compact,
+    List,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerListRowSnapshot {
+    pub(crate) effect_label: &'static str,
+    pub(crate) effect_state_text: &'static str,
+    pub(crate) effect_state_emphasized: bool,
+    pub(crate) parameter_label: &'static str,
+    pub(crate) value_text: String,
+    pub(crate) live_value_text: String,
+    pub(crate) lfo_state_text: &'static str,
+    pub(crate) lfo_state_emphasized: bool,
+    pub(crate) selected: bool,
+    pub(crate) active_field: Option<EffectOverlayField>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerListOverlaySnapshot {
+    pub(crate) pinned: bool,
+    pub(crate) total_parameters: usize,
+    pub(crate) window_start: usize,
+    pub(crate) rows: Vec<EffectTunerListRowSnapshot>,
+    pub(crate) detail: EffectTunerOverlaySnapshot,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -1187,6 +1216,7 @@ pub(crate) struct EffectTunerState {
     current: EffectsConfig,
     lfos: Vec<ParameterLfo>,
     selected_index: usize,
+    page_mode: EffectTunerPageMode,
     edit_mode: EffectEditMode,
     numeric_entry: NumericEntryBuffer,
     pinned: bool,
@@ -1204,6 +1234,7 @@ impl EffectTunerState {
             current: effects_config.clone(),
             lfos: default_lfos(),
             selected_index: 0,
+            page_mode: EffectTunerPageMode::Compact,
             edit_mode: EffectEditMode::Value,
             numeric_entry: NumericEntryBuffer::default(),
             pinned: false,
@@ -1217,6 +1248,10 @@ impl EffectTunerState {
 
     pub(crate) fn selected_parameter(&self) -> EffectTunerParameter {
         EffectTunerParameter::all()[self.selected_index]
+    }
+
+    pub(crate) fn page_mode(&self) -> EffectTunerPageMode {
+        self.page_mode
     }
 
     pub(crate) fn selected_effect_group(&self) -> Option<EffectGroup> {
@@ -1249,6 +1284,7 @@ impl EffectTunerState {
             *target = source;
         }
         self.selected_index = 0;
+        self.page_mode = EffectTunerPageMode::Compact;
         self.edit_mode = EffectEditMode::Value;
         self.clear_numeric_entry();
         self.reset_hold_states();
@@ -1328,16 +1364,46 @@ impl EffectTunerState {
         }
     }
 
+    pub(crate) fn list_overlay_snapshot(
+        &self,
+        context: &EffectTunerViewContext<'_>,
+        now_secs: f32,
+        visible_rows: usize,
+    ) -> EffectTunerListOverlaySnapshot {
+        let live_effects = self.evaluated_effects(now_secs);
+        let (window_start, window_end) = self.selection_window_bounds(visible_rows.max(1));
+        let rows = (window_start..window_end)
+            .map(|index| {
+                self.list_row_snapshot(EffectTunerParameter::all()[index], context, &live_effects)
+            })
+            .collect();
+
+        EffectTunerListOverlaySnapshot {
+            pinned: self.pinned,
+            total_parameters: EffectTunerParameter::all().len(),
+            window_start,
+            rows,
+            detail: self.overlay_snapshot(context, now_secs),
+        }
+    }
+
     pub(crate) fn edit_mode_label(&self) -> &'static str {
         self.displayed_edit_mode().label()
     }
 
     pub(crate) fn open_page(&mut self, now_secs: f32) {
+        self.page_mode = EffectTunerPageMode::Compact;
         self.pinned = true;
         self.note_interaction(now_secs);
     }
 
+    pub(crate) fn show_list_page(&mut self, now_secs: f32) {
+        self.page_mode = EffectTunerPageMode::List;
+        self.note_interaction(now_secs);
+    }
+
     pub(crate) fn close_page(&mut self) {
+        self.page_mode = EffectTunerPageMode::Compact;
         self.pinned = false;
         self.visible_until_secs = 0.0;
         self.clear_numeric_entry();
@@ -1636,6 +1702,14 @@ impl EffectTunerState {
         }
     }
 
+    fn lfo_for_parameter(&self, parameter: EffectTunerParameter) -> Option<ParameterLfo> {
+        let EffectTunerParameter::Effect(parameter) = parameter else {
+            return None;
+        };
+        let index = effect_parameter_index(parameter)?;
+        self.lfos.get(index).copied()
+    }
+
     fn mode_supported_for_parameter(
         &self,
         edit_mode: EffectEditMode,
@@ -1675,6 +1749,62 @@ impl EffectTunerState {
         self.select_next_hold.reset();
         self.decrease_hold.reset();
         self.increase_hold.reset();
+    }
+
+    fn selection_window_bounds(&self, visible_rows: usize) -> (usize, usize) {
+        let total = EffectTunerParameter::all().len();
+        if total <= visible_rows {
+            return (0, total);
+        }
+
+        let half_window = visible_rows / 2;
+        let max_start = total - visible_rows;
+        let window_start = self
+            .selected_index
+            .saturating_sub(half_window)
+            .min(max_start);
+        let window_end = (window_start + visible_rows).min(total);
+        (window_start, window_end)
+    }
+
+    fn list_row_snapshot(
+        &self,
+        parameter: EffectTunerParameter,
+        context: &EffectTunerViewContext<'_>,
+        live_effects: &EffectsConfig,
+    ) -> EffectTunerListRowSnapshot {
+        let selected = parameter == self.selected_parameter();
+        let (effect_state_text, effect_state_emphasized) = match parameter.effect_group() {
+            Some(effect) => {
+                let enabled = effect.is_enabled(&self.current);
+                (if enabled { "ON" } else { "OFF" }, enabled)
+            }
+            None => ("VAL", false),
+        };
+        let (lfo_state_text, lfo_state_emphasized) = match self.lfo_for_parameter(parameter) {
+            Some(lfo) => (if lfo.enabled { "ON" } else { "OFF" }, lfo.enabled),
+            None => ("--", false),
+        };
+
+        EffectTunerListRowSnapshot {
+            effect_label: parameter.group_label(),
+            effect_state_text,
+            effect_state_emphasized,
+            parameter_label: parameter.short_label(),
+            value_text: if selected {
+                self.overlay_numeric_text(
+                    EffectOverlayField::Value,
+                    parameter.display_value(&self.current, context),
+                )
+            } else {
+                parameter.display_value(&self.current, context)
+            },
+            live_value_text: parameter.display_value(live_effects, context),
+            lfo_state_text,
+            lfo_state_emphasized,
+            selected,
+            active_field: selected.then_some(self.active_field()),
+        }
     }
 }
 
@@ -1752,7 +1882,11 @@ fn shape_kind_value_text(kind: ShapeKind) -> &'static str {
 }
 
 fn boolean_value_text(enabled: bool) -> &'static str {
-    if enabled { "on" } else { "off" }
+    if enabled {
+        "on"
+    } else {
+        "off"
+    }
 }
 
 fn material_surface_mode_value_text(mode: MaterialSurfaceMode) -> &'static str {
@@ -1793,13 +1927,13 @@ mod tests {
         EffectGroup, EffectsConfig, GenerationConfig, MaterialConfig, MaterialSurfaceMode,
         StageConfig,
     };
-    use crate::effect_tuner::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LfoShape};
+    use crate::effect_tuner::lfo::{LfoShape, DEFAULT_LFO_FREQUENCY_HZ};
     use crate::effect_tuner::metadata::{EffectEditMode, EffectOverlayField};
     use crate::scene::{GenerationState, MaterialState, StageState};
 
     use super::{
-        EffectTunerEditContext, EffectTunerParameter, EffectTunerSceneParameter, EffectTunerState,
-        EffectTunerViewContext, HoldInput,
+        EffectTunerEditContext, EffectTunerPageMode, EffectTunerParameter,
+        EffectTunerSceneParameter, EffectTunerState, EffectTunerViewContext, HoldInput,
     };
 
     fn default_scene_state() -> (
@@ -1937,6 +2071,57 @@ mod tests {
         assert_eq!(snapshot.parameter_label, "k2");
         assert_eq!(snapshot.active_field, EffectOverlayField::LfoShape);
         assert!(snapshot.pinned);
+    }
+
+    #[test]
+    fn open_and_close_page_manage_page_modes() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+
+        effect_tuner.open_page(1.0);
+        assert_eq!(effect_tuner.page_mode(), EffectTunerPageMode::Compact);
+
+        effect_tuner.show_list_page(1.1);
+        assert_eq!(effect_tuner.page_mode(), EffectTunerPageMode::List);
+
+        effect_tuner.close_page();
+        assert_eq!(effect_tuner.page_mode(), EffectTunerPageMode::Compact);
+    }
+
+    #[test]
+    fn list_overlay_snapshot_scrolls_to_keep_selection_visible() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (
+            generation_config,
+            generation_state,
+            material_config,
+            material_state,
+            stage_config,
+            stage_state,
+        ) = default_scene_state();
+        effect_tuner.selected_index = EffectTunerParameter::all().len() - 1;
+        effect_tuner.show_list_page(1.0);
+
+        let snapshot = effect_tuner.list_overlay_snapshot(
+            &view_context(
+                &generation_config,
+                &generation_state,
+                &material_config,
+                &material_state,
+                &stage_config,
+                &stage_state,
+            ),
+            1.0,
+            7,
+        );
+
+        assert_eq!(snapshot.total_parameters, EffectTunerParameter::all().len());
+        assert_eq!(snapshot.rows.len(), 7);
+        assert_eq!(
+            snapshot.window_start + snapshot.rows.len(),
+            snapshot.total_parameters
+        );
+        assert!(snapshot.rows.last().is_some_and(|row| row.selected));
+        assert_eq!(snapshot.detail.parameter_label, "lvl refl");
     }
 
     #[test]

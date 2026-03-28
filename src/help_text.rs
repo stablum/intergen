@@ -10,8 +10,8 @@ const TOP_LEVEL_HELP: [HelpEntry; 5] = [
         overlay: "F1 / H: Cycle help views",
     },
     HelpEntry {
-        startup: "F2 live control page",
-        overlay: "F2: Toggle the live control page",
+        startup: "F2 cycles compact/list/close for the live control page",
+        overlay: "F2: Open compact controls, second press opens the list, third press closes",
     },
     HelpEntry {
         startup: "F3 scene preset page",
@@ -27,10 +27,14 @@ const TOP_LEVEL_HELP: [HelpEntry; 5] = [
     },
 ];
 
-const FX_HELP: [HelpEntry; 11] = [
+const FX_HELP: [HelpEntry; 12] = [
     HelpEntry {
         startup: "Ctrl+Up/Down selects a control",
         overlay: "In F2 page: Ctrl + Up / Down select control",
+    },
+    HelpEntry {
+        startup: "second F2 press opens the scrolling parameter list",
+        overlay: "In F2 page: Second F2 press opens the scrolling parameter list",
     },
     HelpEntry {
         startup: "Left/Right or Tab/Shift+Tab switch the active field",
@@ -76,7 +80,8 @@ const FX_HELP: [HelpEntry; 11] = [
 
 const PRESET_HELP: [HelpEntry; 1] = [HelpEntry {
     startup: "scene preset page supports save/free/load/collision resolution",
-    overlay: "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions",
+    overlay:
+        "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions",
 }];
 
 const SCENE_HELP: [HelpEntry; 23] = [
