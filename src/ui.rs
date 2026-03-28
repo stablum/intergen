@@ -15,7 +15,10 @@ const EFFECT_TUNER_CHAR_WIDTH_FACTOR: f32 = 0.72;
 const EFFECT_TUNER_MIN_TEXT_WIDTH: f32 = 28.0;
 const EFFECT_TUNER_FIELD_PADDING_X: f32 = 10.0;
 const EFFECT_TUNER_FIELD_PADDING_Y: f32 = 4.0;
-const EFFECT_TUNER_NUMERIC_SLOT_CHARS: usize = 18;
+// F2 values usually render as compact decimals or small integers, so keep the
+// slots tight while leaving a bit of headroom for manual numeric entry.
+const EFFECT_TUNER_LIVE_VALUE_CHARS: usize = 8;
+const EFFECT_TUNER_NUMERIC_INPUT_CHARS: usize = 10;
 const KEYBOARD_HELP_UNUSED_TEXT: &str = "Unused in neutral mode.";
 const KEYBOARD_HELP_KEY_WIDTH: f32 = 44.0;
 const KEYBOARD_HELP_KEY_HEIGHT: f32 = 42.0;
@@ -536,11 +539,12 @@ fn effect_tuner_state_width(font_size: f32) -> f32 {
 }
 
 fn effect_tuner_live_value_width(font_size: f32) -> f32 {
-    effect_tuner_text_width(EFFECT_TUNER_NUMERIC_SLOT_CHARS, font_size)
+    effect_tuner_text_width(EFFECT_TUNER_LIVE_VALUE_CHARS, font_size)
 }
 
 fn effect_tuner_numeric_field_width(font_size: f32) -> f32 {
-    effect_tuner_live_value_width(font_size) + EFFECT_TUNER_FIELD_PADDING_X * 2.0
+    effect_tuner_text_width(EFFECT_TUNER_NUMERIC_INPUT_CHARS, font_size)
+        + EFFECT_TUNER_FIELD_PADDING_X * 2.0
 }
 
 fn effect_tuner_shape_field_width(font_size: f32) -> f32 {
@@ -1214,6 +1218,7 @@ mod tests {
     use super::{
         HelpOverlayMode, KEYBOARD_HELP_ROWS, KEYBOARD_HOME_ROW, KEYBOARD_TOP_LETTER_ROW,
         UiFontSource, control_page_bottom, control_page_secondary_bottom, controls_overlay_text,
+        effect_tuner_live_value_width, effect_tuner_numeric_field_width,
         effect_tuner_parameter_label_chars, effect_tuner_shape_label_chars, font_status_line,
     };
 
@@ -1301,6 +1306,16 @@ mod tests {
     fn effect_tuner_slot_helpers_cover_the_longest_labels() {
         assert_eq!(effect_tuner_parameter_label_chars(), 10);
         assert_eq!(effect_tuner_shape_label_chars(), "brownian motion".len());
+    }
+
+    #[test]
+    fn effect_tuner_numeric_slots_stay_compact() {
+        let live_width = effect_tuner_live_value_width(13.0);
+        let input_width = effect_tuner_numeric_field_width(13.0);
+
+        assert!(live_width < 80.0);
+        assert!(input_width < 120.0);
+        assert!(input_width > live_width);
     }
 
     #[test]
