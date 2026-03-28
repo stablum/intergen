@@ -4,11 +4,11 @@ use serde::{Deserialize, Serialize};
 use crate::camera::CameraRig;
 use crate::config::{AppConfig, LightingConfig, MaterialConfig, RenderingConfig};
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
-use crate::polyhedra::{
-    AttachmentOccupancy, NodeOrigin, PolyhedronKind, PolyhedronNode, SpawnAddMode, SpawnAttachment,
+use crate::scene::{GenerationParameters, GenerationState, MaterialState, StageState};
+use crate::shapes::{
+    AttachmentOccupancy, NodeOrigin, ShapeKind, ShapeNode, SpawnAddMode, SpawnAttachment,
     SpawnPlacementMode,
 };
-use crate::scene::{GenerationParameters, GenerationState, MaterialState, StageState};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct SceneStateSnapshot {
@@ -41,7 +41,8 @@ pub(crate) struct CameraRigSnapshot {
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub(crate) struct GenerationSnapshot {
-    pub(crate) selected_kind: PolyhedronKind,
+    #[serde(alias = "selected_kind")]
+    pub(crate) selected_shape_kind: ShapeKind,
     #[serde(default)]
     pub(crate) spawn_placement_mode: SpawnPlacementMode,
     #[serde(default)]
@@ -51,7 +52,7 @@ pub(crate) struct GenerationSnapshot {
     pub(crate) vertex_offset_ratio: f32,
     #[serde(default)]
     pub(crate) vertex_spawn_exclusion_probability: f32,
-    pub(crate) nodes: Vec<PolyhedronNodeSnapshot>,
+    pub(crate) nodes: Vec<ShapeNodeSnapshot>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -60,8 +61,9 @@ pub(crate) struct MaterialRuntimeSnapshot {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub(crate) struct PolyhedronNodeSnapshot {
-    pub(crate) kind: PolyhedronKind,
+pub(crate) struct ShapeNodeSnapshot {
+    #[serde(alias = "kind")]
+    pub(crate) shape_kind: ShapeKind,
     pub(crate) level: usize,
     pub(crate) center: [f32; 3],
     pub(crate) rotation: [f32; 4],
@@ -112,13 +114,17 @@ impl SceneStateSnapshot {
     }
 
     pub(crate) fn summary(&self) -> String {
-        let root_kind = self
+        let root_shape_kind = self
             .generation
             .nodes
             .first()
-            .map(|node| format!("{:?}", node.kind))
+            .map(|node| format!("{:?}", node.shape_kind))
             .unwrap_or_else(|| "Unknown".to_string());
-        format!("{} root, {} nodes", root_kind, self.generation.nodes.len())
+        format!(
+            "{} root, {} nodes",
+            root_shape_kind,
+            self.generation.nodes.len()
+        )
     }
 
     pub(crate) fn prepare_runtime(&self) -> Result<PreparedSceneState, String> {
@@ -137,7 +143,7 @@ impl SceneStateSnapshot {
         self.generation
             .nodes
             .first()
-            .map(|node| format!("{:?}", node.kind).to_ascii_lowercase())
+            .map(|node| format!("{:?}", node.shape_kind).to_ascii_lowercase())
             .unwrap_or_else(|| "scene".to_string())
     }
 }
@@ -165,7 +171,7 @@ impl CameraRigSnapshot {
 impl GenerationSnapshot {
     pub(crate) fn capture(generation_state: &GenerationState) -> Self {
         Self {
-            selected_kind: generation_state.selected_kind,
+            selected_shape_kind: generation_state.selected_shape_kind,
             spawn_placement_mode: generation_state.spawn_placement_mode,
             spawn_add_mode: generation_state.spawn_add_mode,
             scale_ratio: generation_state.scale_ratio_base(),
@@ -176,24 +182,24 @@ impl GenerationSnapshot {
             nodes: generation_state
                 .nodes
                 .iter()
-                .map(PolyhedronNodeSnapshot::capture)
+                .map(ShapeNodeSnapshot::capture)
                 .collect(),
         }
     }
 
     pub(crate) fn to_runtime(&self) -> Result<GenerationState, String> {
-        let shape_catalog = crate::polyhedra::ShapeCatalog::new();
+        let shape_catalog = crate::shapes::ShapeCatalog::new();
         let nodes = self
             .nodes
             .iter()
             .map(|node| node.to_runtime(&shape_catalog))
             .collect::<Result<Vec<_>, _>>()?;
         if nodes.is_empty() {
-            return Err("Preset scene has no polyhedron nodes.".to_string());
+            return Err("Preset scene has no shape nodes.".to_string());
         }
         Ok(GenerationState {
             nodes,
-            selected_kind: self.selected_kind,
+            selected_shape_kind: self.selected_shape_kind,
             spawn_placement_mode: self.spawn_placement_mode,
             spawn_add_mode: self.spawn_add_mode,
             parameters: GenerationParameters::from_base_values(
@@ -215,10 +221,10 @@ impl MaterialRuntimeSnapshot {
     }
 }
 
-impl PolyhedronNodeSnapshot {
-    pub(crate) fn capture(node: &PolyhedronNode) -> Self {
+impl ShapeNodeSnapshot {
+    pub(crate) fn capture(node: &ShapeNode) -> Self {
         Self {
-            kind: node.kind,
+            shape_kind: node.kind,
             level: node.level,
             center: vec3_to_array(node.center),
             rotation: quat_to_array(node.rotation),
@@ -233,12 +239,12 @@ impl PolyhedronNodeSnapshot {
 
     pub(crate) fn to_runtime(
         &self,
-        shape_catalog: &crate::polyhedra::ShapeCatalog,
-    ) -> Result<PolyhedronNode, String> {
-        let geometry = shape_catalog.geometry(self.kind);
+        shape_catalog: &crate::shapes::ShapeCatalog,
+    ) -> Result<ShapeNode, String> {
+        let geometry = shape_catalog.geometry(self.shape_kind);
 
-        Ok(PolyhedronNode {
-            kind: self.kind,
+        Ok(ShapeNode {
+            kind: self.shape_kind,
             level: self.level,
             center: vec3_from_array(self.center),
             rotation: quat_from_array(self.rotation),

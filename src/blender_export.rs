@@ -15,13 +15,13 @@ use crate::config::{
 };
 use crate::control_page::{ControlPageInputMask, just_pressed_unmasked};
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
-use crate::polyhedra::{PolyhedronKind, PolyhedronNode, SpawnAddMode, SpawnPlacementMode};
 use crate::runtime_scene::SceneSnapshotAccess;
 use crate::scene::{GenerationState, MaterialState, ShapeAssets, material_appearance};
 use crate::scene_snapshot::{
     CameraRigSnapshot, GenerationSnapshot, MaterialRuntimeSnapshot, NodeOriginSnapshot,
-    PolyhedronNodeSnapshot, SceneStateSnapshot,
+    SceneStateSnapshot, ShapeNodeSnapshot,
 };
+use crate::shapes::{ShapeKind, ShapeNode, SpawnAddMode, SpawnPlacementMode};
 
 const BLEND_EXPORT_DIR: &str = "blend-exports";
 const BLEND_EXPORT_FORMAT_VERSION: u32 = 1;
@@ -102,7 +102,7 @@ struct BlendPointLight {
 struct BlendObject {
     name: String,
     node_index: usize,
-    kind: PolyhedronKind,
+    kind: ShapeKind,
     level: usize,
     center: [f32; 3],
     vertices: Vec<[f32; 3]>,
@@ -144,7 +144,7 @@ struct BlendCameraRigMetadata {
 
 #[derive(Debug, Serialize)]
 struct BlendGenerationMetadata {
-    selected_kind: PolyhedronKind,
+    selected_shape_kind: ShapeKind,
     spawn_placement_mode: SpawnPlacementMode,
     spawn_add_mode: SpawnAddMode,
     scale_ratio: f32,
@@ -161,7 +161,7 @@ struct BlendMaterialStateMetadata {
 
 #[derive(Debug, Serialize)]
 struct BlendNodeMetadata {
-    kind: PolyhedronKind,
+    kind: ShapeKind,
     level: usize,
     center: [f32; 3],
     rotation: [f32; 4],
@@ -299,7 +299,7 @@ impl BlendStateMetadata {
 impl BlendObject {
     fn capture(
         node_index: usize,
-        node: &PolyhedronNode,
+        node: &ShapeNode,
         shape_assets: &ShapeAssets,
         material_config: &MaterialConfig,
         opacity: f32,
@@ -313,8 +313,8 @@ impl BlendObject {
             .collect();
         let (parent_index, parent_attachment_mode, parent_attachment_index, parent_vertex_index) =
             match node.origin {
-                crate::polyhedra::NodeOrigin::Root => (None, None, None, None),
-                crate::polyhedra::NodeOrigin::Child {
+                crate::shapes::NodeOrigin::Root => (None, None, None, None),
+                crate::shapes::NodeOrigin::Child {
                     parent_index,
                     attachment,
                 } => (
@@ -347,7 +347,7 @@ impl BlendObject {
 }
 
 impl BlendMaterial {
-    fn capture(node: &PolyhedronNode, material_config: &MaterialConfig, opacity: f32) -> Self {
+    fn capture(node: &ShapeNode, material_config: &MaterialConfig, opacity: f32) -> Self {
         let appearance = material_appearance(node, material_config, opacity);
 
         Self {
@@ -374,7 +374,7 @@ impl BlendCameraRigMetadata {
 impl BlendGenerationMetadata {
     fn from_snapshot(generation_state: &GenerationSnapshot) -> Self {
         Self {
-            selected_kind: generation_state.selected_kind,
+            selected_shape_kind: generation_state.selected_shape_kind,
             spawn_placement_mode: generation_state.spawn_placement_mode,
             spawn_add_mode: generation_state.spawn_add_mode,
             scale_ratio: generation_state.scale_ratio,
@@ -399,9 +399,9 @@ impl BlendMaterialStateMetadata {
 }
 
 impl BlendNodeMetadata {
-    fn from_snapshot(node: &PolyhedronNodeSnapshot) -> Self {
+    fn from_snapshot(node: &ShapeNodeSnapshot) -> Self {
         Self {
-            kind: node.kind,
+            kind: node.shape_kind,
             level: node.level,
             center: node.center,
             rotation: node.rotation,
@@ -592,15 +592,15 @@ fn default_blend_export_path(generation_state: &GenerationState) -> Result<PathB
         )
     })?;
 
-    let root_kind = generation_state
+    let root_shape_kind = generation_state
         .nodes
         .first()
         .map(|node| node.kind)
-        .unwrap_or(generation_state.selected_kind);
+        .unwrap_or(generation_state.selected_shape_kind);
     let timestamp = current_unix_ms();
     let mut suffix = 0_u32;
     loop {
-        let candidate = export_dir.join(blend_export_filename(root_kind, timestamp, suffix));
+        let candidate = export_dir.join(blend_export_filename(root_shape_kind, timestamp, suffix));
         if !candidate.exists() {
             return Ok(candidate);
         }
@@ -608,13 +608,16 @@ fn default_blend_export_path(generation_state: &GenerationState) -> Result<PathB
     }
 }
 
-fn blend_export_filename(root_kind: PolyhedronKind, timestamp_ms: u64, suffix: u32) -> String {
+fn blend_export_filename(root_shape_kind: ShapeKind, timestamp_ms: u64, suffix: u32) -> String {
     if suffix == 0 {
-        format!("intergen-{timestamp_ms}-{}.blend", kind_slug(root_kind))
+        format!(
+            "intergen-{timestamp_ms}-{}.blend",
+            kind_slug(root_shape_kind)
+        )
     } else {
         format!(
             "intergen-{timestamp_ms}-{}-{suffix}.blend",
-            kind_slug(root_kind)
+            kind_slug(root_shape_kind)
         )
     }
 }
@@ -647,12 +650,12 @@ fn ensure_parent_dir(path: &Path) -> Result<(), String> {
     })
 }
 
-fn kind_slug(kind: PolyhedronKind) -> &'static str {
+fn kind_slug(kind: ShapeKind) -> &'static str {
     match kind {
-        PolyhedronKind::Cube => "cube",
-        PolyhedronKind::Tetrahedron => "tetrahedron",
-        PolyhedronKind::Octahedron => "octahedron",
-        PolyhedronKind::Dodecahedron => "dodecahedron",
+        ShapeKind::Cube => "cube",
+        ShapeKind::Tetrahedron => "tetrahedron",
+        ShapeKind::Octahedron => "octahedron",
+        ShapeKind::Dodecahedron => "dodecahedron",
     }
 }
 
@@ -726,7 +729,7 @@ mod tests {
     use bevy::prelude::Vec3;
 
     use super::{bevy_point_to_blender_array, blend_export_filename, hsl_to_rgb};
-    use crate::polyhedra::PolyhedronKind;
+    use crate::shapes::ShapeKind;
 
     #[test]
     fn bevy_axes_convert_to_blender_axes() {
@@ -737,8 +740,8 @@ mod tests {
     }
 
     #[test]
-    fn export_filename_uses_root_kind_slug() {
-        let file_name = blend_export_filename(PolyhedronKind::Octahedron, 42, 0);
+    fn export_filename_uses_root_shape_slug() {
+        let file_name = blend_export_filename(ShapeKind::Octahedron, 42, 0);
 
         assert!(file_name.contains("octahedron"));
         assert!(file_name.ends_with(".blend"));

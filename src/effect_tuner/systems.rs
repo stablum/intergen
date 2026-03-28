@@ -365,7 +365,7 @@ fn apply_selected_parameter_side_effects(
                 &scene.app_config.materials,
                 &scene.material_state,
                 &mut scene.materials,
-                &scene.polyhedron_materials,
+                &scene.shape_materials,
             );
         }
         EffectTunerParameter::Scene(EffectTunerSceneParameter::StageEnabled)
@@ -397,7 +397,7 @@ fn apply_reset_all_side_effects(scene: &mut GenerationSceneAccess<'_, '_>) {
         &scene.app_config.materials,
         &scene.material_state,
         &mut scene.materials,
-        &scene.polyhedron_materials,
+        &scene.shape_materials,
     );
     sync_stage_entities(
         &mut scene.commands,

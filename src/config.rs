@@ -6,7 +6,7 @@ use bevy::window::PresentMode;
 use serde::{Deserialize, Serialize};
 
 use crate::parameters::{GenerationParameter, ScalarParameterSpec};
-use crate::polyhedra::{PolyhedronKind, SpawnPlacementMode, SpawnTuning};
+use crate::shapes::{ShapeKind, SpawnPlacementMode, SpawnTuning};
 
 #[path = "config_effects.rs"]
 mod effects;
@@ -277,9 +277,11 @@ impl Default for CameraConfig {
 #[derive(Clone, Debug, Deserialize, Serialize)]
 #[serde(default)]
 pub(crate) struct GenerationConfig {
-    pub(crate) root_kind: PolyhedronKind,
+    #[serde(alias = "root_kind")]
+    pub(crate) root_shape_kind: ShapeKind,
     pub(crate) root_scale: f32,
-    pub(crate) default_child_kind: PolyhedronKind,
+    #[serde(alias = "default_child_kind")]
+    pub(crate) default_child_shape_kind: ShapeKind,
     pub(crate) default_spawn_placement_mode: SpawnPlacementMode,
     pub(crate) default_scale_ratio: f32,
     pub(crate) scale_adjust_step: f32,
@@ -409,9 +411,9 @@ impl GenerationConfig {
 impl Default for GenerationConfig {
     fn default() -> Self {
         Self {
-            root_kind: PolyhedronKind::Cube,
+            root_shape_kind: ShapeKind::Cube,
             root_scale: 1.9,
-            default_child_kind: PolyhedronKind::Dodecahedron,
+            default_child_shape_kind: ShapeKind::Dodecahedron,
             default_spawn_placement_mode: SpawnPlacementMode::Vertex,
             default_scale_ratio: 0.58,
             scale_adjust_step: 0.05,
@@ -602,12 +604,12 @@ pub(crate) struct MaterialConfig {
 }
 
 impl MaterialConfig {
-    pub(crate) fn hue_bias(&self, kind: PolyhedronKind) -> f32 {
+    pub(crate) fn hue_bias(&self, kind: ShapeKind) -> f32 {
         match kind {
-            PolyhedronKind::Cube => self.cube_hue_bias,
-            PolyhedronKind::Tetrahedron => self.tetrahedron_hue_bias,
-            PolyhedronKind::Octahedron => self.octahedron_hue_bias,
-            PolyhedronKind::Dodecahedron => self.dodecahedron_hue_bias,
+            ShapeKind::Cube => self.cube_hue_bias,
+            ShapeKind::Tetrahedron => self.tetrahedron_hue_bias,
+            ShapeKind::Octahedron => self.octahedron_hue_bias,
+            ShapeKind::Dodecahedron => self.dodecahedron_hue_bias,
         }
     }
 
@@ -790,8 +792,8 @@ mod tests {
         assert_eq!(config.camera.initial_distance, 21.0);
         assert_eq!(config.window.width, 1440);
         assert_eq!(
-            config.generation.default_child_kind,
-            super::PolyhedronKind::Dodecahedron
+            config.generation.default_child_shape_kind,
+            super::ShapeKind::Dodecahedron
         );
     }
 

@@ -10,8 +10,8 @@ use crate::generation::{
     spawn_placement_mode_status_message,
 };
 use crate::parameters::{GenerationParameter, HoldInput, HoldRepeatState};
-use crate::polyhedra::{PolyhedronKind, SpawnAddMode, SpawnPlacementMode};
 use crate::scene::{GenerationState, MaterialState, StageState, opacity_status_message};
+use crate::shapes::{ShapeKind, SpawnAddMode, SpawnPlacementMode};
 
 use super::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LFO_FREQUENCY_STEP_HZ, LfoShape, ParameterLfo};
 use super::metadata::{EffectEditMode, EffectOverlayField};
@@ -585,7 +585,7 @@ impl EffectTunerSceneParameter {
     fn display_value(self, context: &EffectTunerViewContext<'_>) -> String {
         match self {
             Self::ChildKind => {
-                polyhedron_kind_value_text(context.generation_state.selected_kind).to_string()
+                shape_kind_value_text(context.generation_state.selected_shape_kind).to_string()
             }
             Self::SpawnPlacementMode => context
                 .generation_state
@@ -657,8 +657,8 @@ impl EffectTunerSceneParameter {
     ) {
         match self {
             Self::ChildKind => {
-                context.generation_state.selected_kind = cycle_polyhedron_kind(
-                    context.generation_state.selected_kind,
+                context.generation_state.selected_shape_kind = cycle_shape_kind(
+                    context.generation_state.selected_shape_kind,
                     direction as isize,
                 );
             }
@@ -741,8 +741,8 @@ impl EffectTunerSceneParameter {
     fn reset_value(self, context: &mut EffectTunerEditContext<'_>) {
         match self {
             Self::ChildKind => {
-                context.generation_state.selected_kind =
-                    context.generation_config.default_child_kind;
+                context.generation_state.selected_shape_kind =
+                    context.generation_config.default_child_shape_kind;
             }
             Self::SpawnPlacementMode => {
                 context.generation_state.spawn_placement_mode =
@@ -802,7 +802,7 @@ impl EffectTunerSceneParameter {
     fn status_message(self, context: &EffectTunerViewContext<'_>) -> String {
         match self {
             Self::ChildKind => {
-                selected_child_shape_status_message(context.generation_state.selected_kind)
+                selected_child_shape_status_message(context.generation_state.selected_shape_kind)
             }
             Self::SpawnPlacementMode => {
                 spawn_placement_mode_status_message(context.generation_state.spawn_placement_mode)
@@ -1690,12 +1690,12 @@ where
     all[next_index]
 }
 
-fn cycle_polyhedron_kind(current: PolyhedronKind, direction: isize) -> PolyhedronKind {
-    const ALL: [PolyhedronKind; 4] = [
-        PolyhedronKind::Cube,
-        PolyhedronKind::Tetrahedron,
-        PolyhedronKind::Octahedron,
-        PolyhedronKind::Dodecahedron,
+fn cycle_shape_kind(current: ShapeKind, direction: isize) -> ShapeKind {
+    const ALL: [ShapeKind; 4] = [
+        ShapeKind::Cube,
+        ShapeKind::Tetrahedron,
+        ShapeKind::Octahedron,
+        ShapeKind::Dodecahedron,
     ];
     cycle_from_all(&ALL, current, direction)
 }
@@ -1742,12 +1742,12 @@ fn cycle_material_surface_family(
     cycle_from_all(&ALL, current, direction)
 }
 
-fn polyhedron_kind_value_text(kind: PolyhedronKind) -> &'static str {
+fn shape_kind_value_text(kind: ShapeKind) -> &'static str {
     match kind {
-        PolyhedronKind::Cube => "cube",
-        PolyhedronKind::Tetrahedron => "tetrahedron",
-        PolyhedronKind::Octahedron => "octahedron",
-        PolyhedronKind::Dodecahedron => "dodecahedron",
+        ShapeKind::Cube => "cube",
+        ShapeKind::Tetrahedron => "tetrahedron",
+        ShapeKind::Octahedron => "octahedron",
+        ShapeKind::Dodecahedron => "dodecahedron",
     }
 }
 
@@ -2297,9 +2297,9 @@ mod tests {
             stage_config,
             mut stage_state,
         ) = default_scene_state();
-        generation_state.selected_kind = crate::polyhedra::PolyhedronKind::Cube;
-        generation_state.spawn_placement_mode = crate::polyhedra::SpawnPlacementMode::Face;
-        generation_state.spawn_add_mode = crate::polyhedra::SpawnAddMode::FillLevel;
+        generation_state.selected_shape_kind = crate::shapes::ShapeKind::Cube;
+        generation_state.spawn_placement_mode = crate::shapes::SpawnPlacementMode::Face;
+        generation_state.spawn_add_mode = crate::shapes::SpawnAddMode::FillLevel;
         generation_state
             .parameter_mut(crate::parameters::GenerationParameter::ChildOutwardOffsetRatio)
             .adjust_clamped_base_value(
@@ -2338,8 +2338,8 @@ mod tests {
             ))
         );
         assert_eq!(
-            generation_state.selected_kind,
-            generation_config.default_child_kind
+            generation_state.selected_shape_kind,
+            generation_config.default_child_shape_kind
         );
         assert_eq!(
             generation_state.spawn_placement_mode,
@@ -2347,7 +2347,7 @@ mod tests {
         );
         assert_eq!(
             generation_state.spawn_add_mode,
-            crate::polyhedra::SpawnAddMode::default()
+            crate::shapes::SpawnAddMode::default()
         );
         assert_eq!(
             material_state.opacity,
@@ -2400,7 +2400,7 @@ mod tests {
 
         assert_eq!(
             generation_state.spawn_add_mode,
-            crate::polyhedra::SpawnAddMode::FillLevel
+            crate::shapes::SpawnAddMode::FillLevel
         );
     }
 
@@ -2419,7 +2419,7 @@ mod tests {
             &mut effect_tuner,
             EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildKind),
         );
-        let before = generation_state.selected_kind;
+        let before = generation_state.selected_shape_kind;
 
         assert!(!effect_tuner.append_numeric_input(
             '1',
@@ -2433,7 +2433,7 @@ mod tests {
             ),
             1.0,
         ));
-        assert_eq!(generation_state.selected_kind, before);
+        assert_eq!(generation_state.selected_shape_kind, before);
     }
 
     #[test]

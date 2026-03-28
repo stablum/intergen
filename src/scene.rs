@@ -14,8 +14,8 @@ use crate::generation::{
 };
 use crate::help_text::{startup_controls_message, startup_fx_message};
 use crate::parameters::{GenerationParameter, HoldRepeatState, ScalarParameterState};
-use crate::polyhedra::{
-    PolyhedronKind, PolyhedronNode, ShapeCatalog, ShapeGeometry, SpawnAddMode, SpawnPlacementMode,
+use crate::shapes::{
+    ShapeCatalog, ShapeGeometry, ShapeKind, ShapeNode, SpawnAddMode, SpawnPlacementMode,
     SpawnTuning, build_mesh, root_node,
 };
 use crate::ui::{UiFontSource, load_ui_theme, spawn_help_ui};
@@ -34,20 +34,20 @@ impl ShapeAssets {
         let catalog = ShapeCatalog::new();
 
         Self {
-            cube: ShapeRuntime::new(catalog.geometry(PolyhedronKind::Cube), meshes),
-            tetrahedron: ShapeRuntime::new(catalog.geometry(PolyhedronKind::Tetrahedron), meshes),
-            octahedron: ShapeRuntime::new(catalog.geometry(PolyhedronKind::Octahedron), meshes),
-            dodecahedron: ShapeRuntime::new(catalog.geometry(PolyhedronKind::Dodecahedron), meshes),
+            cube: ShapeRuntime::new(catalog.geometry(ShapeKind::Cube), meshes),
+            tetrahedron: ShapeRuntime::new(catalog.geometry(ShapeKind::Tetrahedron), meshes),
+            octahedron: ShapeRuntime::new(catalog.geometry(ShapeKind::Octahedron), meshes),
+            dodecahedron: ShapeRuntime::new(catalog.geometry(ShapeKind::Dodecahedron), meshes),
             catalog,
         }
     }
 
-    pub(crate) fn mesh(&self, kind: PolyhedronKind) -> &Handle<Mesh> {
+    pub(crate) fn mesh(&self, kind: ShapeKind) -> &Handle<Mesh> {
         match kind {
-            PolyhedronKind::Cube => &self.cube.mesh,
-            PolyhedronKind::Tetrahedron => &self.tetrahedron.mesh,
-            PolyhedronKind::Octahedron => &self.octahedron.mesh,
-            PolyhedronKind::Dodecahedron => &self.dodecahedron.mesh,
+            ShapeKind::Cube => &self.cube.mesh,
+            ShapeKind::Tetrahedron => &self.tetrahedron.mesh,
+            ShapeKind::Octahedron => &self.octahedron.mesh,
+            ShapeKind::Dodecahedron => &self.dodecahedron.mesh,
         }
     }
 }
@@ -173,8 +173,8 @@ impl GenerationParameters {
 
 #[derive(Resource)]
 pub(crate) struct GenerationState {
-    pub(crate) nodes: Vec<PolyhedronNode>,
-    pub(crate) selected_kind: PolyhedronKind,
+    pub(crate) nodes: Vec<ShapeNode>,
+    pub(crate) selected_shape_kind: ShapeKind,
     pub(crate) spawn_placement_mode: SpawnPlacementMode,
     pub(crate) spawn_add_mode: SpawnAddMode,
     pub(crate) parameters: GenerationParameters,
@@ -189,7 +189,7 @@ impl GenerationState {
 
         Self {
             nodes: vec![root],
-            selected_kind: generation_config.default_child_kind,
+            selected_shape_kind: generation_config.default_child_shape_kind,
             spawn_placement_mode: generation_config.default_spawn_placement_mode,
             spawn_add_mode: SpawnAddMode::default(),
             parameters: GenerationParameters::from_config(generation_config),
@@ -357,7 +357,7 @@ impl MaterialState {
 }
 
 #[derive(Component)]
-pub(crate) struct PolyhedronEntity {
+pub(crate) struct ShapeEntity {
     pub(crate) node_index: usize,
 }
 
@@ -402,7 +402,7 @@ pub(crate) fn setup_scene(
         &runtime_rendering,
     );
 
-    spawn_polyhedron_entity(
+    spawn_shape_entity(
         &mut commands,
         &mut materials,
         shape_assets.mesh(root.kind),
@@ -440,7 +440,7 @@ pub(crate) fn setup_scene(
     commands.insert_resource(shape_assets);
     commands.insert_resource(GenerationState {
         nodes: vec![root],
-        selected_kind: app_config.generation.default_child_kind,
+        selected_shape_kind: app_config.generation.default_child_shape_kind,
         spawn_placement_mode: initial_spawn_placement_mode,
         spawn_add_mode: SpawnAddMode::default(),
         parameters: initial_parameters,
@@ -453,7 +453,7 @@ pub(crate) fn setup_scene(
     println!("{}", startup_fx_message());
     println!(
         "Selected child shape: {:?}, ratio: {:.2}",
-        app_config.generation.default_child_kind, initial_scale_ratio
+        app_config.generation.default_child_shape_kind, initial_scale_ratio
     );
     println!(
         "{}",
@@ -480,9 +480,9 @@ pub(crate) fn setup_scene(
 pub(crate) fn root_generation_node(
     shape_catalog: &ShapeCatalog,
     generation_config: &GenerationConfig,
-) -> PolyhedronNode {
+) -> ShapeNode {
     root_node(
-        generation_config.root_kind,
+        generation_config.root_shape_kind,
         generation_config.root_scale,
         shape_catalog,
     )
@@ -492,9 +492,9 @@ pub(crate) fn reset_generation_state(
     generation_state: &mut GenerationState,
     shape_catalog: &ShapeCatalog,
     generation_config: &GenerationConfig,
-) -> PolyhedronNode {
+) -> ShapeNode {
     let root = root_node(
-        generation_state.selected_kind,
+        generation_state.selected_shape_kind,
         generation_config.root_scale,
         shape_catalog,
     );
@@ -642,21 +642,21 @@ enum StageSurfaceOrientation {
     Vertical,
 }
 
-pub(crate) fn spawn_polyhedron_entity(
+pub(crate) fn spawn_shape_entity(
     commands: &mut Commands,
     materials: &mut Assets<StandardMaterial>,
     mesh: &Handle<Mesh>,
-    node: &PolyhedronNode,
+    node: &ShapeNode,
     material_config: &MaterialConfig,
     opacity: f32,
     node_index: usize,
 ) {
-    let material = materials.add(polyhedron_material(node, material_config, opacity));
+    let material = materials.add(shape_material(node, material_config, opacity));
 
     commands.spawn((
         Mesh3d(mesh.clone()),
         MeshMaterial3d(material),
-        PolyhedronEntity { node_index },
+        ShapeEntity { node_index },
         Transform {
             translation: node.center,
             rotation: node.rotation,
@@ -666,12 +666,12 @@ pub(crate) fn spawn_polyhedron_entity(
     ));
 }
 
-pub(crate) fn sync_polyhedron_transforms(
-    nodes: &[PolyhedronNode],
-    polyhedron_transforms: &mut Query<(&PolyhedronEntity, &mut Transform)>,
+pub(crate) fn sync_shape_transforms(
+    nodes: &[ShapeNode],
+    shape_transforms: &mut Query<(&ShapeEntity, &mut Transform)>,
 ) {
-    for (polyhedron_entity, mut transform) in polyhedron_transforms.iter_mut() {
-        let Some(node) = nodes.get(polyhedron_entity.node_index) else {
+    for (shape_entity, mut transform) in shape_transforms.iter_mut() {
+        let Some(node) = nodes.get(shape_entity.node_index) else {
             continue;
         };
 
@@ -699,7 +699,7 @@ struct SurfaceProperties {
 }
 
 pub(crate) fn material_appearance(
-    node: &PolyhedronNode,
+    node: &ShapeNode,
     material_config: &MaterialConfig,
     opacity: f32,
 ) -> MaterialAppearance {
@@ -781,8 +781,8 @@ fn resolved_surface(
     }
 }
 
-fn polyhedron_material(
-    node: &PolyhedronNode,
+fn shape_material(
+    node: &ShapeNode,
     material_config: &MaterialConfig,
     opacity: f32,
 ) -> StandardMaterial {
@@ -864,9 +864,9 @@ mod tests {
 
     use crate::config::GenerationConfig;
     use crate::parameters::{GenerationParameter, HoldRepeatState};
-    use crate::polyhedra::{
-        AttachmentOccupancy, NodeOrigin, PolyhedronKind, PolyhedronNode, ShapeCatalog,
-        SpawnAddMode, SpawnAttachment, SpawnPlacementMode,
+    use crate::shapes::{
+        AttachmentOccupancy, NodeOrigin, ShapeCatalog, ShapeKind, ShapeNode, SpawnAddMode,
+        SpawnAttachment, SpawnPlacementMode,
     };
 
     use super::{
@@ -881,8 +881,8 @@ mod tests {
         let mut root = root_generation_node(&shape_catalog, &generation_config);
         root.occupied_attachments.vertices[0] = true;
 
-        let child = PolyhedronNode {
-            kind: PolyhedronKind::Tetrahedron,
+        let child = ShapeNode {
+            kind: ShapeKind::Tetrahedron,
             level: 1,
             center: Vec3::new(2.0, -1.0, 0.5),
             rotation: Quat::IDENTITY,
@@ -900,7 +900,7 @@ mod tests {
 
         let mut generation_state = GenerationState {
             nodes: vec![root, child],
-            selected_kind: PolyhedronKind::Octahedron,
+            selected_shape_kind: ShapeKind::Octahedron,
             spawn_placement_mode: SpawnPlacementMode::Face,
             spawn_add_mode: SpawnAddMode::FillLevel,
             parameters: GenerationParameters::from_base_values(0.42, 0.3, 0.6, 0.2),
@@ -980,10 +980,10 @@ mod tests {
             reset_generation_state(&mut generation_state, &shape_catalog, &generation_config);
 
         assert_eq!(generation_state.nodes.len(), 1);
-        assert_eq!(generation_state.nodes[0].kind, PolyhedronKind::Octahedron);
+        assert_eq!(generation_state.nodes[0].kind, ShapeKind::Octahedron);
         assert_eq!(generation_state.nodes[0].level, 0);
         assert_eq!(generation_state.nodes[0].center, Vec3::ZERO);
-        assert_eq!(generation_state.selected_kind, PolyhedronKind::Octahedron);
+        assert_eq!(generation_state.selected_shape_kind, ShapeKind::Octahedron);
         assert_eq!(generation_state.scale_ratio_base(), 0.42);
         assert_eq!(generation_state.twist_per_vertex_radians_base(), 0.3);
         assert_eq!(generation_state.vertex_offset_ratio_base(), 0.6);
@@ -1018,7 +1018,7 @@ mod tests {
                 .all(|occupied| !occupied)
         );
         assert_eq!(reset_root.center, Vec3::ZERO);
-        assert_eq!(reset_root.kind, PolyhedronKind::Octahedron);
+        assert_eq!(reset_root.kind, ShapeKind::Octahedron);
         assert_eq!(generation_state.spawn_hold.elapsed_secs, 0.0);
         assert!(!generation_state.spawn_hold.repeating);
         let twist_input = generation_state

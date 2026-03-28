@@ -2,7 +2,7 @@ use bevy::asset::RenderAssetUsages;
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
 
-use super::shapes::ShapeGeometry;
+use super::catalog::ShapeGeometry;
 
 pub(crate) fn build_mesh(geometry: &ShapeGeometry) -> Mesh {
     let mut positions = Vec::new();

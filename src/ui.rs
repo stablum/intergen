@@ -73,7 +73,7 @@ const KEYBOARD_TOP_LETTER_ROW: [KeyboardHelpKeySpec; 14] = [
     keyboard_help_key("Q", 1.0, true, "Roll the camera left."),
     keyboard_help_key("W", 1.0, true, "Zoom in."),
     keyboard_help_key("E", 1.0, true, "Roll the camera right."),
-    keyboard_help_key("R", 1.0, true, "Reset to the selected polyhedron as root."),
+    keyboard_help_key("R", 1.0, true, "Reset to the selected shape as root."),
     keyboard_help_key("T", 1.0, true, "Reset the child twist angle."),
     keyboard_help_key("Y", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("U", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
@@ -123,7 +123,7 @@ const KEYBOARD_SPACE_ROW: [KeyboardHelpKeySpec; 7] = [
         "Space",
         5.8,
         true,
-        "Add polyhedra; hold to repeat. With Ctrl, cycle the add mode.",
+        "Add shapes; hold to repeat. With Ctrl, cycle the add mode.",
     ),
     keyboard_help_key("Left", 1.1, true, "Yaw the camera left."),
     keyboard_help_key("Down", 1.1, true, "Pitch the camera down."),
@@ -1239,11 +1239,11 @@ mod tests {
         assert!(text.contains(
             "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions"
         ));
-        assert!(text.contains("Space: Add polyhedra using the current add mode (hold to repeat)"));
+        assert!(text.contains("Space: Add shapes using the current add mode (hold to repeat)"));
         assert!(text.contains("Ctrl + Space: Cycle add mode (single / fill current level)"));
         assert!(text.contains("G: Cycle spawn placement mode (vertex / edge / face)"));
         assert!(text.contains("Backspace: Stop camera rotation momentum"));
-        assert!(text.contains("R: Reset to the selected polyhedron as root"));
+        assert!(text.contains("R: Reset to the selected shape as root"));
         assert!(text.contains("F12: Save a screenshot"));
         assert!(text.contains("4: Select dodecahedron"));
         assert!(text.contains("O / P: Adjust global opacity"));

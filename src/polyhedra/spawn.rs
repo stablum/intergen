@@ -3,7 +3,7 @@ use std::f32::consts::PI;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::shapes::{ShapeCatalog, ShapeGeometry};
+use super::catalog::{ShapeCatalog, ShapeGeometry};
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct SpawnTuning {
@@ -69,7 +69,7 @@ impl SpawnAddMode {
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum PolyhedronKind {
+pub(crate) enum ShapeKind {
     Cube,
     Tetrahedron,
     Octahedron,
@@ -133,8 +133,8 @@ pub(crate) enum NodeOrigin {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct PolyhedronNode {
-    pub(crate) kind: PolyhedronKind,
+pub(crate) struct ShapeNode {
+    pub(crate) kind: ShapeKind,
     pub(crate) level: usize,
     pub(crate) center: Vec3,
     pub(crate) rotation: Quat,
@@ -145,10 +145,10 @@ pub(crate) struct PolyhedronNode {
 }
 
 #[derive(Clone, Debug)]
-pub(crate) struct SpawnedNode {
-    pub(crate) kind: PolyhedronKind,
+pub(crate) struct SpawnedShape {
+    pub(crate) kind: ShapeKind,
     pub(crate) parent_level: usize,
-    pub(crate) node: PolyhedronNode,
+    pub(crate) node: ShapeNode,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -162,13 +162,13 @@ struct PendingSpawn {
     parent_index: usize,
     parent_level: usize,
     attachment: SpawnAttachment,
-    node: PolyhedronNode,
+    node: ShapeNode,
 }
 
 struct SpawnCandidateInput<'a> {
-    parent: &'a PolyhedronNode,
+    parent: &'a ShapeNode,
     parent_geometry: &'a ShapeGeometry,
-    child_kind: PolyhedronKind,
+    child_kind: ShapeKind,
     child_geometry: &'a ShapeGeometry,
     parent_index: usize,
     attachment: SpawnAttachment,
@@ -176,9 +176,9 @@ struct SpawnCandidateInput<'a> {
     tuning: SpawnTuning,
 }
 
-pub(crate) fn root_node(kind: PolyhedronKind, scale: f32, shapes: &ShapeCatalog) -> PolyhedronNode {
+pub(crate) fn root_node(kind: ShapeKind, scale: f32, shapes: &ShapeCatalog) -> ShapeNode {
     let geometry = shapes.geometry(kind);
-    PolyhedronNode {
+    ShapeNode {
         kind,
         level: 0,
         center: Vec3::ZERO,
@@ -191,12 +191,12 @@ pub(crate) fn root_node(kind: PolyhedronKind, scale: f32, shapes: &ShapeCatalog)
 }
 
 pub(crate) fn next_spawn(
-    nodes: &mut Vec<PolyhedronNode>,
+    nodes: &mut Vec<ShapeNode>,
     shapes: &ShapeCatalog,
-    child_kind: PolyhedronKind,
+    child_kind: ShapeKind,
     scale_ratio: f32,
     tuning: SpawnTuning,
-) -> Option<SpawnedNode> {
+) -> Option<SpawnedShape> {
     find_next_spawn(
         nodes,
         shapes,
@@ -209,13 +209,13 @@ pub(crate) fn next_spawn(
 }
 
 pub(crate) fn spawn_batch(
-    nodes: &mut Vec<PolyhedronNode>,
+    nodes: &mut Vec<ShapeNode>,
     shapes: &ShapeCatalog,
-    child_kind: PolyhedronKind,
+    child_kind: ShapeKind,
     scale_ratio: f32,
     tuning: SpawnTuning,
     add_mode: SpawnAddMode,
-) -> Vec<SpawnedNode> {
+) -> Vec<SpawnedShape> {
     let Some(first) = next_spawn(nodes, shapes, child_kind, scale_ratio, tuning) else {
         return Vec::new();
     };
@@ -236,13 +236,13 @@ pub(crate) fn spawn_batch(
 }
 
 fn next_spawn_at_level(
-    nodes: &mut Vec<PolyhedronNode>,
+    nodes: &mut Vec<ShapeNode>,
     shapes: &ShapeCatalog,
-    child_kind: PolyhedronKind,
+    child_kind: ShapeKind,
     scale_ratio: f32,
     tuning: SpawnTuning,
     target_level: usize,
-) -> Option<SpawnedNode> {
+) -> Option<SpawnedShape> {
     find_next_spawn(
         nodes,
         shapes,
@@ -255,9 +255,9 @@ fn next_spawn_at_level(
 }
 
 fn find_next_spawn(
-    nodes: &[PolyhedronNode],
+    nodes: &[ShapeNode],
     shapes: &ShapeCatalog,
-    child_kind: PolyhedronKind,
+    child_kind: ShapeKind,
     scale_ratio: f32,
     tuning: SpawnTuning,
     level_constraint: SpawnLevelConstraint,
@@ -344,14 +344,14 @@ fn find_next_spawn(
     None
 }
 
-fn apply_spawn(nodes: &mut Vec<PolyhedronNode>, pending: PendingSpawn) -> SpawnedNode {
+fn apply_spawn(nodes: &mut Vec<ShapeNode>, pending: PendingSpawn) -> SpawnedShape {
     let node = pending.node;
     nodes[pending.parent_index]
         .occupied_attachments
         .mark_occupied(pending.attachment);
     nodes.push(node.clone());
 
-    SpawnedNode {
+    SpawnedShape {
         kind: node.kind,
         parent_level: pending.parent_level,
         node,
@@ -359,7 +359,7 @@ fn apply_spawn(nodes: &mut Vec<PolyhedronNode>, pending: PendingSpawn) -> Spawne
 }
 
 pub(crate) fn recompute_spawn_tree(
-    nodes: &mut [PolyhedronNode],
+    nodes: &mut [ShapeNode],
     shapes: &ShapeCatalog,
     twist_per_vertex_radians: f32,
     vertex_offset_ratio: f32,
@@ -394,7 +394,7 @@ pub(crate) fn recompute_spawn_tree(
     }
 }
 
-fn spawn_candidate(input: SpawnCandidateInput<'_>) -> PolyhedronNode {
+fn spawn_candidate(input: SpawnCandidateInput<'_>) -> ShapeNode {
     let scale = input.parent.scale * input.scale_ratio;
     let radius = input.child_geometry.radius * scale;
     let (center, rotation) = child_transform(
@@ -406,7 +406,7 @@ fn spawn_candidate(input: SpawnCandidateInput<'_>) -> PolyhedronNode {
         input.tuning.vertex_offset_ratio,
     );
 
-    PolyhedronNode {
+    ShapeNode {
         kind: input.child_kind,
         level: input.parent.level + 1,
         center,
@@ -456,7 +456,7 @@ fn attachment_exclusion_sample(parent_index: usize, attachment: SpawnAttachment)
 }
 
 fn child_transform(
-    parent: &PolyhedronNode,
+    parent: &ShapeNode,
     parent_geometry: &ShapeGeometry,
     attachment: SpawnAttachment,
     child_radius: f32,
@@ -484,7 +484,7 @@ fn child_transform(
 fn is_fully_contained(
     center: Vec3,
     radius: f32,
-    nodes: &[PolyhedronNode],
+    nodes: &[ShapeNode],
     containment_epsilon: f32,
 ) -> bool {
     nodes.iter().any(|node| {
@@ -496,7 +496,7 @@ fn is_fully_contained(
 fn contains_existing(
     center: Vec3,
     radius: f32,
-    nodes: &[PolyhedronNode],
+    nodes: &[ShapeNode],
     containment_epsilon: f32,
 ) -> bool {
     nodes.iter().any(|node| {
@@ -524,18 +524,12 @@ mod tests {
     #[test]
     fn root_level_is_exhausted_before_level_one_is_used() {
         let shapes = ShapeCatalog::new();
-        let mut nodes = vec![root_node(PolyhedronKind::Cube, 1.4, &shapes)];
+        let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
 
         let mut parent_levels = Vec::new();
         for _ in 0..9 {
-            let spawn = next_spawn(
-                &mut nodes,
-                &shapes,
-                PolyhedronKind::Cube,
-                0.35,
-                test_tuning(),
-            )
-            .expect("spawn should succeed");
+            let spawn = next_spawn(&mut nodes, &shapes, ShapeKind::Cube, 0.35, test_tuning())
+                .expect("spawn should succeed");
             parent_levels.push(spawn.parent_level);
         }
 
@@ -546,20 +540,14 @@ mod tests {
     #[test]
     fn fill_level_mode_spawns_remaining_nodes_only_on_the_current_level() {
         let shapes = ShapeCatalog::new();
-        let mut nodes = vec![root_node(PolyhedronKind::Cube, 1.4, &shapes)];
+        let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
 
-        next_spawn(
-            &mut nodes,
-            &shapes,
-            PolyhedronKind::Cube,
-            0.35,
-            test_tuning(),
-        )
-        .expect("initial spawn should succeed");
+        next_spawn(&mut nodes, &shapes, ShapeKind::Cube, 0.35, test_tuning())
+            .expect("initial spawn should succeed");
         let spawned = spawn_batch(
             &mut nodes,
             &shapes,
-            PolyhedronKind::Cube,
+            ShapeKind::Cube,
             0.35,
             test_tuning(),
             SpawnAddMode::FillLevel,
@@ -573,12 +561,12 @@ mod tests {
     #[test]
     fn fill_level_mode_stops_before_opening_the_next_level() {
         let shapes = ShapeCatalog::new();
-        let mut nodes = vec![root_node(PolyhedronKind::Cube, 1.4, &shapes)];
+        let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
 
         let first_batch = spawn_batch(
             &mut nodes,
             &shapes,
-            PolyhedronKind::Cube,
+            ShapeKind::Cube,
             0.35,
             test_tuning(),
             SpawnAddMode::FillLevel,
@@ -586,7 +574,7 @@ mod tests {
         let second_batch = spawn_batch(
             &mut nodes,
             &shapes,
-            PolyhedronKind::Cube,
+            ShapeKind::Cube,
             0.35,
             test_tuning(),
             SpawnAddMode::FillLevel,
@@ -601,8 +589,8 @@ mod tests {
 
     #[test]
     fn full_containment_is_rejected() {
-        let nodes = vec![PolyhedronNode {
-            kind: PolyhedronKind::Cube,
+        let nodes = vec![ShapeNode {
+            kind: ShapeKind::Cube,
             level: 0,
             center: Vec3::ZERO,
             rotation: Quat::IDENTITY,
@@ -632,9 +620,9 @@ mod tests {
         let parent_rotation = Quat::from_euler(EulerRot::YXZ, 0.45, -0.3, 0.2);
         let parent_center = Vec3::new(1.5, -0.75, 2.25);
         let parent_scale = 1.4;
-        let parent_kind = PolyhedronKind::Cube;
+        let parent_kind = ShapeKind::Cube;
         let parent_geometry = shapes.geometry(parent_kind);
-        let mut nodes = vec![PolyhedronNode {
+        let mut nodes = vec![ShapeNode {
             kind: parent_kind,
             level: 0,
             center: parent_center,
@@ -648,7 +636,7 @@ mod tests {
         let spawn = next_spawn(
             &mut nodes,
             &shapes,
-            PolyhedronKind::Tetrahedron,
+            ShapeKind::Tetrahedron,
             0.35,
             test_tuning(),
         )
@@ -665,9 +653,9 @@ mod tests {
     #[test]
     fn spawned_child_center_matches_parent_edge_direction() {
         let shapes = ShapeCatalog::new();
-        let parent_geometry = shapes.geometry(PolyhedronKind::Cube);
-        let mut nodes = vec![PolyhedronNode {
-            kind: PolyhedronKind::Cube,
+        let parent_geometry = shapes.geometry(ShapeKind::Cube);
+        let mut nodes = vec![ShapeNode {
+            kind: ShapeKind::Cube,
             level: 0,
             center: Vec3::new(1.5, -0.75, 2.25),
             rotation: Quat::IDENTITY,
@@ -680,7 +668,7 @@ mod tests {
         let spawn = next_spawn(
             &mut nodes,
             &shapes,
-            PolyhedronKind::Tetrahedron,
+            ShapeKind::Tetrahedron,
             0.35,
             SpawnTuning {
                 spawn_placement_mode: SpawnPlacementMode::Edge,
@@ -697,9 +685,9 @@ mod tests {
     #[test]
     fn spawned_child_center_matches_parent_face_direction() {
         let shapes = ShapeCatalog::new();
-        let parent_geometry = shapes.geometry(PolyhedronKind::Cube);
-        let mut nodes = vec![PolyhedronNode {
-            kind: PolyhedronKind::Cube,
+        let parent_geometry = shapes.geometry(ShapeKind::Cube);
+        let mut nodes = vec![ShapeNode {
+            kind: ShapeKind::Cube,
             level: 0,
             center: Vec3::new(1.5, -0.75, 2.25),
             rotation: Quat::IDENTITY,
@@ -712,7 +700,7 @@ mod tests {
         let spawn = next_spawn(
             &mut nodes,
             &shapes,
-            PolyhedronKind::Tetrahedron,
+            ShapeKind::Tetrahedron,
             0.35,
             SpawnTuning {
                 spawn_placement_mode: SpawnPlacementMode::Face,
@@ -729,14 +717,14 @@ mod tests {
     #[test]
     fn spawned_child_offset_scales_with_child_radius() {
         let shapes = ShapeCatalog::new();
-        let parent_kind = PolyhedronKind::Cube;
+        let parent_kind = ShapeKind::Cube;
         let parent_scale = 1.4;
         let parent_geometry = shapes.geometry(parent_kind);
-        let child_kind = PolyhedronKind::Tetrahedron;
+        let child_kind = ShapeKind::Tetrahedron;
         let child_geometry = shapes.geometry(child_kind);
         let scale_ratio = 0.35;
         let vertex_offset_ratio = 0.5;
-        let mut nodes = vec![PolyhedronNode {
+        let mut nodes = vec![ShapeNode {
             kind: parent_kind,
             level: 0,
             center: Vec3::new(1.5, -0.75, 2.25),
@@ -769,12 +757,12 @@ mod tests {
     #[test]
     fn full_vertex_exclusion_probability_blocks_spawns() {
         let shapes = ShapeCatalog::new();
-        let mut nodes = vec![root_node(PolyhedronKind::Cube, 1.4, &shapes)];
+        let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
 
         let spawn = next_spawn(
             &mut nodes,
             &shapes,
-            PolyhedronKind::Cube,
+            ShapeKind::Cube,
             0.35,
             SpawnTuning {
                 vertex_spawn_exclusion_probability: 1.0,
@@ -789,14 +777,14 @@ mod tests {
     #[test]
     fn switching_spawn_modes_uses_separate_attachment_occupancy() {
         let shapes = ShapeCatalog::new();
-        let mut root = root_node(PolyhedronKind::Cube, 1.4, &shapes);
+        let mut root = root_node(ShapeKind::Cube, 1.4, &shapes);
         root.occupied_attachments.vertices.fill(true);
         let mut nodes = vec![root];
 
         let spawn = next_spawn(
             &mut nodes,
             &shapes,
-            PolyhedronKind::Cube,
+            ShapeKind::Cube,
             0.35,
             SpawnTuning {
                 spawn_placement_mode: SpawnPlacementMode::Edge,
@@ -817,9 +805,9 @@ mod tests {
     fn zero_twist_keeps_child_orientation_aligned_with_parent() {
         let shapes = ShapeCatalog::new();
         let parent_rotation = Quat::from_euler(EulerRot::YXZ, 0.45, -0.3, 0.2);
-        let parent_kind = PolyhedronKind::Cube;
+        let parent_kind = ShapeKind::Cube;
         let parent_geometry = shapes.geometry(parent_kind);
-        let mut nodes = vec![PolyhedronNode {
+        let mut nodes = vec![ShapeNode {
             kind: parent_kind,
             level: 0,
             center: Vec3::new(1.5, -0.75, 2.25),
@@ -833,7 +821,7 @@ mod tests {
         let spawn = next_spawn(
             &mut nodes,
             &shapes,
-            PolyhedronKind::Tetrahedron,
+            ShapeKind::Tetrahedron,
             0.35,
             SpawnTuning {
                 twist_per_vertex_radians: 0.0,
@@ -848,16 +836,10 @@ mod tests {
     #[test]
     fn recompute_spawn_tree_updates_existing_children_for_new_twist() {
         let shapes = ShapeCatalog::new();
-        let mut nodes = vec![root_node(PolyhedronKind::Cube, 1.4, &shapes)];
+        let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
         for _ in 0..2 {
-            next_spawn(
-                &mut nodes,
-                &shapes,
-                PolyhedronKind::Cube,
-                0.35,
-                test_tuning(),
-            )
-            .expect("spawn should succeed");
+            next_spawn(&mut nodes, &shapes, ShapeKind::Cube, 0.35, test_tuning())
+                .expect("spawn should succeed");
         }
 
         let child_before = nodes[2].rotation * Vec3::X;
@@ -870,15 +852,9 @@ mod tests {
     #[test]
     fn recompute_spawn_tree_updates_existing_children_for_new_vertex_offset() {
         let shapes = ShapeCatalog::new();
-        let mut nodes = vec![root_node(PolyhedronKind::Cube, 1.4, &shapes)];
-        next_spawn(
-            &mut nodes,
-            &shapes,
-            PolyhedronKind::Cube,
-            0.35,
-            test_tuning(),
-        )
-        .expect("spawn should succeed");
+        let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
+        next_spawn(&mut nodes, &shapes, ShapeKind::Cube, 0.35, test_tuning())
+            .expect("spawn should succeed");
 
         let center_before = nodes[1].center;
         recompute_spawn_tree(

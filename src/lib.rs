@@ -9,11 +9,12 @@ mod effects;
 mod generation;
 mod help_text;
 mod parameters;
-mod polyhedra;
 mod presets;
 mod runtime_scene;
 mod scene;
 mod scene_snapshot;
+#[path = "polyhedra/mod.rs"]
+mod shapes;
 mod ui;
 
 pub use app::run;

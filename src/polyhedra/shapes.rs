@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use bevy::prelude::*;
 
 use super::mesh::{centroid, face_normal};
-use super::spawn::{PolyhedronKind, SpawnPlacementMode};
+use super::spawn::{ShapeKind, SpawnPlacementMode};
 
 #[derive(Clone)]
 pub(crate) struct ShapeGeometry {
@@ -31,12 +31,12 @@ impl ShapeCatalog {
         }
     }
 
-    pub(crate) fn geometry(&self, kind: PolyhedronKind) -> &ShapeGeometry {
+    pub(crate) fn geometry(&self, kind: ShapeKind) -> &ShapeGeometry {
         match kind {
-            PolyhedronKind::Cube => &self.cube,
-            PolyhedronKind::Tetrahedron => &self.tetrahedron,
-            PolyhedronKind::Octahedron => &self.octahedron,
-            PolyhedronKind::Dodecahedron => &self.dodecahedron,
+            ShapeKind::Cube => &self.cube,
+            ShapeKind::Tetrahedron => &self.tetrahedron,
+            ShapeKind::Octahedron => &self.octahedron,
+            ShapeKind::Dodecahedron => &self.dodecahedron,
         }
     }
 }

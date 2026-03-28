@@ -1,6 +1,6 @@
 # intergen
 
-Interactive 3D polyhedron generation tool built with Rust and Bevy.
+Interactive 3D shape generation tool built with Rust and Bevy.
 
 Runtime tuning lives in `config.toml` at the repository root.
 
@@ -21,7 +21,7 @@ Runtime tuning lives in `config.toml` at the repository root.
 The current prototype focuses on a fast local development loop and a usable vertical slice:
 - inertial camera rotation on all 3 axes with preserved angular momentum
 - keyboard zoom
-- recursive polyhedron spawning from parent vertices, edges, or faces
+- recursive shape spawning from parent vertices, edges, or faces
 - selectable child shape type
 - adjustable child scale ratio
 - two-step in-app help overlay with text controls plus a hoverable neutral-mode keyboard map
@@ -175,7 +175,7 @@ Current scene preset contents:
 - stage visibility plus floor/backdrop toggles
 - material palette/PBR settings, procedural surface-family settings, and current global opacity
 - camera position, distance, and momentum
-- current polyhedron tree, selected child shape, spawn placement mode, scale ratio, twist, outward offset, and global spawn-exclusion probability
+- current shape tree, selected child shape, spawn placement mode, scale ratio, twist, outward offset, and global spawn-exclusion probability
 - live camera-output effect values plus all per-parameter LFO settings
 
 ## Blender Export
@@ -183,7 +183,7 @@ Current scene preset contents:
 Press `F4` during a normal interactive run to write a timestamped Blender scene under `blend-exports/`.
 
 What the `.blend` currently includes:
-- the full polyhedron scene as real Blender mesh objects
+- the full shape scene as real Blender mesh objects
 - the current camera, directional light, point light, and world background
 - per-object materials with transparency, metallic, roughness, and reflectance-derived specular
 - compositor recreation for lens distortion, hard-wrap wavefolder, gaussian blur, bloom, and edge detection
@@ -261,8 +261,8 @@ cargo test-plain
 - `Shift + Enter` in F2: reset all F2 controls to their startup defaults
 - `F4`: export the current scene to `blend-exports/` as a Blender `.blend`
 - `F12`: save a screenshot to `screenshots/`
-- `R`: reset the scene with the currently selected polyhedron as the new root
-- `Space`: spawn child polyhedra with the current placement mode, or hold to keep spawning
+- `R`: reset the scene with the currently selected shape as the new root
+- `Space`: spawn child shapes with the current placement mode, or hold to keep spawning
 - `Ctrl + Space`: cycle the add mode between single spawn and fill-current-level spawning
 - `G`: cycle the spawn placement mode between vertices, edges, and faces
 - `1`: select cube

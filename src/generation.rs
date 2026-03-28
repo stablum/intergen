@@ -4,14 +4,13 @@ use crate::control_page::{
     ControlPageInputMask, just_pressed_unmasked, just_released_unmasked, pressed_unmasked,
 };
 use crate::parameters::GenerationParameter;
-use crate::polyhedra::{
-    PolyhedronKind, SpawnAddMode, SpawnPlacementMode, SpawnedNode, recompute_spawn_tree,
-    spawn_batch,
-};
 use crate::runtime_scene::GenerationSceneAccess;
 use crate::scene::{
-    PolyhedronEntity, alpha_mode_for_opacity, material_appearance, opacity_status_message,
-    reset_generation_state, spawn_polyhedron_entity, sync_polyhedron_transforms,
+    ShapeEntity, alpha_mode_for_opacity, material_appearance, opacity_status_message,
+    reset_generation_state, spawn_shape_entity, sync_shape_transforms,
+};
+use crate::shapes::{
+    ShapeKind, SpawnAddMode, SpawnPlacementMode, SpawnedShape, recompute_spawn_tree, spawn_batch,
 };
 
 const RADIANS_TO_DEGREES: f32 = 180.0 / std::f32::consts::PI;
@@ -22,11 +21,11 @@ const VERTEX_OFFSET_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyX];
 const VERTEX_EXCLUSION_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyV];
 const VERTEX_EXCLUSION_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyB];
 
-const SHAPE_SELECTION_KEYS: [(KeyCode, PolyhedronKind); 4] = [
-    (KeyCode::Digit1, PolyhedronKind::Cube),
-    (KeyCode::Digit2, PolyhedronKind::Tetrahedron),
-    (KeyCode::Digit3, PolyhedronKind::Octahedron),
-    (KeyCode::Digit4, PolyhedronKind::Dodecahedron),
+const SHAPE_SELECTION_KEYS: [(KeyCode, ShapeKind); 4] = [
+    (KeyCode::Digit1, ShapeKind::Cube),
+    (KeyCode::Digit2, ShapeKind::Tetrahedron),
+    (KeyCode::Digit3, ShapeKind::Octahedron),
+    (KeyCode::Digit4, ShapeKind::Dodecahedron),
 ];
 
 pub(crate) fn generation_input_system(
@@ -115,10 +114,10 @@ fn handle_shape_selection(
             continue;
         }
 
-        generation_state.selected_kind = kind;
+        generation_state.selected_shape_kind = kind;
         println!(
             "{}",
-            selected_child_shape_status_message(generation_state.selected_kind)
+            selected_child_shape_status_message(generation_state.selected_shape_kind)
         );
     }
 }
@@ -218,7 +217,7 @@ fn handle_opacity_input(
             &scene.app_config.materials,
             &scene.material_state,
             &mut scene.materials,
-            &scene.polyhedron_materials,
+            &scene.shape_materials,
         );
     }
 }
@@ -303,10 +302,7 @@ pub(crate) fn recompute_generation_tree(scene: &mut GenerationSceneAccess<'_, '_
         twist_per_vertex_radians,
         vertex_offset_ratio,
     );
-    sync_polyhedron_transforms(
-        &scene.generation_state.nodes,
-        &mut scene.polyhedron_transforms,
-    );
+    sync_shape_transforms(&scene.generation_state.nodes, &mut scene.shape_transforms);
 }
 
 fn handle_scene_reset(
@@ -318,7 +314,7 @@ fn handle_scene_reset(
         return false;
     }
 
-    for entity in scene.polyhedron_entities.iter() {
+    for entity in scene.shape_entities.iter() {
         scene.commands.entity(entity).despawn();
     }
 
@@ -330,7 +326,7 @@ fn handle_scene_reset(
     let material_config = scene
         .material_state
         .runtime_material_config(&scene.app_config.materials);
-    spawn_polyhedron_entity(
+    spawn_shape_entity(
         &mut scene.commands,
         &mut scene.materials,
         scene.shape_assets.mesh(root.kind),
@@ -339,7 +335,7 @@ fn handle_scene_reset(
         scene.material_state.opacity,
         0,
     );
-    println!("Reset scene to a {:?} root polyhedron.", root.kind);
+    println!("Reset scene to a {:?} root shape.", root.kind);
     true
 }
 
@@ -362,7 +358,7 @@ fn handle_spawn_input(
         return;
     }
 
-    let selected_kind = scene.generation_state.selected_kind;
+    let selected_shape_kind = scene.generation_state.selected_shape_kind;
     let scale_ratio = scene
         .generation_state
         .scale_ratio(&scene.app_config.generation);
@@ -373,7 +369,7 @@ fn handle_spawn_input(
     let spawned = spawn_batch(
         &mut scene.generation_state.nodes,
         &scene.shape_assets.catalog,
-        selected_kind,
+        selected_shape_kind,
         scale_ratio,
         spawn_tuning,
         add_mode,
@@ -388,7 +384,7 @@ fn handle_spawn_input(
         .material_state
         .runtime_material_config(&scene.app_config.materials);
     for (offset, spawn) in spawned.iter().enumerate() {
-        spawn_polyhedron_entity(
+        spawn_shape_entity(
             &mut scene.commands,
             &mut scene.materials,
             scene.shape_assets.mesh(spawn.kind),
@@ -444,12 +440,12 @@ pub(crate) fn apply_live_material_state(
     defaults: &crate::config::MaterialConfig,
     material_state: &crate::scene::MaterialState,
     materials: &mut Assets<StandardMaterial>,
-    polyhedron_materials: &Query<(&PolyhedronEntity, &MeshMaterial3d<StandardMaterial>)>,
+    shape_materials: &Query<(&ShapeEntity, &MeshMaterial3d<StandardMaterial>)>,
 ) {
     let material_config = material_state.runtime_material_config(defaults);
 
-    for (polyhedron_entity, material_handle) in polyhedron_materials {
-        let Some(node) = generation_state.nodes.get(polyhedron_entity.node_index) else {
+    for (shape_entity, material_handle) in shape_materials {
+        let Some(node) = generation_state.nodes.get(shape_entity.node_index) else {
             continue;
         };
         let Some(material) = materials.get_mut(&material_handle.0) else {
@@ -500,11 +496,11 @@ pub(crate) fn spawn_placement_mode_status_message(mode: SpawnPlacementMode) -> S
     format!("Spawn placement mode: {}", mode.plural_label())
 }
 
-pub(crate) fn selected_child_shape_status_message(kind: PolyhedronKind) -> String {
+pub(crate) fn selected_child_shape_status_message(kind: ShapeKind) -> String {
     format!("Selected child shape: {:?}", kind)
 }
 
-fn spawn_summary_status_message(spawned: &[SpawnedNode], add_mode: SpawnAddMode) -> String {
+fn spawn_summary_status_message(spawned: &[SpawnedShape], add_mode: SpawnAddMode) -> String {
     let first = &spawned[0];
     if spawned.len() == 1 {
         return format!(
@@ -531,7 +527,7 @@ mod tests {
     };
     use crate::config::GenerationConfig;
     use crate::parameters::HoldRepeatState;
-    use crate::polyhedra::SpawnAddMode;
+    use crate::shapes::SpawnAddMode;
 
     #[test]
     fn spawn_hold_repeats_while_space_is_held() {

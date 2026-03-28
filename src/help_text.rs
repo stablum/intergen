@@ -102,7 +102,7 @@ const SCENE_HELP: [HelpEntry; 23] = [
     },
     HelpEntry {
         startup: "hold Space to add objects",
-        overlay: "Space: Add polyhedra using the current add mode (hold to repeat)",
+        overlay: "Space: Add shapes using the current add mode (hold to repeat)",
     },
     HelpEntry {
         startup: "Ctrl+Space cycles add mode",
@@ -114,7 +114,7 @@ const SCENE_HELP: [HelpEntry; 23] = [
     },
     HelpEntry {
         startup: "R reset scene",
-        overlay: "R: Reset to the selected polyhedron as root",
+        overlay: "R: Reset to the selected shape as root",
     },
     HelpEntry {
         startup: "1 selects cube",

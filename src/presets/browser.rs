@@ -217,12 +217,12 @@ impl PresetBrowserState {
 mod tests {
     use super::{PresetBrowserState, PresetIndex};
     use crate::config::{EffectsConfig, LightingConfig, MaterialConfig, RenderingConfig};
-    use crate::polyhedra::{PolyhedronKind, SpawnAddMode, SpawnPlacementMode};
     use crate::presets::storage::ScenePresetFile;
     use crate::scene_snapshot::{
         CameraRigSnapshot, GenerationSnapshot, MaterialRuntimeSnapshot, NodeOriginSnapshot,
-        PolyhedronNodeSnapshot, SceneStateSnapshot,
+        SceneStateSnapshot, ShapeNodeSnapshot,
     };
+    use crate::shapes::{ShapeKind, SpawnAddMode, SpawnPlacementMode};
 
     #[test]
     fn bank_occupancy_marks_collisions() {
@@ -267,15 +267,15 @@ mod tests {
                 zoom_velocity: 0.0,
             },
             generation: GenerationSnapshot {
-                selected_kind: PolyhedronKind::Cube,
+                selected_shape_kind: ShapeKind::Cube,
                 spawn_placement_mode: SpawnPlacementMode::Vertex,
                 spawn_add_mode: SpawnAddMode::Single,
                 scale_ratio: 0.5,
                 twist_per_vertex_radians: 0.0,
                 vertex_offset_ratio: 0.0,
                 vertex_spawn_exclusion_probability: 0.0,
-                nodes: vec![PolyhedronNodeSnapshot {
-                    kind: PolyhedronKind::Cube,
+                nodes: vec![ShapeNodeSnapshot {
+                    shape_kind: ShapeKind::Cube,
                     level: 0,
                     center: [0.0, 0.0, 0.0],
                     rotation: [0.0, 0.0, 0.0, 1.0],

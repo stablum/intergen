@@ -5,8 +5,8 @@ use crate::camera::CameraRig;
 use crate::config::AppConfig;
 use crate::effect_tuner::EffectTunerState;
 use crate::scene::{
-    GenerationState, MaterialState, PolyhedronEntity, SceneLightEntity, SceneStageEntity,
-    ShapeAssets, StageState,
+    GenerationState, MaterialState, SceneLightEntity, SceneStageEntity, ShapeAssets, ShapeEntity,
+    StageState,
 };
 
 #[derive(SystemParam)]
@@ -35,7 +35,7 @@ pub(crate) struct SceneMutationAccess<'w, 's> {
     pub(crate) stage_state: ResMut<'w, StageState>,
     pub(crate) meshes: ResMut<'w, Assets<Mesh>>,
     pub(crate) materials: ResMut<'w, Assets<StandardMaterial>>,
-    pub(crate) polyhedron_entities: Query<'w, 's, Entity, With<PolyhedronEntity>>,
+    pub(crate) shape_entities: Query<'w, 's, Entity, With<ShapeEntity>>,
     pub(crate) light_entities: Query<'w, 's, Entity, With<SceneLightEntity>>,
     pub(crate) stage_entities: Query<'w, 's, Entity, With<SceneStageEntity>>,
 }
@@ -50,16 +50,15 @@ pub(crate) struct GenerationSceneAccess<'w, 's> {
     pub(crate) stage_state: ResMut<'w, StageState>,
     pub(crate) meshes: ResMut<'w, Assets<Mesh>>,
     pub(crate) materials: ResMut<'w, Assets<StandardMaterial>>,
-    pub(crate) polyhedron_entities: Query<'w, 's, Entity, With<PolyhedronEntity>>,
+    pub(crate) shape_entities: Query<'w, 's, Entity, With<ShapeEntity>>,
     pub(crate) stage_entities: Query<'w, 's, Entity, With<SceneStageEntity>>,
-    pub(crate) polyhedron_materials: Query<
+    pub(crate) shape_materials: Query<
         'w,
         's,
         (
-            &'static PolyhedronEntity,
+            &'static ShapeEntity,
             &'static MeshMaterial3d<StandardMaterial>,
         ),
     >,
-    pub(crate) polyhedron_transforms:
-        Query<'w, 's, (&'static PolyhedronEntity, &'static mut Transform)>,
+    pub(crate) shape_transforms: Query<'w, 's, (&'static ShapeEntity, &'static mut Transform)>,
 }

@@ -9,7 +9,7 @@ use crate::control_page::{ControlPage, ControlPageState};
 use crate::effect_tuner::EffectTunerState;
 use crate::runtime_scene::SceneMutationAccess;
 use crate::scene::{
-    GenerationState, MaterialState, StageState, spawn_polyhedron_entity, spawn_scene_lights,
+    GenerationState, MaterialState, StageState, spawn_scene_lights, spawn_shape_entity,
     spawn_stage_entities,
 };
 use crate::scene_snapshot::SceneStateSnapshot;
@@ -274,7 +274,7 @@ fn apply_scene_preset(
     for entity in runtime.stage_entities.iter() {
         runtime.commands.entity(entity).despawn();
     }
-    for entity in runtime.polyhedron_entities.iter() {
+    for entity in runtime.shape_entities.iter() {
         runtime.commands.entity(entity).despawn();
     }
 
@@ -290,7 +290,7 @@ fn apply_scene_preset(
         .runtime_material_config(&runtime.app_config.materials);
 
     for (node_index, node) in runtime.generation_state.nodes.iter().enumerate() {
-        spawn_polyhedron_entity(
+        spawn_shape_entity(
             &mut runtime.commands,
             &mut runtime.materials,
             runtime.shape_assets.mesh(node.kind),
