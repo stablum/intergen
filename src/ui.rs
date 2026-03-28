@@ -1199,7 +1199,7 @@ fn spawn_keyboard_help_overlay(
                 align_items: AlignItems::Center,
                 ..default()
             },
-            BackgroundColor(srgba(ui_config.overlay_background)),
+            BackgroundColor(Color::NONE),
             GlobalZIndex(30),
             Visibility::Hidden,
             KeyboardHelpOverlay,
@@ -1715,7 +1715,7 @@ pub(crate) fn spawn_help_ui(
                         border_radius: BorderRadius::all(px(999.0)),
                         ..default()
                     },
-                    BackgroundColor(srgba(ui_config.panel_background)),
+                    BackgroundColor(Color::NONE),
                 ))
                 .with_children(|strip| {
                     spawn_effect_tuner_label(
