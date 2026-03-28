@@ -1336,7 +1336,7 @@ fn spawn_effect_tuner_list_overlay(
                         border_radius: BorderRadius::all(px(ui_config.panel_radius)),
                         ..default()
                     },
-                    BackgroundColor(srgba(ui_config.panel_background)),
+                    BackgroundColor(Color::NONE),
                 ))
                 .with_children(|panel| {
                     panel
@@ -1472,7 +1472,7 @@ fn spawn_effect_tuner_list_overlay(
                                             border_radius: BorderRadius::all(px(999.0)),
                                             ..default()
                                         },
-                                        BackgroundColor(srgba(ui_config.hint_background)),
+                                        BackgroundColor(Color::NONE),
                                         Visibility::Hidden,
                                         EffectTunerListDetailPanel(slot),
                                     ))
