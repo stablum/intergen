@@ -1721,6 +1721,21 @@ impl EffectTunerState {
         }
     }
 
+    pub(crate) fn scroll_selection(&mut self, direction: isize, now_secs: f32) -> bool {
+        let direction = direction.signum();
+        if direction == 0 {
+            return false;
+        }
+
+        if direction < 0 {
+            self.select_previous_hold.reset();
+        } else {
+            self.select_next_hold.reset();
+        }
+        self.cycle_selection(direction, now_secs);
+        true
+    }
+
     pub(crate) fn step_adjustment(
         &mut self,
         direction: f32,
@@ -2383,6 +2398,15 @@ mod tests {
 
         effect_tuner.close_page();
         assert_eq!(effect_tuner.page_mode(), EffectTunerPageMode::Compact);
+    }
+
+    #[test]
+    fn scroll_selection_moves_without_hold_input() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let initial = effect_tuner.selected_parameter();
+
+        assert!(effect_tuner.scroll_selection(1, 1.0));
+        assert_ne!(effect_tuner.selected_parameter(), initial);
     }
 
     #[test]

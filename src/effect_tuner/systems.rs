@@ -1,5 +1,8 @@
 use bevy::{
-    input::{keyboard::KeyboardInput, mouse::{MouseScrollUnit, MouseWheel}},
+    input::{
+        keyboard::KeyboardInput,
+        mouse::{MouseScrollUnit, MouseWheel},
+    },
     prelude::*,
 };
 
@@ -22,10 +25,12 @@ pub(crate) fn effect_tuner_input_system(
     control_page: Res<ControlPageState>,
     mut keyboard_input_reader: MessageReader<KeyboardInput>,
     mut mouse_wheel_reader: MessageReader<MouseWheel>,
+    mut mouse_wheel_selection_remainder: Local<f32>,
     mut effect_tuner: ResMut<EffectTunerState>,
     mut scene: GenerationSceneAccess,
 ) {
     if !control_page.page_has_focus(ControlPage::EffectTuner) {
+        *mouse_wheel_selection_remainder = 0.0;
         return;
     }
 
@@ -119,21 +124,15 @@ pub(crate) fn effect_tuner_input_system(
 
     let mut scrolled_selection = false;
     for mouse_wheel in mouse_wheel_reader.read() {
-        let Some(direction) = mouse_wheel_selection_direction(mouse_wheel.y) else {
-            continue;
-        };
-        let step_count = mouse_wheel_selection_step_count(mouse_wheel.y, mouse_wheel.unit);
-        for _ in 0..step_count {
-            if effect_tuner.step_selection(
-                direction,
-                HoldInput {
-                    just_pressed: true,
-                    pressed: false,
-                    just_released: true,
-                    delta_secs,
-                },
-                now_secs,
-            ) {
+        *mouse_wheel_selection_remainder +=
+            mouse_wheel_selection_lines(mouse_wheel.y, mouse_wheel.unit);
+    }
+    let selection_steps = mouse_wheel_selection_whole_steps(*mouse_wheel_selection_remainder);
+    if selection_steps != 0 {
+        *mouse_wheel_selection_remainder -= selection_steps as f32;
+        let direction = if selection_steps > 0 { -1 } else { 1 };
+        for _ in 0..selection_steps.unsigned_abs() {
+            if effect_tuner.scroll_selection(direction, now_secs) {
                 scrolled_selection = true;
             }
         }
@@ -371,25 +370,20 @@ fn modifier_pressed(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool 
         .any(|key_code| keys.pressed(key_code))
 }
 
-fn mouse_wheel_selection_direction(delta_y: f32) -> Option<isize> {
-    if delta_y > 0.0 {
-        Some(-1)
-    } else if delta_y < 0.0 {
-        Some(1)
-    } else {
-        None
+fn mouse_wheel_selection_lines(delta_y: f32, unit: MouseScrollUnit) -> f32 {
+    match unit {
+        MouseScrollUnit::Line => delta_y,
+        MouseScrollUnit::Pixel => delta_y / 40.0,
     }
 }
 
-fn mouse_wheel_selection_step_count(delta_y: f32, unit: MouseScrollUnit) -> usize {
-    let magnitude = match unit {
-        MouseScrollUnit::Line => delta_y.abs(),
-        MouseScrollUnit::Pixel => delta_y.abs() / 40.0,
-    };
-    if magnitude < 0.5 {
-        0
+fn mouse_wheel_selection_whole_steps(lines: f32) -> isize {
+    if lines > 0.0 {
+        lines.floor() as isize
+    } else if lines < 0.0 {
+        lines.ceil() as isize
     } else {
-        magnitude.round().max(1.0) as usize
+        0
     }
 }
 
@@ -533,32 +527,32 @@ fn apply_reset_all_side_effects(scene: &mut GenerationSceneAccess<'_, '_>) {
 mod tests {
     use bevy::input::mouse::MouseScrollUnit;
 
-    use super::{mouse_wheel_selection_direction, mouse_wheel_selection_step_count};
+    use super::{mouse_wheel_selection_lines, mouse_wheel_selection_whole_steps};
 
     #[test]
-    fn mouse_wheel_selection_direction_matches_scroll_direction() {
-        assert_eq!(mouse_wheel_selection_direction(1.0), Some(-1));
-        assert_eq!(mouse_wheel_selection_direction(-1.0), Some(1));
-        assert_eq!(mouse_wheel_selection_direction(0.0), None);
+    fn mouse_wheel_selection_lines_handles_line_and_pixel_units() {
+        assert_eq!(mouse_wheel_selection_lines(1.0, MouseScrollUnit::Line), 1.0);
+        assert_eq!(
+            mouse_wheel_selection_lines(-2.0, MouseScrollUnit::Line),
+            -2.0
+        );
+        assert_eq!(
+            mouse_wheel_selection_lines(80.0, MouseScrollUnit::Pixel),
+            2.0
+        );
+        assert_eq!(
+            mouse_wheel_selection_lines(-20.0, MouseScrollUnit::Pixel),
+            -0.5
+        );
     }
 
     #[test]
-    fn mouse_wheel_selection_step_count_handles_line_and_pixel_units() {
-        assert_eq!(
-            mouse_wheel_selection_step_count(1.0, MouseScrollUnit::Line),
-            1
-        );
-        assert_eq!(
-            mouse_wheel_selection_step_count(2.4, MouseScrollUnit::Line),
-            2
-        );
-        assert_eq!(
-            mouse_wheel_selection_step_count(80.0, MouseScrollUnit::Pixel),
-            2
-        );
-        assert_eq!(
-            mouse_wheel_selection_step_count(8.0, MouseScrollUnit::Pixel),
-            0
-        );
+    fn mouse_wheel_selection_whole_steps_preserves_partial_scroll() {
+        assert_eq!(mouse_wheel_selection_whole_steps(0.8), 0);
+        assert_eq!(mouse_wheel_selection_whole_steps(1.0), 1);
+        assert_eq!(mouse_wheel_selection_whole_steps(2.4), 2);
+        assert_eq!(mouse_wheel_selection_whole_steps(-0.8), 0);
+        assert_eq!(mouse_wheel_selection_whole_steps(-1.0), -1);
+        assert_eq!(mouse_wheel_selection_whole_steps(-1.6), -1);
     }
 }
