@@ -486,7 +486,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
 
     for (field, mut background) in field_query.iter_mut() {
         *background = if field.0 == snapshot.active_field {
-            BackgroundColor(srgba(ui_config.focus_background))
+            BackgroundColor(effect_tuner_active_field_background())
         } else {
             BackgroundColor(Color::NONE)
         };
@@ -671,7 +671,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
         if let Some(row_snapshot) = snapshot.rows.get(row.0) {
             *visibility = Visibility::Visible;
             *background = if row_snapshot.selected {
-                BackgroundColor(srgba(ui_config.hint_background))
+                BackgroundColor(effect_tuner_panel_fill_color())
             } else {
                 BackgroundColor(Color::NONE)
             };
@@ -740,7 +740,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
             .and_then(|row| row.active_field)
             .is_some_and(|active_field| active_field == EffectOverlayField::Value);
         *background = if active {
-            BackgroundColor(srgba(ui_config.focus_background))
+            BackgroundColor(effect_tuner_active_field_background())
         } else {
             BackgroundColor(Color::NONE)
         };
@@ -770,7 +770,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
             .is_some_and(|row| row.selected && row.supports_lfo);
         let active = selected_slot && snapshot.detail.active_field == field.field;
         *background = if active {
-            BackgroundColor(srgba(ui_config.focus_background))
+            BackgroundColor(effect_tuner_active_field_background())
         } else {
             BackgroundColor(Color::NONE)
         };
@@ -988,6 +988,18 @@ fn lfo_enabled_text_color() -> Color {
     Color::srgb(0.95, 0.34, 0.34)
 }
 
+fn effect_tuner_panel_fill_color() -> Color {
+    Color::srgba(0.0, 0.0, 0.0, 0.72)
+}
+
+fn effect_tuner_active_field_background() -> Color {
+    Color::srgba(1.0, 1.0, 1.0, 0.9)
+}
+
+fn effect_tuner_corner_radius() -> BorderRadius {
+    BorderRadius::all(px(0.0))
+}
+
 fn spawn_effect_tuner_label(
     parent: &mut ChildSpawnerCommands,
     ui_theme: &UiTheme,
@@ -1057,7 +1069,7 @@ fn spawn_effect_tuner_editable_slot(
                     px(EFFECT_TUNER_FIELD_PADDING_Y),
                 ),
                 align_items: AlignItems::Center,
-                border_radius: BorderRadius::all(px(999.0)),
+                border_radius: effect_tuner_corner_radius(),
                 flex_shrink: 0.0,
                 ..default()
             },
@@ -1133,7 +1145,7 @@ fn spawn_effect_tuner_list_value_slot(
                     px(EFFECT_TUNER_FIELD_PADDING_Y),
                 ),
                 align_items: AlignItems::Center,
-                border_radius: BorderRadius::all(px(999.0)),
+                border_radius: effect_tuner_corner_radius(),
                 flex_shrink: 0.0,
                 ..default()
             },
@@ -1180,7 +1192,7 @@ fn spawn_effect_tuner_list_detail_slot(
                     px(EFFECT_TUNER_FIELD_PADDING_Y),
                 ),
                 align_items: AlignItems::Center,
-                border_radius: BorderRadius::all(px(999.0)),
+                border_radius: effect_tuner_corner_radius(),
                 flex_shrink: 0.0,
                 ..default()
             },
@@ -1568,7 +1580,7 @@ fn spawn_effect_tuner_list_overlay(
                         flex_direction: FlexDirection::Column,
                         row_gap: px(8.0),
                         padding: UiRect::all(px(ui_config.panel_padding * 0.7)),
-                        border_radius: BorderRadius::all(px(ui_config.panel_radius)),
+                        border_radius: effect_tuner_corner_radius(),
                         ..default()
                     },
                     BackgroundColor(Color::NONE),
@@ -1593,10 +1605,10 @@ fn spawn_effect_tuner_list_overlay(
                                 .spawn((
                                     Node {
                                         padding: UiRect::axes(px(7.0), px(3.0)),
-                                        border_radius: BorderRadius::all(px(999.0)),
+                                        border_radius: effect_tuner_corner_radius(),
                                         ..default()
                                     },
-                                    BackgroundColor(srgba(ui_config.hint_background)),
+                                    BackgroundColor(effect_tuner_panel_fill_color()),
                                     Visibility::Hidden,
                                     EffectTunerListPinnedBadge,
                                 ))
@@ -1631,7 +1643,7 @@ fn spawn_effect_tuner_list_overlay(
                                         align_items: AlignItems::Center,
                                         column_gap: px(8.0),
                                         padding: UiRect::axes(px(8.0), px(4.0)),
-                                        border_radius: BorderRadius::all(px(14.0)),
+                                        border_radius: effect_tuner_corner_radius(),
                                         ..default()
                                     },
                                     BackgroundColor(Color::NONE),
@@ -1705,7 +1717,7 @@ fn spawn_effect_tuner_list_overlay(
                                             column_gap: px(6.0),
                                             margin: UiRect::left(px(4.0)),
                                             padding: UiRect::axes(px(8.0), px(4.0)),
-                                            border_radius: BorderRadius::all(px(999.0)),
+                                            border_radius: effect_tuner_corner_radius(),
                                             ..default()
                                         },
                                         BackgroundColor(Color::NONE),
@@ -1934,7 +1946,7 @@ pub(crate) fn spawn_help_ui(
                             px(ui_config.hint_padding_x),
                             px((ui_config.hint_padding_y - 1.0).max(4.0)),
                         ),
-                        border_radius: BorderRadius::all(px(999.0)),
+                        border_radius: effect_tuner_corner_radius(),
                         ..default()
                     },
                     BackgroundColor(Color::NONE),
@@ -1951,10 +1963,10 @@ pub(crate) fn spawn_help_ui(
                         .spawn((
                             Node {
                                 padding: UiRect::axes(px(7.0), px(3.0)),
-                                border_radius: BorderRadius::all(px(999.0)),
+                                border_radius: effect_tuner_corner_radius(),
                                 ..default()
                             },
-                            BackgroundColor(srgba(ui_config.hint_background)),
+                            BackgroundColor(effect_tuner_panel_fill_color()),
                             Visibility::Hidden,
                             EffectTunerPinnedBadge,
                         ))
