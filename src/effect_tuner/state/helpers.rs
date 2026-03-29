@@ -1,0 +1,139 @@
+fn cycle_from_all<T>(all: &[T], current: T, direction: isize) -> T
+where
+    T: Copy + Eq,
+{
+    let current_index = all
+        .iter()
+        .position(|candidate| *candidate == current)
+        .unwrap_or(0) as isize;
+    let next_index = (current_index + direction).rem_euclid(all.len() as isize) as usize;
+    all[next_index]
+}
+
+fn cycle_shape_kind(current: ShapeKind, direction: isize) -> ShapeKind {
+    const ALL: [ShapeKind; 4] = [
+        ShapeKind::Cube,
+        ShapeKind::Tetrahedron,
+        ShapeKind::Octahedron,
+        ShapeKind::Dodecahedron,
+    ];
+    cycle_from_all(&ALL, current, direction)
+}
+
+fn cycle_spawn_placement_mode(current: SpawnPlacementMode, direction: isize) -> SpawnPlacementMode {
+    const ALL: [SpawnPlacementMode; 3] = [
+        SpawnPlacementMode::Vertex,
+        SpawnPlacementMode::Edge,
+        SpawnPlacementMode::Face,
+    ];
+    cycle_from_all(&ALL, current, direction)
+}
+
+fn cycle_spawn_add_mode(current: SpawnAddMode, direction: isize) -> SpawnAddMode {
+    const ALL: [SpawnAddMode; 2] = [SpawnAddMode::Single, SpawnAddMode::FillLevel];
+    cycle_from_all(&ALL, current, direction)
+}
+
+fn cycle_bool(current: bool, direction: f32) -> bool {
+    cycle_from_all(&[false, true], current, direction as isize)
+}
+
+fn cycle_material_surface_mode(
+    current: MaterialSurfaceMode,
+    direction: isize,
+) -> MaterialSurfaceMode {
+    const ALL: [MaterialSurfaceMode; 2] =
+        [MaterialSurfaceMode::Legacy, MaterialSurfaceMode::Procedural];
+    cycle_from_all(&ALL, current, direction)
+}
+
+fn cycle_material_surface_family(
+    current: MaterialSurfaceFamily,
+    direction: isize,
+) -> MaterialSurfaceFamily {
+    const ALL: [MaterialSurfaceFamily; 6] = [
+        MaterialSurfaceFamily::Legacy,
+        MaterialSurfaceFamily::Matte,
+        MaterialSurfaceFamily::Satin,
+        MaterialSurfaceFamily::Glossy,
+        MaterialSurfaceFamily::Metal,
+        MaterialSurfaceFamily::Frosted,
+    ];
+    cycle_from_all(&ALL, current, direction)
+}
+
+fn shape_kind_value_text(kind: ShapeKind) -> &'static str {
+    match kind {
+        ShapeKind::Cube => "cube",
+        ShapeKind::Tetrahedron => "tetrahedron",
+        ShapeKind::Octahedron => "octahedron",
+        ShapeKind::Dodecahedron => "dodecahedron",
+    }
+}
+
+fn boolean_value_text(enabled: bool) -> &'static str {
+    if enabled { "on" } else { "off" }
+}
+
+fn material_surface_mode_value_text(mode: MaterialSurfaceMode) -> &'static str {
+    match mode {
+        MaterialSurfaceMode::Legacy => "legacy",
+        MaterialSurfaceMode::Procedural => "procedural",
+    }
+}
+
+fn material_surface_family_value_text(family: MaterialSurfaceFamily) -> &'static str {
+    match family {
+        MaterialSurfaceFamily::Legacy => "legacy",
+        MaterialSurfaceFamily::Matte => "matte",
+        MaterialSurfaceFamily::Satin => "satin",
+        MaterialSurfaceFamily::Glossy => "glossy",
+        MaterialSurfaceFamily::Metal => "metal",
+        MaterialSurfaceFamily::Frosted => "frosted",
+    }
+}
+
+fn default_lfos() -> Vec<ParameterLfo> {
+    let mut lfos: Vec<_> = EffectNumericParameter::all()
+        .iter()
+        .copied()
+        .map(ParameterLfo::default_for)
+        .collect();
+    lfos.extend(
+        EffectTunerSceneParameter::lfo_capable()
+            .iter()
+            .map(|_| ParameterLfo::new(0.0)),
+    );
+    lfos
+}
+
+fn default_material_scene_lfo_bases() -> Vec<f32> {
+    let material_state = MaterialState::from_config(&MaterialConfig::default());
+    EffectTunerSceneParameter::material_lfo_capable()
+        .iter()
+        .map(|parameter| {
+            parameter
+                .material_numeric_value(&material_state)
+                .unwrap_or_default()
+        })
+        .collect()
+}
+
+fn effect_parameter_index(parameter: EffectNumericParameter) -> Option<usize> {
+    EffectNumericParameter::all()
+        .iter()
+        .position(|candidate| *candidate == parameter)
+}
+
+fn lfo_index_for_parameter(parameter: EffectTunerParameter) -> Option<usize> {
+    match parameter {
+        EffectTunerParameter::Effect(parameter) => effect_parameter_index(parameter),
+        EffectTunerParameter::Scene(parameter) => parameter
+            .lfo_scene_index()
+            .map(|index| EffectNumericParameter::all().len() + index),
+    }
+}
+
+fn lfo_seed_for_index(index: usize) -> u32 {
+    index as u32 + 1
+}
