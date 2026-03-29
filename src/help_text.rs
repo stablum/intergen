@@ -226,9 +226,9 @@ const SCENE_HELP: [HelpEntry; 23] = [
         explanation: "Reset global opacity.",
     },
     HelpEntry {
-        startup: "hold [/] or ,/. to adjust child twist",
-        overlay: "[ / ] or , / .: Adjust child twist angle (hold to repeat)",
-        binding: "[ / ] or , / .",
+        startup: "hold [/] to adjust child twist",
+        overlay: "[ / ]: Adjust child twist angle (hold to repeat)",
+        binding: "[ / ]",
         explanation: "Adjust child twist angle, and hold to repeat.",
     },
     HelpEntry {

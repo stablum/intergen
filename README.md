@@ -272,8 +272,8 @@ cargo test-plain
 - `4`: select dodecahedron
 - `-`: decrease child scale ratio
 - `+`: increase child scale ratio
-- `[` or `,`: decrease child twist angle, or hold to keep decreasing
-- `]` or `.`: increase child twist angle, or hold to keep increasing
+- `[`: decrease child twist angle, or hold to keep decreasing
+- `]`: increase child twist angle, or hold to keep increasing
 - `Z`: decrease the child outward offset, or hold to keep decreasing
 - `X`: increase the child outward offset, or hold to keep increasing
 - `C`: reset the child outward offset to the configured default

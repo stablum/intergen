@@ -125,8 +125,8 @@ const KEYBOARD_BOTTOM_LETTER_ROW: [KeyboardHelpKeySpec; 12] = [
     keyboard_help_key("B", 1.0, true, "Increase spawn exclusion probability."),
     keyboard_help_key("N", 1.0, true, "Reset spawn exclusion probability."),
     keyboard_help_key("M", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
-    keyboard_help_key(",", 1.0, true, "Decrease the child twist angle."),
-    keyboard_help_key(".", 1.0, true, "Increase the child twist angle."),
+    keyboard_help_key(",", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
+    keyboard_help_key(".", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("/", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("Shift", 2.3, false, KEYBOARD_HELP_UNUSED_TEXT),
 ];
@@ -2199,7 +2199,7 @@ mod tests {
         assert!(text.contains("4: Select dodecahedron"));
         assert!(text.contains("O / P: Adjust global opacity"));
         assert!(text.contains("I: Reset global opacity"));
-        assert!(text.contains("[ / ] or , / .: Adjust child twist angle (hold to repeat)"));
+        assert!(text.contains("[ / ]: Adjust child twist angle (hold to repeat)"));
         assert!(text.contains("Z / X: Adjust child outward offset (hold to repeat)"));
         assert!(text.contains("V / B: Adjust spawn exclusion probability (hold to repeat)"));
         assert!(text.contains("C: Reset child outward offset"));
@@ -2224,6 +2224,8 @@ mod tests {
         assert!(specs.iter().any(|spec| spec.label == "F1" && spec.used));
         assert!(specs.iter().any(|spec| spec.label == "A" && !spec.used));
         assert!(specs.iter().any(|spec| spec.label == "H" && !spec.used));
+        assert!(specs.iter().any(|spec| spec.label == "," && !spec.used));
+        assert!(specs.iter().any(|spec| spec.label == "." && !spec.used));
         assert!(specs.iter().any(|spec| spec.label == "F11" && !spec.used));
         assert!(
             KEYBOARD_TOP_LETTER_ROW

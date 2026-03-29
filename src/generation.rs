@@ -15,8 +15,8 @@ use crate::shapes::{
 };
 
 const RADIANS_TO_DEGREES: f32 = 180.0 / std::f32::consts::PI;
-const TWIST_DECREASE_KEYS: [KeyCode; 2] = [KeyCode::BracketLeft, KeyCode::Comma];
-const TWIST_INCREASE_KEYS: [KeyCode; 2] = [KeyCode::BracketRight, KeyCode::Period];
+const TWIST_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::BracketLeft];
+const TWIST_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::BracketRight];
 const VERTEX_OFFSET_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyZ];
 const VERTEX_OFFSET_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyX];
 const VERTEX_EXCLUSION_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyV];
