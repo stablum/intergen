@@ -681,7 +681,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
             EffectTunerListRowTextKind::Value => row_snapshot.value_text.clone(),
             EffectTunerListRowTextKind::LiveValue => row_snapshot.live_value_text.clone(),
             EffectTunerListRowTextKind::LfoState => {
-                if row_snapshot.supports_lfo && !row_snapshot.selected {
+                if row_snapshot.supports_lfo {
                     format!("LFO {}", row_snapshot.lfo_state_text)
                 } else {
                     String::new()
@@ -774,9 +774,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
         }
 
         let value = match text_meta.kind {
-            EffectTunerListDetailTextKind::State => {
-                format!("LFO {}", snapshot.detail.lfo_state_text)
-            }
+            EffectTunerListDetailTextKind::State => String::new(),
             EffectTunerListDetailTextKind::Amplitude => snapshot.detail.amplitude_text.clone(),
             EffectTunerListDetailTextKind::Frequency => snapshot.detail.frequency_text.clone(),
             EffectTunerListDetailTextKind::Shape => snapshot.detail.shape_text.to_string(),
@@ -784,13 +782,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
         *text = Text::new(value);
 
         let color = match text_meta.kind {
-            EffectTunerListDetailTextKind::State => {
-                if snapshot.detail.lfo_state_emphasized {
-                    lfo_enabled_text_color()
-                } else {
-                    srgb(ui_config.body_text)
-                }
-            }
+            EffectTunerListDetailTextKind::State => srgb(ui_config.body_text),
             EffectTunerListDetailTextKind::Amplitude => {
                 if snapshot.detail.active_field == EffectOverlayField::LfoAmplitude {
                     srgb(ui_config.focus_text)
