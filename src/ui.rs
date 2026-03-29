@@ -398,7 +398,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
     generation_state: Res<GenerationState>,
     material_state: Res<MaterialState>,
     stage_state: Res<crate::scene::StageState>,
-    mut overlay_query: Query<&mut Visibility, With<EffectTunerOverlay>>,
+    mut overlay_query: Query<(&mut Visibility, &mut Node), With<EffectTunerOverlay>>,
     mut pinned_badge_query: Query<
         &mut Visibility,
         (With<EffectTunerPinnedBadge>, Without<EffectTunerOverlay>),
@@ -432,33 +432,37 @@ pub(crate) fn update_effect_tuner_overlay_system(
     );
     let ui_config = &app_config.ui;
 
-    let Ok(mut overlay_visibility) = overlay_query.single_mut() else {
+    let Ok((mut overlay_visibility, mut overlay_node)) = overlay_query.single_mut() else {
         return;
     };
-    *overlay_visibility = if control_page.page_has_focus(ControlPage::EffectTuner)
+    let compact_visible = control_page.page_has_focus(ControlPage::EffectTuner)
         && effect_tuner.page_mode() == EffectTunerPageMode::Compact
-        && effect_tuner.is_visible(now_secs)
-    {
+        && effect_tuner.is_visible(now_secs);
+    *overlay_visibility = if compact_visible {
         Visibility::Visible
     } else {
         Visibility::Hidden
+    };
+    overlay_node.display = if compact_visible {
+        Display::Flex
+    } else {
+        Display::None
     };
 
     let Ok(mut pinned_badge_visibility) = pinned_badge_query.single_mut() else {
         return;
     };
-    *pinned_badge_visibility =
-        if control_page.page_has_focus(ControlPage::EffectTuner) && snapshot.pinned {
-            Visibility::Visible
-        } else {
-            Visibility::Hidden
-        };
+    *pinned_badge_visibility = if compact_visible && snapshot.pinned {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
 
     let Ok((mut lfo_section_visibility, mut lfo_section_node)) = lfo_section_query.single_mut()
     else {
         return;
     };
-    let lfo_visible = snapshot.supports_lfo;
+    let lfo_visible = compact_visible && snapshot.supports_lfo;
     *lfo_section_visibility = if lfo_visible {
         Visibility::Visible
     } else {
@@ -486,7 +490,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
             EffectTunerTextKind::ParameterLabel => snapshot.parameter_label.to_string(),
             EffectTunerTextKind::Value => snapshot.value_text.clone(),
             EffectTunerTextKind::LiveValue => snapshot.live_value_text.clone(),
-            EffectTunerTextKind::LfoState => snapshot.lfo_state_text.to_string(),
+            EffectTunerTextKind::LfoState => format!("LFO {}", snapshot.lfo_state_text),
             EffectTunerTextKind::Amplitude => snapshot.amplitude_text.clone(),
             EffectTunerTextKind::Frequency => snapshot.frequency_text.clone(),
             EffectTunerTextKind::Shape => snapshot.shape_text.to_string(),
@@ -514,7 +518,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
                 }
                 EffectTunerTextKind::LfoState => {
                     if snapshot.lfo_state_emphasized {
-                        srgb(ui_config.title_text)
+                        lfo_enabled_text_color()
                     } else {
                         srgb(ui_config.body_text)
                     }
@@ -1942,19 +1946,12 @@ pub(crate) fn spawn_help_ui(
                             EffectTunerLfoSection,
                         ))
                         .with_children(|lfo_section| {
-                            spawn_effect_tuner_label(
-                                lfo_section,
-                                ui_theme,
-                                strip_font_size,
-                                "lfo",
-                                srgb(ui_config.body_text),
-                            );
                             spawn_effect_tuner_text_slot(
                                 lfo_section,
                                 ui_theme,
                                 strip_font_size,
                                 EffectTunerTextKind::LfoState,
-                                effect_tuner_state_width(strip_font_size),
+                                effect_tuner_lfo_state_width(strip_font_size),
                                 Justify::Center,
                                 srgb(ui_config.body_text),
                             );
@@ -2156,8 +2153,9 @@ mod tests {
     use super::{
         HelpOverlayMode, KEYBOARD_HELP_ROWS, KEYBOARD_HOME_ROW, KEYBOARD_TOP_LETTER_ROW,
         UiFontSource, control_page_bottom, control_page_secondary_bottom, controls_overlay_text,
-        effect_tuner_live_value_width, effect_tuner_numeric_field_width,
-        effect_tuner_parameter_label_chars, effect_tuner_shape_label_chars, font_status_line,
+        effect_tuner_lfo_state_width, effect_tuner_live_value_width,
+        effect_tuner_numeric_field_width, effect_tuner_parameter_label_chars,
+        effect_tuner_shape_label_chars, effect_tuner_text_width, font_status_line,
     };
 
     #[test]
@@ -2280,6 +2278,9 @@ mod tests {
     fn effect_tuner_slot_helpers_cover_the_longest_labels() {
         assert_eq!(effect_tuner_parameter_label_chars(), 10);
         assert_eq!(effect_tuner_shape_label_chars(), "brownian motion".len());
+        assert!(
+            effect_tuner_lfo_state_width(13.0) >= effect_tuner_text_width("LFO OFF".len(), 13.0)
+        );
     }
 
     #[test]
