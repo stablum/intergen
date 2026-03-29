@@ -312,7 +312,7 @@ pub(crate) fn control_page_input_system(
         }
     }
 
-    if keys.just_pressed(KeyCode::F1) || keys.just_pressed(KeyCode::KeyH) {
+    if keys.just_pressed(KeyCode::F1) {
         if let Some(page) = control_page.close_active_page() {
             close_page(page, &mut effect_tuner, &mut preset_browser);
             println!("{}", page.closed_message());
@@ -488,7 +488,9 @@ mod tests {
             .resource_mut::<ControlPageState>()
             .open_page(ControlPage::EffectTuner);
         world.resource_mut::<EffectTunerState>().open_page(0.0);
-        world.resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::F1);
+        world
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::F1);
 
         run_control_page_input(&mut world);
 
@@ -498,10 +500,25 @@ mod tests {
     }
 
     #[test]
+    fn h_key_does_not_open_help_overlay() {
+        let mut world = input_world();
+        world
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::KeyH);
+
+        run_control_page_input(&mut world);
+
+        assert!(!world.resource::<HelpOverlayState>().is_visible());
+        assert_eq!(world.resource::<ControlPageState>().active_page(), None);
+    }
+
+    #[test]
     fn effect_tuner_shortcut_hides_help_overlay() {
         let mut world = input_world();
         world.resource_mut::<HelpOverlayState>().cycle();
-        world.resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::F2);
+        world
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::F2);
 
         run_control_page_input(&mut world);
 

@@ -107,7 +107,7 @@ const KEYBOARD_HOME_ROW: [KeyboardHelpKeySpec; 13] = [
     keyboard_help_key("D", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("F", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("G", 1.0, true, "Cycle the spawn placement mode."),
-    keyboard_help_key("H", 1.0, true, "Cycle the help overlay views."),
+    keyboard_help_key("H", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("J", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("K", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("L", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
@@ -1373,7 +1373,7 @@ fn spawn_keyboard_help_overlay(
                         TextColor(title_color),
                     ));
                     panel.spawn((
-                        Text::new("Second F1/H press opens this view. Hover a key to see what it does when no F-page is active."),
+                        Text::new("Second F1 press opens this view. Hover a key to see what it does when no F-page is active."),
                         ui_theme.text_font((ui_config.body_font_size - 1.0).max(14.0)),
                         TextColor(srgb(ui_config.body_text)),
                         TextLayout::new_with_justify(Justify::Center),
@@ -2057,7 +2057,7 @@ pub(crate) fn spawn_help_ui(
                     ));
                     panel.spawn((
                         Text::new(
-                            "First F1/H press opens this quick reference. The left column shows the keybinding, and the right column explains what it does.",
+                            "First F1 press opens this quick reference. The left column shows the keybinding, and the right column explains what it does.",
                         ),
                         ui_theme.text_font((ui_config.body_font_size - 1.0).max(14.0)),
                         TextColor(srgb(ui_config.body_text)),
@@ -2169,7 +2169,7 @@ mod tests {
     fn overlay_text_lists_help_and_spawn_controls() {
         let text = controls_overlay_text(UiFontSource::CarbonPlus);
 
-        assert!(text.contains("F1 / H: Cycle help views"));
+        assert!(text.contains("F1: Cycle help views"));
         assert!(text.contains(
             "F2: Open compact controls, second press opens the list, third press closes"
         ));
@@ -2223,6 +2223,7 @@ mod tests {
 
         assert!(specs.iter().any(|spec| spec.label == "F1" && spec.used));
         assert!(specs.iter().any(|spec| spec.label == "A" && !spec.used));
+        assert!(specs.iter().any(|spec| spec.label == "H" && !spec.used));
         assert!(specs.iter().any(|spec| spec.label == "F11" && !spec.used));
         assert!(
             KEYBOARD_TOP_LETTER_ROW
@@ -2244,7 +2245,7 @@ mod tests {
         assert!(
             entries
                 .iter()
-                .any(|entry| entry.binding == "F1 / H" && entry.explanation.contains("Cycle"))
+                .any(|entry| entry.binding == "F1" && entry.explanation.contains("Cycle"))
         );
         assert!(
             entries

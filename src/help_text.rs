@@ -9,9 +9,9 @@ pub(crate) struct HelpEntry {
 
 const TOP_LEVEL_HELP: [HelpEntry; 5] = [
     HelpEntry {
-        startup: "F1/H cycles help views",
-        overlay: "F1 / H: Cycle help views",
-        binding: "F1 / H",
+        startup: "F1 cycles help views",
+        overlay: "F1: Cycle help views",
+        binding: "F1",
         explanation: "Cycle help views.",
     },
     HelpEntry {

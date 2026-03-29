@@ -247,7 +247,7 @@ cargo test-plain
 - `Q` / `E`: roll camera
 - `W` / `S`: zoom in / out
 - `Backspace`: stop camera rotation momentum, or erase typed numeric F2 input while the F2 page is focused
-- `F1` or `H`: cycle help views between hidden, text, and keyboard-map overlays
+- `F1`: cycle help views between hidden, text, and keyboard-map overlays
 - `F2`: open the compact F2 control page, second press opens the list page, third press closes it
 - `F3`: open or close the scene preset page
 - `Esc`: close the active control page
