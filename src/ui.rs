@@ -2115,7 +2115,8 @@ pub(crate) fn spawn_help_ui(
                 position_type: PositionType::Absolute,
                 padding: UiRect::all(px(ui_config.overlay_padding)),
                 flex_direction: FlexDirection::Column,
-                align_items: AlignItems::FlexEnd,
+                align_items: AlignItems::Center,
+                justify_content: JustifyContent::Center,
                 ..default()
             },
             BackgroundColor(Color::NONE),
