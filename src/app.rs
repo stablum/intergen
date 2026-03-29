@@ -78,8 +78,8 @@ pub fn run() {
         .add_systems(
             Update,
             (
-                toggle_help_overlay_system,
                 control_page_input_system,
+                toggle_help_overlay_system,
                 preset_input_system,
                 sync_control_page_input_mask_system,
                 blender_export_input_system,

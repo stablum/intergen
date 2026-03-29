@@ -214,6 +214,20 @@ pub(crate) struct HelpOverlayState {
     mode: HelpOverlayMode,
 }
 
+impl HelpOverlayState {
+    pub(crate) fn is_visible(&self) -> bool {
+        self.mode != HelpOverlayMode::Hidden
+    }
+
+    pub(crate) fn cycle(&mut self) {
+        self.mode = self.mode.cycle();
+    }
+
+    pub(crate) fn hide(&mut self) {
+        self.mode = HelpOverlayMode::Hidden;
+    }
+}
+
 #[derive(Component)]
 pub(crate) struct HelpOverlay;
 
@@ -324,8 +338,7 @@ enum EffectTunerListDetailTextKind {
 }
 
 pub(crate) fn toggle_help_overlay_system(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut help_overlay: ResMut<HelpOverlayState>,
+    help_overlay: Res<HelpOverlayState>,
     mut text_overlay_query: Query<
         &mut Visibility,
         (With<HelpOverlay>, Without<KeyboardHelpOverlay>),
@@ -335,12 +348,6 @@ pub(crate) fn toggle_help_overlay_system(
         (With<KeyboardHelpOverlay>, Without<HelpOverlay>),
     >,
 ) {
-    if !(keys.just_pressed(KeyCode::F1) || keys.just_pressed(KeyCode::KeyH)) {
-        return;
-    }
-
-    help_overlay.mode = help_overlay.mode.cycle();
-
     let Ok(mut text_visibility) = text_overlay_query.single_mut() else {
         return;
     };
@@ -2167,7 +2174,7 @@ mod tests {
             "F2: Open compact controls, second press opens the list, third press closes"
         ));
         assert!(text.contains("F3: Toggle the scene preset page"));
-        assert!(text.contains("Esc: Close the current control page"));
+        assert!(text.contains("Esc: Close the current F-page"));
         assert!(text.contains("F4: Export the current scene as a Blender .blend"));
         assert!(text.contains("In F2 page: Ctrl + Up / Down select control"));
         assert!(text.contains("In F2 page: Second F2 press opens the scrolling parameter list"));

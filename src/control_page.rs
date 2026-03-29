@@ -2,6 +2,7 @@ use bevy::prelude::*;
 
 use crate::effect_tuner::{EffectTunerPageMode, EffectTunerState};
 use crate::presets::PresetBrowserState;
+use crate::ui::HelpOverlayState;
 
 const EFFECT_TUNER_BINDINGS: [KeyBindingPattern; 10] = [
     KeyBindingPattern::any_modifiers(KeyCode::Space),
@@ -293,6 +294,7 @@ pub(crate) fn control_page_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     mut control_page: ResMut<ControlPageState>,
+    mut help_overlay: ResMut<HelpOverlayState>,
     mut effect_tuner: ResMut<EffectTunerState>,
     mut preset_browser: ResMut<PresetBrowserState>,
 ) {
@@ -302,9 +304,26 @@ pub(crate) fn control_page_input_system(
             println!("{}", page.closed_message());
             return;
         }
+
+        if help_overlay.is_visible() {
+            help_overlay.hide();
+            println!("F1 help page closed.");
+            return;
+        }
+    }
+
+    if keys.just_pressed(KeyCode::F1) || keys.just_pressed(KeyCode::KeyH) {
+        if let Some(page) = control_page.close_active_page() {
+            close_page(page, &mut effect_tuner, &mut preset_browser);
+            println!("{}", page.closed_message());
+        }
+        help_overlay.cycle();
+        return;
     }
 
     if keys.just_pressed(KeyCode::F2) {
+        help_overlay.hide();
+
         if control_page.is_active(ControlPage::EffectTuner) {
             match effect_tuner.page_mode() {
                 EffectTunerPageMode::Compact => {
@@ -331,6 +350,8 @@ pub(crate) fn control_page_input_system(
     if !keys.just_pressed(KeyCode::F3) {
         return;
     }
+
+    help_overlay.hide();
 
     if control_page.is_active(ControlPage::ScenePresets) {
         control_page.close_active_page();
@@ -377,9 +398,16 @@ fn modifier_pressed(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool 
 
 #[cfg(test)]
 mod tests {
-    use bevy::prelude::KeyCode;
+    use bevy::{
+        ecs::system::SystemState,
+        prelude::{ButtonInput, KeyCode, Res, ResMut, Time, World},
+    };
 
     use super::{ControlPage, ControlPageInputMask, ControlPageState, KeyBinding, KeyModifiers};
+    use crate::config::EffectsConfig;
+    use crate::effect_tuner::EffectTunerState;
+    use crate::presets::PresetBrowserState;
+    use crate::ui::HelpOverlayState;
 
     #[test]
     fn opening_a_page_replaces_the_previous_page() {
@@ -453,6 +481,52 @@ mod tests {
         assert!(chooser_mask.captures_binding(binding(KeyCode::Enter)));
     }
 
+    #[test]
+    fn help_shortcut_closes_effect_tuner_before_showing_help() {
+        let mut world = input_world();
+        world
+            .resource_mut::<ControlPageState>()
+            .open_page(ControlPage::EffectTuner);
+        world.resource_mut::<EffectTunerState>().open_page(0.0);
+        world.resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::F1);
+
+        run_control_page_input(&mut world);
+
+        assert_eq!(world.resource::<ControlPageState>().active_page(), None);
+        assert!(world.resource::<HelpOverlayState>().is_visible());
+        assert!(!world.resource::<EffectTunerState>().is_visible(1.0));
+    }
+
+    #[test]
+    fn effect_tuner_shortcut_hides_help_overlay() {
+        let mut world = input_world();
+        world.resource_mut::<HelpOverlayState>().cycle();
+        world.resource_mut::<ButtonInput<KeyCode>>().press(KeyCode::F2);
+
+        run_control_page_input(&mut world);
+
+        assert!(!world.resource::<HelpOverlayState>().is_visible());
+        assert_eq!(
+            world.resource::<ControlPageState>().active_page(),
+            Some(ControlPage::EffectTuner)
+        );
+        assert!(world.resource::<EffectTunerState>().is_visible(0.0));
+    }
+
+    #[test]
+    fn escape_closes_help_overlay_when_no_control_page_is_active() {
+        let mut world = input_world();
+        world.resource_mut::<HelpOverlayState>().cycle();
+        world
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::Escape);
+
+        run_control_page_input(&mut world);
+
+        assert!(!world.resource::<HelpOverlayState>().is_visible());
+        assert_eq!(world.resource::<ControlPageState>().active_page(), None);
+    }
+
     fn binding(key_code: KeyCode) -> KeyBinding {
         KeyBinding {
             key_code,
@@ -468,5 +542,38 @@ mod tests {
                 ..KeyModifiers::default()
             },
         }
+    }
+
+    fn input_world() -> World {
+        let mut world = World::default();
+        world.insert_resource(ButtonInput::<KeyCode>::default());
+        world.insert_resource::<Time>(Time::default());
+        world.insert_resource(ControlPageState::default());
+        world.insert_resource(HelpOverlayState::default());
+        world.insert_resource(EffectTunerState::from_config(&EffectsConfig::default()));
+        world.insert_resource(PresetBrowserState::default());
+        world
+    }
+
+    fn run_control_page_input(world: &mut World) {
+        let mut system_state = SystemState::<(
+            Res<ButtonInput<KeyCode>>,
+            Res<Time>,
+            ResMut<ControlPageState>,
+            ResMut<HelpOverlayState>,
+            ResMut<EffectTunerState>,
+            ResMut<PresetBrowserState>,
+        )>::new(world);
+        let (keys, time, control_page, help_overlay, effect_tuner, preset_browser) =
+            system_state.get_mut(world);
+        super::control_page_input_system(
+            keys,
+            time,
+            control_page,
+            help_overlay,
+            effect_tuner,
+            preset_browser,
+        );
+        system_state.apply(world);
     }
 }

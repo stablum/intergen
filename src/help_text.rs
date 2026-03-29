@@ -27,10 +27,10 @@ const TOP_LEVEL_HELP: [HelpEntry; 5] = [
         explanation: "Toggle the scene preset page.",
     },
     HelpEntry {
-        startup: "Esc closes the active control page",
-        overlay: "Esc: Close the current control page",
+        startup: "Esc closes the current F-page",
+        overlay: "Esc: Close the current F-page",
         binding: "Esc",
-        explanation: "Close the active control page.",
+        explanation: "Close the current F-page.",
     },
     HelpEntry {
         startup: "F4 export Blender .blend",
