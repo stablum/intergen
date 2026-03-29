@@ -148,7 +148,7 @@ The in-app F2 control page starts from the values loaded from `config.toml` at l
 - `Enter` resets the selected F2 field.
 - `Shift + Enter` resets all F2 controls to their startup defaults.
 - Shader-effect parameters expose LFO fields, and so do the supported numeric scene/material parameters that update the current scene immediately. Other scene, stage, and material controls remain value-only.
-- `Esc` closes the active control page.
+- `Esc` closes the current F-page, including help, F2, or F3.
 - The tuner does not write changes back to `config.toml` automatically.
 
 Live opacity controls use these `materials` settings:
@@ -174,10 +174,13 @@ Current scene preset contents:
 - render clear color and ambient light
 - directional and point light settings
 - stage visibility plus floor/backdrop toggles
-- material palette/PBR settings, procedural surface-family settings, and current global opacity
+- material palette/PBR settings, procedural surface-family settings, and the saved base global opacity
 - camera position, distance, and momentum
-- current shape tree, selected child shape, spawn placement mode, scale ratio, twist, outward offset, and global spawn-exclusion probability
-- live camera-output effect values plus all per-parameter LFO settings
+- selected child shape, spawn placement mode, scale ratio, base twist/outward-offset values, and global spawn-exclusion probability
+- the shape tree rebuilt from those saved base values
+- effect-tuner values plus all per-parameter LFO settings
+
+When scene or material LFOs are active, preset files preserve the underlying base values and the LFO setup separately instead of freezing a single sampled frame.
 
 ## Blender Export
 
@@ -188,7 +191,7 @@ What the `.blend` currently includes:
 - the current camera, directional light, point light, and world background
 - per-object materials with transparency, metallic, roughness, and reflectance-derived specular
 - compositor recreation for lens distortion, hard-wrap wavefolder, gaussian blur, bloom, and edge detection
-- embedded `Text` datablocks with the full Intergen export snapshot, evaluated effect values, and all effect/LFO runtime settings
+- embedded `Text` datablocks with the full Intergen export snapshot, evaluated camera-output effect values, and all effect-tuner/LFO runtime settings
 
 Current limitation:
 - LFOs are preserved inside the `.blend` as metadata, but they are not yet converted into native Blender animation drivers or node animation
@@ -250,7 +253,7 @@ cargo test-plain
 - `F1`: cycle help views between hidden, text, and keyboard-map overlays
 - `F2`: open the compact F2 control page, second press opens the list page, third press closes it
 - `F3`: open or close the scene preset page
-- `Esc`: close the active control page
+- `Esc`: close the current F-page, including help, F2, or F3
 - `Ctrl + Up` / `Ctrl + Down` in F2: select the active F2 control, with hold-to-repeat
 - `Left` / `Right` or `Tab` / `Shift + Tab` in F2: switch the active F2 field
 - `Up` / `Down` in F2: adjust the active F2 field
@@ -302,7 +305,7 @@ Implemented now:
 - F2 control page for shader effects, scene parameters, stage toggles, and material tuning
 - scene preset save/load/free support with slot-collision resolution
 - camera-output hard-wrap wavefolder, lens distortion, gaussian blur, bloom, and edge-detection post process
-- Blender export with embedded snapshot and effect/LFO metadata
+- Blender export with embedded snapshot, evaluated effect values, and effect-tuner/LFO metadata
 - unit tests for geometry counts and spawn ordering
 
 Not implemented yet:
