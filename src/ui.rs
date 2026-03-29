@@ -238,6 +238,9 @@ pub(crate) struct EffectTunerPinnedBadge;
 pub(crate) struct EffectTunerListOverlay;
 
 #[derive(Component)]
+pub(crate) struct EffectTunerLfoSection;
+
+#[derive(Component)]
 pub(crate) struct EffectTunerListPinnedBadge;
 
 #[derive(Component)]
@@ -400,6 +403,14 @@ pub(crate) fn update_effect_tuner_overlay_system(
         &mut Visibility,
         (With<EffectTunerPinnedBadge>, Without<EffectTunerOverlay>),
     >,
+    mut lfo_section_query: Query<
+        (&mut Visibility, &mut Node),
+        (
+            With<EffectTunerLfoSection>,
+            Without<EffectTunerOverlay>,
+            Without<EffectTunerPinnedBadge>,
+        ),
+    >,
     mut text_query: Query<(
         &EffectTunerTextKind,
         Option<&EffectTunerEditableFieldText>,
@@ -442,6 +453,22 @@ pub(crate) fn update_effect_tuner_overlay_system(
         } else {
             Visibility::Hidden
         };
+
+    let Ok((mut lfo_section_visibility, mut lfo_section_node)) = lfo_section_query.single_mut()
+    else {
+        return;
+    };
+    let lfo_visible = snapshot.supports_lfo;
+    *lfo_section_visibility = if lfo_visible {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+    lfo_section_node.display = if lfo_visible {
+        Display::Flex
+    } else {
+        Display::None
+    };
 
     for (field, mut background) in field_query.iter_mut() {
         *background = if field.0 == snapshot.active_field {
@@ -551,7 +578,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
         ),
     >,
     mut detail_panel_query: Query<
-        (&EffectTunerListDetailPanel, &mut Visibility),
+        (&EffectTunerListDetailPanel, &mut Visibility, &mut Node),
         (
             Without<EffectTunerListOverlay>,
             Without<EffectTunerListPinnedBadge>,
@@ -653,7 +680,13 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
             EffectTunerListRowTextKind::ParameterLabel => row_snapshot.parameter_label.to_string(),
             EffectTunerListRowTextKind::Value => row_snapshot.value_text.clone(),
             EffectTunerListRowTextKind::LiveValue => row_snapshot.live_value_text.clone(),
-            EffectTunerListRowTextKind::LfoState => row_snapshot.lfo_state_text.to_string(),
+            EffectTunerListRowTextKind::LfoState => {
+                if row_snapshot.supports_lfo && !row_snapshot.selected {
+                    format!("LFO {}", row_snapshot.lfo_state_text)
+                } else {
+                    String::new()
+                }
+            }
         };
         *text = Text::new(value);
 
@@ -677,7 +710,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
             EffectTunerListRowTextKind::LiveValue => srgb(ui_config.title_text),
             EffectTunerListRowTextKind::LfoState => {
                 if row_snapshot.lfo_state_emphasized {
-                    srgb(ui_config.title_text)
+                    lfo_enabled_text_color()
                 } else {
                     srgb(ui_config.body_text)
                 }
@@ -699,11 +732,20 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
         };
     }
 
-    for (panel, mut visibility) in detail_panel_query.iter_mut() {
-        *visibility = if snapshot.rows.get(panel.0).is_some_and(|row| row.selected) {
+    for (panel, mut visibility, mut node) in detail_panel_query.iter_mut() {
+        let lfo_detail_visible = snapshot
+            .rows
+            .get(panel.0)
+            .is_some_and(|row| row.selected && row.supports_lfo);
+        *visibility = if lfo_detail_visible {
             Visibility::Visible
         } else {
             Visibility::Hidden
+        };
+        node.display = if lfo_detail_visible {
+            Display::Flex
+        } else {
+            Display::None
         };
     }
 
@@ -711,7 +753,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
         let selected_slot = snapshot
             .rows
             .get(field.slot)
-            .is_some_and(|row| row.selected);
+            .is_some_and(|row| row.selected && row.supports_lfo);
         let active = selected_slot && snapshot.detail.active_field == field.field;
         *background = if active {
             BackgroundColor(srgba(ui_config.focus_background))
@@ -724,7 +766,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
         let selected_slot = snapshot
             .rows
             .get(text_meta.slot)
-            .is_some_and(|row| row.selected);
+            .is_some_and(|row| row.selected && row.supports_lfo);
         if !selected_slot {
             *text = Text::new("");
             *text_color = TextColor(srgb(ui_config.body_text));
@@ -732,7 +774,9 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
         }
 
         let value = match text_meta.kind {
-            EffectTunerListDetailTextKind::State => snapshot.detail.lfo_state_text.to_string(),
+            EffectTunerListDetailTextKind::State => {
+                format!("LFO {}", snapshot.detail.lfo_state_text)
+            }
             EffectTunerListDetailTextKind::Amplitude => snapshot.detail.amplitude_text.clone(),
             EffectTunerListDetailTextKind::Frequency => snapshot.detail.frequency_text.clone(),
             EffectTunerListDetailTextKind::Shape => snapshot.detail.shape_text.to_string(),
@@ -742,7 +786,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
         let color = match text_meta.kind {
             EffectTunerListDetailTextKind::State => {
                 if snapshot.detail.lfo_state_emphasized {
-                    srgb(ui_config.title_text)
+                    lfo_enabled_text_color()
                 } else {
                     srgb(ui_config.body_text)
                 }
@@ -878,6 +922,10 @@ fn effect_tuner_state_width(font_size: f32) -> f32 {
     effect_tuner_text_width(3, font_size)
 }
 
+fn effect_tuner_lfo_state_width(font_size: f32) -> f32 {
+    effect_tuner_text_width(7, font_size)
+}
+
 fn effect_tuner_live_value_width(font_size: f32) -> f32 {
     effect_tuner_text_width(EFFECT_TUNER_LIVE_VALUE_CHARS, font_size)
 }
@@ -928,6 +976,10 @@ fn help_overlay_badge_border_color() -> Color {
 
 fn help_overlay_row_divider_color() -> Color {
     Color::srgba(1.0, 1.0, 1.0, 0.12)
+}
+
+fn lfo_enabled_text_color() -> Color {
+    Color::srgb(0.95, 0.34, 0.34)
 }
 
 fn spawn_effect_tuner_label(
@@ -1549,13 +1601,14 @@ fn spawn_effect_tuner_list_overlay(
                                         row_font_size,
                                         slot,
                                         EffectTunerListRowTextKind::LfoState,
-                                        effect_tuner_state_width(row_font_size),
+                                        effect_tuner_lfo_state_width(row_font_size),
                                         Justify::Center,
                                         srgb(ui_config.body_text),
                                     );
 
                                     row.spawn((
                                         Node {
+                                            display: Display::None,
                                             flex_direction: FlexDirection::Row,
                                             align_items: AlignItems::Center,
                                             column_gap: px(6.0),
@@ -1569,25 +1622,11 @@ fn spawn_effect_tuner_list_overlay(
                                         EffectTunerListDetailPanel(slot),
                                     ))
                                     .with_children(|detail| {
-                                        spawn_effect_tuner_label(
-                                            detail,
-                                            ui_theme,
-                                            header_font_size,
-                                            "LFO",
-                                            srgb(ui_config.title_text),
-                                        );
-                                        spawn_effect_tuner_label(
-                                            detail,
-                                            ui_theme,
-                                            header_font_size,
-                                            "state",
-                                            srgb(ui_config.body_text),
-                                        );
                                         detail.spawn((
                                             Text::new(""),
                                             ui_theme.text_font(header_font_size),
                                             TextColor(srgb(ui_config.body_text)),
-                                            effect_tuner_text_layout(Justify::Center),
+                                            effect_tuner_text_layout(Justify::Left),
                                             EffectTunerListDetailText {
                                                 slot,
                                                 kind: EffectTunerListDetailTextKind::State,
@@ -1897,73 +1936,88 @@ pub(crate) fn spawn_help_ui(
                         Justify::Right,
                         srgb(ui_config.title_text),
                     );
-                    spawn_effect_tuner_label(
-                        strip,
-                        ui_theme,
-                        strip_font_size,
-                        "lfo",
-                        srgb(ui_config.body_text),
-                    );
-                    spawn_effect_tuner_text_slot(
-                        strip,
-                        ui_theme,
-                        strip_font_size,
-                        EffectTunerTextKind::LfoState,
-                        effect_tuner_state_width(strip_font_size),
-                        Justify::Center,
-                        srgb(ui_config.body_text),
-                    );
-                    spawn_effect_tuner_label(
-                        strip,
-                        ui_theme,
-                        strip_font_size,
-                        "amp",
-                        srgb(ui_config.body_text),
-                    );
-                    spawn_effect_tuner_editable_slot(
-                        strip,
-                        ui_theme,
-                        strip_font_size,
-                        EffectOverlayField::LfoAmplitude,
-                        EffectTunerTextKind::Amplitude,
-                        effect_tuner_numeric_field_width(strip_font_size),
-                        Justify::Right,
-                        srgb(ui_config.body_text),
-                    );
-                    spawn_effect_tuner_label(
-                        strip,
-                        ui_theme,
-                        strip_font_size,
-                        "freq",
-                        srgb(ui_config.body_text),
-                    );
-                    spawn_effect_tuner_editable_slot(
-                        strip,
-                        ui_theme,
-                        strip_font_size,
-                        EffectOverlayField::LfoFrequency,
-                        EffectTunerTextKind::Frequency,
-                        effect_tuner_numeric_field_width(strip_font_size),
-                        Justify::Right,
-                        srgb(ui_config.body_text),
-                    );
-                    spawn_effect_tuner_label(
-                        strip,
-                        ui_theme,
-                        strip_font_size,
-                        "shape",
-                        srgb(ui_config.body_text),
-                    );
-                    spawn_effect_tuner_editable_slot(
-                        strip,
-                        ui_theme,
-                        strip_font_size,
-                        EffectOverlayField::LfoShape,
-                        EffectTunerTextKind::Shape,
-                        effect_tuner_shape_field_width(strip_font_size),
-                        Justify::Left,
-                        srgb(ui_config.body_text),
-                    );
+                    strip
+                        .spawn((
+                            Node {
+                                display: Display::None,
+                                flex_direction: FlexDirection::Row,
+                                align_items: AlignItems::Center,
+                                column_gap: px(8.0),
+                                ..default()
+                            },
+                            BackgroundColor(Color::NONE),
+                            Visibility::Hidden,
+                            EffectTunerLfoSection,
+                        ))
+                        .with_children(|lfo_section| {
+                            spawn_effect_tuner_label(
+                                lfo_section,
+                                ui_theme,
+                                strip_font_size,
+                                "lfo",
+                                srgb(ui_config.body_text),
+                            );
+                            spawn_effect_tuner_text_slot(
+                                lfo_section,
+                                ui_theme,
+                                strip_font_size,
+                                EffectTunerTextKind::LfoState,
+                                effect_tuner_state_width(strip_font_size),
+                                Justify::Center,
+                                srgb(ui_config.body_text),
+                            );
+                            spawn_effect_tuner_label(
+                                lfo_section,
+                                ui_theme,
+                                strip_font_size,
+                                "amp",
+                                srgb(ui_config.body_text),
+                            );
+                            spawn_effect_tuner_editable_slot(
+                                lfo_section,
+                                ui_theme,
+                                strip_font_size,
+                                EffectOverlayField::LfoAmplitude,
+                                EffectTunerTextKind::Amplitude,
+                                effect_tuner_numeric_field_width(strip_font_size),
+                                Justify::Right,
+                                srgb(ui_config.body_text),
+                            );
+                            spawn_effect_tuner_label(
+                                lfo_section,
+                                ui_theme,
+                                strip_font_size,
+                                "freq",
+                                srgb(ui_config.body_text),
+                            );
+                            spawn_effect_tuner_editable_slot(
+                                lfo_section,
+                                ui_theme,
+                                strip_font_size,
+                                EffectOverlayField::LfoFrequency,
+                                EffectTunerTextKind::Frequency,
+                                effect_tuner_numeric_field_width(strip_font_size),
+                                Justify::Right,
+                                srgb(ui_config.body_text),
+                            );
+                            spawn_effect_tuner_label(
+                                lfo_section,
+                                ui_theme,
+                                strip_font_size,
+                                "shape",
+                                srgb(ui_config.body_text),
+                            );
+                            spawn_effect_tuner_editable_slot(
+                                lfo_section,
+                                ui_theme,
+                                strip_font_size,
+                                EffectOverlayField::LfoShape,
+                                EffectTunerTextKind::Shape,
+                                effect_tuner_shape_field_width(strip_font_size),
+                                Justify::Left,
+                                srgb(ui_config.body_text),
+                            );
+                        });
                 });
         });
 

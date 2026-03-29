@@ -25,6 +25,7 @@ pub(crate) struct EffectTunerOverlaySnapshot {
     pub(crate) parameter_label: &'static str,
     pub(crate) value_text: String,
     pub(crate) live_value_text: String,
+    pub(crate) supports_lfo: bool,
     pub(crate) lfo_state_text: &'static str,
     pub(crate) lfo_state_emphasized: bool,
     pub(crate) amplitude_text: String,
@@ -47,6 +48,7 @@ pub(crate) struct EffectTunerListRowSnapshot {
     pub(crate) parameter_label: &'static str,
     pub(crate) value_text: String,
     pub(crate) live_value_text: String,
+    pub(crate) supports_lfo: bool,
     pub(crate) lfo_state_text: &'static str,
     pub(crate) lfo_state_emphasized: bool,
     pub(crate) selected: bool,
@@ -1559,6 +1561,7 @@ impl EffectTunerState {
     ) -> EffectTunerOverlaySnapshot {
         let parameter = self.selected_parameter();
         let live_effects = self.evaluated_effects(now_secs);
+        let supports_lfo = parameter.supports_lfo();
         let (effect_state_text, effect_state_emphasized) = match parameter.effect_group() {
             Some(effect) => {
                 let enabled = effect.is_enabled(&self.current);
@@ -1567,7 +1570,7 @@ impl EffectTunerState {
             None => ("VAL", false),
         };
         let (lfo_state_text, lfo_state_emphasized, amplitude_text, frequency_text, shape_text) =
-            if parameter.supports_lfo() {
+            if supports_lfo {
                 let lfo = self.selected_lfo();
                 (
                     if lfo.enabled { "ON" } else { "OFF" },
@@ -1597,6 +1600,7 @@ impl EffectTunerState {
                 self.parameter_value_text(parameter, context),
             ),
             live_value_text: self.parameter_live_value_text(parameter, &live_effects, context),
+            supports_lfo,
             lfo_state_text,
             lfo_state_emphasized,
             amplitude_text,
@@ -2016,6 +2020,7 @@ impl EffectTunerState {
         live_effects: &EffectsConfig,
     ) -> EffectTunerListRowSnapshot {
         let selected = parameter == self.selected_parameter();
+        let supports_lfo = parameter.supports_lfo();
         let (effect_state_text, effect_state_emphasized) = match parameter.effect_group() {
             Some(effect) => {
                 let enabled = effect.is_enabled(&self.current);
@@ -2023,9 +2028,13 @@ impl EffectTunerState {
             }
             None => ("VAL", false),
         };
-        let (lfo_state_text, lfo_state_emphasized) = match self.lfo_for_parameter(parameter) {
-            Some(lfo) => (if lfo.enabled { "ON" } else { "OFF" }, lfo.enabled),
-            None => ("--", false),
+        let (lfo_state_text, lfo_state_emphasized) = if supports_lfo {
+            let lfo = self
+                .lfo_for_parameter(parameter)
+                .expect("LFO-capable parameter should have an LFO slot");
+            (if lfo.enabled { "ON" } else { "OFF" }, lfo.enabled)
+        } else {
+            ("--", false)
         };
 
         EffectTunerListRowSnapshot {
@@ -2042,6 +2051,7 @@ impl EffectTunerState {
                 self.parameter_value_text(parameter, context)
             },
             live_value_text: self.parameter_live_value_text(parameter, live_effects, context),
+            supports_lfo,
             lfo_state_text,
             lfo_state_emphasized,
             selected,
@@ -2835,6 +2845,7 @@ mod tests {
 
         assert_eq!(snapshot.effect_label, "scene");
         assert_eq!(snapshot.effect_state_text, "VAL");
+        assert!(!snapshot.supports_lfo);
         assert_eq!(snapshot.lfo_state_text, "--");
         assert_eq!(snapshot.amplitude_text, "--");
         assert_eq!(snapshot.active_field, EffectOverlayField::Value);
@@ -2870,6 +2881,7 @@ mod tests {
             0.0,
         );
 
+        assert!(snapshot.supports_lfo);
         assert_eq!(snapshot.lfo_state_text, "OFF");
         assert_eq!(snapshot.amplitude_text, "0.000");
         assert_eq!(snapshot.active_field, EffectOverlayField::LfoShape);
