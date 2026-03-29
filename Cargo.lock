@@ -2275,7 +2275,7 @@ dependencies = [
 
 [[package]]
 name = "intergen"
-version = "0.8.6"
+version = "0.8.7"
 dependencies = [
  "bevy",
  "serde",

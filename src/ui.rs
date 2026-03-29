@@ -30,7 +30,10 @@ const KEYBOARD_HELP_KEY_HEIGHT: f32 = 42.0;
 const KEYBOARD_HELP_KEY_GAP: f32 = 6.0;
 const KEYBOARD_HELP_KEY_BORDER: f32 = 1.5;
 const KEYBOARD_HELP_PANEL_MAX_WIDTH: f32 = 980.0;
-const HELP_OVERLAY_BINDING_COLUMN_WIDTH: f32 = 240.0;
+const HELP_OVERLAY_PANEL_MAX_WIDTH: f32 = 1360.0;
+const HELP_OVERLAY_COLUMN_COUNT: usize = 3;
+const HELP_OVERLAY_COLUMN_MIN_WIDTH: f32 = 320.0;
+const HELP_OVERLAY_BINDING_COLUMN_WIDTH: f32 = 160.0;
 const HELP_OVERLAY_ROW_BORDER: f32 = 1.0;
 
 #[derive(Clone, Copy)]
@@ -1226,36 +1229,7 @@ fn spawn_help_overlay_row(
             BorderColor::all(help_overlay_row_divider_color()),
         ))
         .with_children(|row| {
-            row.spawn(Node {
-                width: px(HELP_OVERLAY_BINDING_COLUMN_WIDTH),
-                min_width: px(HELP_OVERLAY_BINDING_COLUMN_WIDTH),
-                max_width: px(HELP_OVERLAY_BINDING_COLUMN_WIDTH),
-                flex_shrink: 0.0,
-                ..default()
-            })
-            .with_children(|binding_cell| {
-                binding_cell
-                    .spawn((
-                        Node {
-                            padding: UiRect::axes(px(10.0), px(5.0)),
-                            border: UiRect::all(px(1.0)),
-                            border_radius: BorderRadius::all(px(999.0)),
-                            align_items: AlignItems::Center,
-                            justify_content: JustifyContent::Center,
-                            ..default()
-                        },
-                        BackgroundColor(Color::NONE),
-                        BorderColor::all(help_overlay_badge_border_color()),
-                    ))
-                    .with_children(|badge| {
-                        badge.spawn((
-                            Text::new(entry.binding),
-                            ui_theme.text_font(font_size),
-                            TextColor(srgb(ui_config.title_text)),
-                            effect_tuner_text_layout(Justify::Center),
-                        ));
-                    });
-            });
+            spawn_help_overlay_binding_cell(row, ui_theme, font_size, entry.binding, ui_config);
 
             row.spawn(Node {
                 flex_grow: 1.0,
@@ -1276,6 +1250,120 @@ fn spawn_help_overlay_row(
                 ));
             });
         });
+}
+
+fn spawn_help_overlay_binding_cell(
+    parent: &mut ChildSpawnerCommands,
+    ui_theme: &UiTheme,
+    font_size: f32,
+    binding: &str,
+    ui_config: &UiConfig,
+) {
+    parent
+        .spawn(Node {
+            width: px(HELP_OVERLAY_BINDING_COLUMN_WIDTH),
+            min_width: px(HELP_OVERLAY_BINDING_COLUMN_WIDTH),
+            max_width: px(HELP_OVERLAY_BINDING_COLUMN_WIDTH),
+            flex_direction: FlexDirection::Row,
+            flex_wrap: FlexWrap::Wrap,
+            align_items: AlignItems::Center,
+            align_content: AlignContent::FlexStart,
+            column_gap: px(6.0),
+            row_gap: px(6.0),
+            flex_shrink: 0.0,
+            ..default()
+        })
+        .with_children(|binding_cell| {
+            for (text, is_badge) in help_overlay_binding_fragments(binding) {
+                if is_badge {
+                    binding_cell
+                        .spawn((
+                            Node {
+                                padding: UiRect::axes(px(10.0), px(5.0)),
+                                border: UiRect::all(px(1.0)),
+                                border_radius: BorderRadius::all(px(999.0)),
+                                align_items: AlignItems::Center,
+                                justify_content: JustifyContent::Center,
+                                ..default()
+                            },
+                            BackgroundColor(Color::NONE),
+                            BorderColor::all(help_overlay_badge_border_color()),
+                        ))
+                        .with_children(|badge| {
+                            badge.spawn((
+                                Text::new(text),
+                                ui_theme.text_font(font_size),
+                                TextColor(srgb(ui_config.title_text)),
+                                effect_tuner_text_layout(Justify::Center),
+                            ));
+                        });
+                } else {
+                    binding_cell.spawn((
+                        Text::new(text),
+                        ui_theme.text_font((font_size - 1.0).max(12.0)),
+                        TextColor(srgb(ui_config.hint_text)),
+                        effect_tuner_text_layout(Justify::Center),
+                        Node {
+                            padding: UiRect::horizontal(px(1.0)),
+                            ..default()
+                        },
+                    ));
+                }
+            }
+        });
+}
+
+fn help_overlay_binding_fragments(binding: &str) -> Vec<(String, bool)> {
+    let mut fragments = Vec::new();
+
+    for (or_index, option) in binding.split(" or ").enumerate() {
+        if or_index > 0 {
+            fragments.push(("or".to_string(), false));
+        }
+
+        for (slash_index, slash_part) in option.split(" / ").enumerate() {
+            if slash_index > 0 {
+                fragments.push(("/".to_string(), false));
+            }
+
+            for (plus_index, plus_part) in slash_part.split(" + ").enumerate() {
+                if plus_index > 0 {
+                    fragments.push(("+".to_string(), false));
+                }
+                push_help_overlay_binding_badges(&mut fragments, plus_part.trim());
+            }
+        }
+    }
+
+    fragments
+}
+
+fn push_help_overlay_binding_badges(fragments: &mut Vec<(String, bool)>, token: &str) {
+    let token = token.trim();
+    if token.is_empty() {
+        return;
+    }
+
+    if token == "+" {
+        fragments.push((token.to_string(), true));
+        return;
+    }
+
+    if token.contains('+') {
+        let mut parts = token.split('+').peekable();
+        while let Some(part) = parts.next() {
+            let part = part.trim();
+            if !part.is_empty() {
+                fragments.push((part.to_string(), true));
+            }
+            if parts.peek().is_some() {
+                fragments.push(("+".to_string(), false));
+            }
+        }
+        return;
+    }
+
+    fragments.push((token.to_string(), true));
 }
 
 fn spawn_keyboard_help_key(
@@ -2041,7 +2129,7 @@ pub(crate) fn spawn_help_ui(
                 .spawn((
                     Node {
                         width: percent(100),
-                        max_width: px(ui_config.panel_max_width),
+                        max_width: px(ui_config.panel_max_width.max(HELP_OVERLAY_PANEL_MAX_WIDTH)),
                         flex_direction: FlexDirection::Column,
                         row_gap: px(14.0),
                         padding: UiRect::all(px(ui_config.panel_padding)),
@@ -2057,74 +2145,107 @@ pub(crate) fn spawn_help_ui(
                     ));
                     panel.spawn((
                         Text::new(
-                            "First F1 press opens this quick reference. The left column shows the keybinding, and the right column explains what it does.",
+                            "First F1 press opens this quick reference. Each column pairs keybinding pills with a short explanation.",
                         ),
                         ui_theme.text_font((ui_config.body_font_size - 1.0).max(14.0)),
                         TextColor(srgb(ui_config.body_text)),
                         TextLayout::new_with_justify(Justify::Center),
                         Node {
-                            max_width: px((ui_config.body_max_width + 220.0).max(760.0)),
+                            max_width: px((ui_config.body_max_width + 520.0).max(1120.0)),
                             ..default()
                         },
                     ));
                     panel
-                        .spawn((
-                            Node {
-                                width: percent(100),
-                                flex_direction: FlexDirection::Row,
-                                align_items: AlignItems::Center,
-                                column_gap: px(18.0),
-                                padding: UiRect::bottom(px(8.0)),
-                                border: UiRect::bottom(px(HELP_OVERLAY_ROW_BORDER)),
-                                ..default()
-                            },
-                            BackgroundColor(Color::NONE),
-                            BorderColor::all(help_overlay_row_divider_color()),
-                        ))
-                        .with_children(|header| {
-                            header.spawn((
-                                Text::new("KEYBINDING"),
-                                ui_theme.text_font((ui_config.hint_font_size - 0.5).max(12.0)),
-                                TextColor(srgb(ui_config.hint_text)),
-                                effect_tuner_text_layout(Justify::Left),
-                                Node {
-                                    width: px(HELP_OVERLAY_BINDING_COLUMN_WIDTH),
-                                    min_width: px(HELP_OVERLAY_BINDING_COLUMN_WIDTH),
-                                    max_width: px(HELP_OVERLAY_BINDING_COLUMN_WIDTH),
-                                    flex_shrink: 0.0,
-                                    ..default()
-                                },
-                            ));
-                            header.spawn((
-                                Text::new("EXPLANATION"),
-                                ui_theme.text_font((ui_config.hint_font_size - 0.5).max(12.0)),
-                                TextColor(srgb(ui_config.hint_text)),
-                                effect_tuner_text_layout(Justify::Left),
-                                Node {
-                                    flex_grow: 1.0,
-                                    min_width: px(0.0),
-                                    ..default()
-                                },
-                            ));
-                        });
-                    panel
                         .spawn(Node {
                             width: percent(100),
-                            flex_direction: FlexDirection::Column,
-                            align_items: AlignItems::Stretch,
-                            row_gap: px(0.0),
+                            flex_direction: FlexDirection::Row,
+                            flex_wrap: FlexWrap::Wrap,
+                            align_items: AlignItems::FlexStart,
+                            align_content: AlignContent::FlexStart,
+                            column_gap: px(22.0),
+                            row_gap: px(16.0),
                             ..default()
                         })
-                        .with_children(|table| {
-                            for (index, entry) in help_entries.iter().enumerate() {
-                                spawn_help_overlay_row(
-                                    table,
-                                    ui_theme,
-                                    (ui_config.body_font_size - 1.5).max(14.0),
-                                    entry,
-                                    index + 1 < help_entries.len(),
-                                    ui_config,
-                                );
+                        .with_children(|columns| {
+                            let column_count = HELP_OVERLAY_COLUMN_COUNT.min(help_entries.len().max(1));
+                            let entries_per_column =
+                                (help_entries.len() + column_count - 1) / column_count;
+                            for column_entries in help_entries.chunks(entries_per_column.max(1)) {
+                                columns
+                                    .spawn(Node {
+                                        min_width: px(HELP_OVERLAY_COLUMN_MIN_WIDTH),
+                                        flex_basis: px(0.0),
+                                        flex_grow: 1.0,
+                                        flex_direction: FlexDirection::Column,
+                                        row_gap: px(0.0),
+                                        ..default()
+                                    })
+                                    .with_children(|column| {
+                                        column
+                                            .spawn((
+                                                Node {
+                                                    width: percent(100),
+                                                    flex_direction: FlexDirection::Row,
+                                                    align_items: AlignItems::Center,
+                                                    column_gap: px(18.0),
+                                                    padding: UiRect::bottom(px(8.0)),
+                                                    border: UiRect::bottom(px(HELP_OVERLAY_ROW_BORDER)),
+                                                    ..default()
+                                                },
+                                                BackgroundColor(Color::NONE),
+                                                BorderColor::all(help_overlay_row_divider_color()),
+                                            ))
+                                            .with_children(|header| {
+                                                header.spawn((
+                                                    Text::new("KEYBINDING"),
+                                                    ui_theme.text_font(
+                                                        (ui_config.hint_font_size - 0.5).max(12.0),
+                                                    ),
+                                                    TextColor(srgb(ui_config.hint_text)),
+                                                    effect_tuner_text_layout(Justify::Left),
+                                                    Node {
+                                                        width: px(HELP_OVERLAY_BINDING_COLUMN_WIDTH),
+                                                        min_width: px(HELP_OVERLAY_BINDING_COLUMN_WIDTH),
+                                                        max_width: px(HELP_OVERLAY_BINDING_COLUMN_WIDTH),
+                                                        flex_shrink: 0.0,
+                                                        ..default()
+                                                    },
+                                                ));
+                                                header.spawn((
+                                                    Text::new("EXPLANATION"),
+                                                    ui_theme.text_font(
+                                                        (ui_config.hint_font_size - 0.5).max(12.0),
+                                                    ),
+                                                    TextColor(srgb(ui_config.hint_text)),
+                                                    effect_tuner_text_layout(Justify::Left),
+                                                    Node {
+                                                        flex_grow: 1.0,
+                                                        min_width: px(0.0),
+                                                        ..default()
+                                                    },
+                                                ));
+                                            });
+                                        column
+                                            .spawn(Node {
+                                                width: percent(100),
+                                                flex_direction: FlexDirection::Column,
+                                                align_items: AlignItems::Stretch,
+                                                row_gap: px(0.0),
+                                                ..default()
+                                            })
+                                            .with_children(|table| {
+                                                for (index, entry) in column_entries.iter().enumerate() {
+                                                    spawn_help_overlay_row(
+                                                        table,
+                                                        ui_theme,
+                                                        (ui_config.body_font_size - 1.5).max(14.0),
+                                                        entry,
+                                                        index + 1 < column_entries.len(),
+                                                        ui_config,
+                                                    );
+                                                }
+                                            });
+                                    });
                             }
                         });
                     panel.spawn((
@@ -2158,11 +2279,13 @@ pub(crate) fn font_status_line(font_source: UiFontSource) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        HelpOverlayMode, KEYBOARD_HELP_ROWS, KEYBOARD_HOME_ROW, KEYBOARD_TOP_LETTER_ROW,
-        UiFontSource, control_page_bottom, control_page_secondary_bottom, controls_overlay_text,
-        effect_tuner_lfo_state_width, effect_tuner_live_value_width,
+        HELP_OVERLAY_BINDING_COLUMN_WIDTH, HELP_OVERLAY_COLUMN_COUNT,
+        HELP_OVERLAY_COLUMN_MIN_WIDTH, HelpOverlayMode, KEYBOARD_HELP_ROWS, KEYBOARD_HOME_ROW,
+        KEYBOARD_TOP_LETTER_ROW, UiFontSource, control_page_bottom, control_page_secondary_bottom,
+        controls_overlay_text, effect_tuner_lfo_state_width, effect_tuner_live_value_width,
         effect_tuner_numeric_field_width, effect_tuner_parameter_label_chars,
         effect_tuner_shape_label_chars, effect_tuner_text_width, font_status_line,
+        help_overlay_binding_fragments,
     };
 
     #[test]
@@ -2212,6 +2335,44 @@ mod tests {
         assert_eq!(HelpOverlayMode::Hidden.cycle(), HelpOverlayMode::Text);
         assert_eq!(HelpOverlayMode::Text.cycle(), HelpOverlayMode::Keyboard);
         assert_eq!(HelpOverlayMode::Keyboard.cycle(), HelpOverlayMode::Hidden);
+    }
+
+    #[test]
+    fn help_overlay_binding_fragments_split_composite_shortcuts() {
+        assert_eq!(
+            help_overlay_binding_fragments("F1 / H"),
+            vec![
+                ("F1".to_string(), true),
+                ("/".to_string(), false),
+                ("H".to_string(), true),
+            ]
+        );
+        assert_eq!(
+            help_overlay_binding_fragments("Left / Right or Tab / Shift+Tab"),
+            vec![
+                ("Left".to_string(), true),
+                ("/".to_string(), false),
+                ("Right".to_string(), true),
+                ("or".to_string(), false),
+                ("Tab".to_string(), true),
+                ("/".to_string(), false),
+                ("Shift".to_string(), true),
+                ("+".to_string(), false),
+                ("Tab".to_string(), true),
+            ]
+        );
+    }
+
+    #[test]
+    fn help_overlay_first_panel_uses_three_balanced_columns() {
+        let entries = crate::help_text::overlay_help_entries().collect::<Vec<_>>();
+        let entries_per_column =
+            (entries.len() + HELP_OVERLAY_COLUMN_COUNT - 1) / HELP_OVERLAY_COLUMN_COUNT;
+        let column_count = entries.chunks(entries_per_column.max(1)).count();
+
+        assert_eq!(HELP_OVERLAY_COLUMN_COUNT, 3);
+        assert_eq!(column_count, HELP_OVERLAY_COLUMN_COUNT);
+        assert!(HELP_OVERLAY_COLUMN_MIN_WIDTH > HELP_OVERLAY_BINDING_COLUMN_WIDTH);
     }
 
     #[test]
