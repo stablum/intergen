@@ -3,6 +3,7 @@ use bevy::prelude::*;
 use crate::control_page::{
     ControlPageInputMask, just_pressed_unmasked, just_released_unmasked, pressed_unmasked,
 };
+use crate::effect_tuner::{EffectTunerParameter, EffectTunerSceneParameter, EffectTunerState};
 use crate::parameters::GenerationParameter;
 use crate::runtime_scene::GenerationSceneAccess;
 use crate::scene::{
@@ -32,6 +33,7 @@ pub(crate) fn generation_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     control_page_input_mask: Res<ControlPageInputMask>,
+    mut effect_tuner: ResMut<EffectTunerState>,
     mut scene: GenerationSceneAccess,
 ) {
     let input_mask = *control_page_input_mask;
@@ -44,7 +46,7 @@ pub(crate) fn generation_input_system(
         &scene.app_config.generation,
         &mut scene.generation_state,
     );
-    handle_opacity_input(&keys, input_mask, &mut scene);
+    handle_opacity_input(&keys, input_mask, &mut effect_tuner, &mut scene);
 
     let mut transform_changed = false;
     transform_changed |= handle_generation_parameter_input(
@@ -179,11 +181,18 @@ fn handle_scale_input(
 fn handle_opacity_input(
     keys: &ButtonInput<KeyCode>,
     input_mask: ControlPageInputMask,
+    effect_tuner: &mut EffectTunerState,
     scene: &mut GenerationSceneAccess<'_, '_>,
 ) {
     let (min_opacity, max_opacity) = scene.app_config.materials.opacity_bounds();
     let mut opacity_changed = false;
+    let opacity_parameter = EffectTunerParameter::Scene(EffectTunerSceneParameter::GlobalOpacity);
     if just_pressed_unmasked(keys, input_mask, KeyCode::KeyO) {
+        effect_tuner.restore_scene_parameter_base_if_needed(
+            opacity_parameter,
+            &scene.app_config.materials,
+            &mut scene.material_state,
+        );
         scene.material_state.opacity = adjust_clamped_value(
             scene.material_state.opacity,
             -scene.app_config.materials.opacity_adjust_step,
@@ -194,6 +203,11 @@ fn handle_opacity_input(
         println!("{}", opacity_status_message(scene.material_state.opacity));
     }
     if just_pressed_unmasked(keys, input_mask, KeyCode::KeyP) {
+        effect_tuner.restore_scene_parameter_base_if_needed(
+            opacity_parameter,
+            &scene.app_config.materials,
+            &mut scene.material_state,
+        );
         scene.material_state.opacity = adjust_clamped_value(
             scene.material_state.opacity,
             scene.app_config.materials.opacity_adjust_step,
@@ -204,6 +218,11 @@ fn handle_opacity_input(
         println!("{}", opacity_status_message(scene.material_state.opacity));
     }
     if just_pressed_unmasked(keys, input_mask, KeyCode::KeyI) {
+        effect_tuner.restore_scene_parameter_base_if_needed(
+            opacity_parameter,
+            &scene.app_config.materials,
+            &mut scene.material_state,
+        );
         scene.material_state.opacity = scene.app_config.materials.default_opacity_clamped();
         opacity_changed = true;
         println!(
@@ -212,6 +231,7 @@ fn handle_opacity_input(
         );
     }
     if opacity_changed {
+        effect_tuner.sync_scene_parameter_base_if_needed(opacity_parameter, &scene.material_state);
         apply_live_material_state(
             &scene.generation_state,
             &scene.app_config.materials,

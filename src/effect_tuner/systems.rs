@@ -47,7 +47,13 @@ pub(crate) fn effect_tuner_input_system(
 
     if keys.just_pressed(KeyCode::KeyL) {
         let selected_parameter = effect_tuner.selected_parameter();
-        if let Some(enabled) = effect_tuner.toggle_selected_lfo(now_secs) {
+        let view = effect_tuner_view_context(
+            &scene.app_config,
+            &scene.generation_state,
+            &scene.material_state,
+            &scene.stage_state,
+        );
+        if let Some(enabled) = effect_tuner.toggle_selected_lfo(&view, now_secs) {
             println!(
                 "LFO for {} {}.",
                 selected_parameter.label(),
@@ -108,6 +114,7 @@ pub(crate) fn effect_tuner_input_system(
     }
 
     let adjusted_up = {
+        restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
         let mut context = effect_tuner_edit_context(
             &scene.app_config,
             &mut scene.generation_state,
@@ -129,6 +136,7 @@ pub(crate) fn effect_tuner_input_system(
     };
     if adjusted_up {
         apply_selected_parameter_side_effects(effect_tuner.selected_parameter(), &mut scene);
+        sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
         println!(
             "{}",
             effect_tuner.selected_status_message(
@@ -144,6 +152,7 @@ pub(crate) fn effect_tuner_input_system(
     }
 
     let adjusted_down = {
+        restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
         let mut context = effect_tuner_edit_context(
             &scene.app_config,
             &mut scene.generation_state,
@@ -165,6 +174,7 @@ pub(crate) fn effect_tuner_input_system(
     };
     if adjusted_down {
         apply_selected_parameter_side_effects(effect_tuner.selected_parameter(), &mut scene);
+        sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
         println!(
             "{}",
             effect_tuner.selected_status_message(
@@ -192,10 +202,12 @@ pub(crate) fn effect_tuner_input_system(
                 );
                 effect_tuner.reset_all(&mut context, now_secs);
             }
+            effect_tuner.sync_material_scene_lfo_bases(&scene.material_state);
             apply_reset_all_side_effects(&mut scene);
             println!("Reset all F2 controls to defaults.");
         } else {
             let selected_parameter = effect_tuner.selected_parameter();
+            restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
             {
                 let mut context = effect_tuner_edit_context(
                     &scene.app_config,
@@ -206,6 +218,8 @@ pub(crate) fn effect_tuner_input_system(
                 effect_tuner.reset_selected(&mut context, now_secs);
             }
             apply_selected_parameter_side_effects(selected_parameter, &mut scene);
+            effect_tuner
+                .sync_scene_parameter_base_if_needed(selected_parameter, &scene.material_state);
             println!(
                 "Reset {}.",
                 effect_tuner.selected_status_message(
@@ -224,6 +238,7 @@ pub(crate) fn effect_tuner_input_system(
     if keys.just_pressed(KeyCode::Backspace) {
         let selected_parameter = effect_tuner.selected_parameter();
         let changed = {
+            restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
             let mut context = effect_tuner_edit_context(
                 &scene.app_config,
                 &mut scene.generation_state,
@@ -234,6 +249,8 @@ pub(crate) fn effect_tuner_input_system(
         };
         if changed {
             apply_selected_parameter_side_effects(selected_parameter, &mut scene);
+            effect_tuner
+                .sync_scene_parameter_base_if_needed(selected_parameter, &scene.material_state);
         }
     }
 
@@ -256,6 +273,7 @@ pub(crate) fn effect_tuner_input_system(
         {
             let selected_parameter = effect_tuner.selected_parameter();
             let changed = {
+                restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
                 let mut context = effect_tuner_edit_context(
                     &scene.app_config,
                     &mut scene.generation_state,
@@ -266,6 +284,8 @@ pub(crate) fn effect_tuner_input_system(
             };
             if changed {
                 apply_selected_parameter_side_effects(selected_parameter, &mut scene);
+                effect_tuner
+                    .sync_scene_parameter_base_if_needed(selected_parameter, &scene.material_state);
             }
         }
     }
@@ -273,10 +293,34 @@ pub(crate) fn effect_tuner_input_system(
 
 pub(crate) fn apply_effect_tuner_system(
     time: Res<Time>,
-    effect_tuner: Res<EffectTunerState>,
+    mut effect_tuner: ResMut<EffectTunerState>,
+    mut scene: GenerationSceneAccess,
     mut camera_effects: Query<&mut CameraEffectsSettings, With<SceneCamera>>,
 ) {
-    if !effect_tuner.is_changed() && !effect_tuner.has_active_lfos() {
+    let should_update_effects = effect_tuner.is_changed() || effect_tuner.has_active_effect_lfos();
+    if effect_tuner.needs_scene_lfo_application() {
+        let lfo_result = effect_tuner.apply_scene_lfos(
+            time.elapsed_secs(),
+            &scene.app_config.generation,
+            &mut scene.generation_state,
+            &scene.app_config.materials,
+            &mut scene.material_state,
+        );
+        if lfo_result.generation_changed {
+            recompute_generation_tree(&mut scene);
+        }
+        if lfo_result.materials_changed {
+            apply_live_material_state(
+                &scene.generation_state,
+                &scene.app_config.materials,
+                &scene.material_state,
+                &mut scene.materials,
+                &scene.shape_materials,
+            );
+        }
+    }
+
+    if !should_update_effects {
         return;
     }
 
@@ -297,6 +341,28 @@ fn modifier_pressed(keys: &ButtonInput<KeyCode>, key_codes: &[KeyCode]) -> bool 
 
 fn is_numeric_entry_char(character: char) -> bool {
     matches!(character, '0'..='9' | '.' | '-' | '+')
+}
+
+fn restore_selected_scene_parameter_base_if_needed(
+    effect_tuner: &mut EffectTunerState,
+    scene: &mut GenerationSceneAccess<'_, '_>,
+) {
+    let selected_parameter = effect_tuner.selected_parameter();
+    effect_tuner.restore_scene_parameter_base_if_needed(
+        selected_parameter,
+        &scene.app_config.materials,
+        &mut scene.material_state,
+    );
+}
+
+fn sync_selected_scene_parameter_base_if_needed(
+    effect_tuner: &mut EffectTunerState,
+    scene: &GenerationSceneAccess<'_, '_>,
+) {
+    effect_tuner.sync_scene_parameter_base_if_needed(
+        effect_tuner.selected_parameter(),
+        &scene.material_state,
+    );
 }
 
 fn effect_tuner_view_context<'a>(

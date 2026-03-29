@@ -113,6 +113,33 @@ impl SceneStateSnapshot {
         }
     }
 
+    pub(crate) fn capture_preset(
+        app_config: &AppConfig,
+        camera_rig: &CameraRig,
+        generation_state: &GenerationState,
+        material_state: &MaterialState,
+        stage_state: &StageState,
+        effect_tuner: &EffectTunerState,
+    ) -> Self {
+        let base_generation =
+            effect_tuner.base_generation_state(&app_config.generation, generation_state);
+        let base_material_state =
+            effect_tuner.base_material_state(&app_config.materials, material_state);
+        let runtime_materials = base_material_state.runtime_material_config(&app_config.materials);
+        let mut runtime_rendering = app_config.rendering.clone();
+        runtime_rendering.stage = stage_state.runtime_stage_config(&app_config.rendering.stage);
+
+        Self {
+            rendering: runtime_rendering,
+            lighting: app_config.lighting.clone(),
+            materials: runtime_materials,
+            camera: CameraRigSnapshot::capture(camera_rig),
+            generation: GenerationSnapshot::capture(&base_generation),
+            material_state: MaterialRuntimeSnapshot::capture(&base_material_state),
+            effects: effect_tuner.runtime_snapshot(),
+        }
+    }
+
     pub(crate) fn summary(&self) -> String {
         let root_shape_kind = self
             .generation

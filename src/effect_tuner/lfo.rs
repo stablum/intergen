@@ -82,13 +82,17 @@ pub(crate) struct ParameterLfo {
 }
 
 impl ParameterLfo {
-    pub(crate) fn default_for(parameter: EffectNumericParameter) -> Self {
+    pub(crate) fn new(default_amplitude: f32) -> Self {
         Self {
             enabled: false,
             shape: LfoShape::Sine,
-            amplitude: parameter.default_lfo_amplitude(),
+            amplitude: default_amplitude,
             frequency_hz: DEFAULT_LFO_FREQUENCY_HZ,
         }
+    }
+
+    pub(crate) fn default_for(parameter: EffectNumericParameter) -> Self {
+        Self::new(parameter.default_lfo_amplitude())
     }
 
     pub(crate) fn is_active(self) -> bool {

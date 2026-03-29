@@ -168,6 +168,10 @@ impl ScalarParameterValue {
     pub(crate) fn clear_modulation(&mut self) {
         self.modulation = ScalarParameterModulation::default();
     }
+
+    pub(crate) fn set_additive_offset(&mut self, offset: f32) {
+        self.modulation.additive_offset = offset;
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -355,6 +359,10 @@ impl ScalarParameterState {
     pub(crate) fn clear_runtime_state(&mut self) {
         self.value.clear_modulation();
         self.input.reset();
+    }
+
+    pub(crate) fn set_additive_offset(&mut self, offset: f32) {
+        self.value.set_additive_offset(offset);
     }
 }
 

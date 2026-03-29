@@ -171,7 +171,7 @@ impl GenerationParameters {
     }
 }
 
-#[derive(Resource)]
+#[derive(Clone, Resource)]
 pub(crate) struct GenerationState {
     pub(crate) nodes: Vec<ShapeNode>,
     pub(crate) selected_shape_kind: ShapeKind,
@@ -253,7 +253,7 @@ impl GenerationState {
     }
 }
 
-#[derive(Resource)]
+#[derive(Clone, Resource)]
 pub(crate) struct MaterialState {
     pub(crate) opacity: f32,
     pub(crate) hue_step_per_level: f32,
@@ -278,7 +278,7 @@ pub(crate) struct MaterialState {
     pub(crate) level_reflectance_shift: f32,
 }
 
-#[derive(Resource)]
+#[derive(Clone, Resource)]
 pub(crate) struct StageState {
     pub(crate) enabled: bool,
     pub(crate) floor_enabled: bool,
@@ -383,12 +383,14 @@ pub(crate) fn setup_scene(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     camera_rig: Res<CameraRig>,
+    mut effect_tuner: ResMut<crate::effect_tuner::EffectTunerState>,
 ) {
     let ui_theme = load_ui_theme(&asset_server, &app_config.ui);
     let shape_assets = ShapeAssets::new(&mut meshes);
     let root = root_generation_node(&shape_assets.catalog, &app_config.generation);
     let stage_state = StageState::from_config(&app_config.rendering.stage);
     let material_state = MaterialState::from_config(&app_config.materials);
+    effect_tuner.sync_material_scene_lfo_bases(&material_state);
     let runtime_material_config = material_state.runtime_material_config(&app_config.materials);
     let initial_opacity = material_state.opacity;
 

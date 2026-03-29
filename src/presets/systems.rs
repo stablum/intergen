@@ -155,7 +155,7 @@ fn save_scene_preset(
     stage_state: &StageState,
     effect_tuner: &EffectTunerState,
 ) -> Result<Option<String>, String> {
-    let scene = SceneStateSnapshot::capture(
+    let scene = SceneStateSnapshot::capture_preset(
         app_config,
         camera_rig,
         generation_state,
@@ -266,6 +266,9 @@ fn apply_scene_preset(
     *runtime.generation_state = prepared.generation;
     *runtime.material_state = MaterialState::from_config(&runtime.app_config.materials);
     runtime.material_state.opacity = prepared.material_opacity;
+    runtime
+        .effect_tuner
+        .sync_material_scene_lfo_bases(&runtime.material_state);
     *runtime.stage_state = StageState::from_config(&runtime.app_config.rendering.stage);
 
     for entity in runtime.light_entities.iter() {

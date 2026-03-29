@@ -5,15 +5,11 @@ use crate::config::{
     EffectGroup, EffectNumericParameter, EffectsConfig, GenerationConfig, MaterialConfig,
     MaterialSurfaceFamily, MaterialSurfaceMode, StageConfig,
 };
-use crate::generation::{
-    selected_child_shape_status_message, spawn_add_mode_status_message,
-    spawn_placement_mode_status_message,
-};
 use crate::parameters::{GenerationParameter, HoldInput, HoldRepeatState};
-use crate::scene::{opacity_status_message, GenerationState, MaterialState, StageState};
+use crate::scene::{GenerationState, MaterialState, StageState};
 use crate::shapes::{ShapeKind, SpawnAddMode, SpawnPlacementMode};
 
-use super::lfo::{LfoShape, ParameterLfo, DEFAULT_LFO_FREQUENCY_HZ, LFO_FREQUENCY_STEP_HZ};
+use super::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LFO_FREQUENCY_STEP_HZ, LfoShape, ParameterLfo};
 use super::metadata::{EffectEditMode, EffectOverlayField};
 
 const OVERLAY_HOLD_SECS: f32 = 2.5;
@@ -177,8 +173,62 @@ impl EffectTunerSceneParameter {
         Self::MaterialLevelReflectanceShift,
     ];
 
+    const LFO_CAPABLE: [Self; 19] = [
+        Self::ChildTwistPerVertexRadians,
+        Self::ChildOutwardOffsetRatio,
+        Self::GlobalOpacity,
+        Self::MaterialHueStepPerLevel,
+        Self::MaterialSaturation,
+        Self::MaterialLightness,
+        Self::MaterialMetallic,
+        Self::MaterialPerceptualRoughness,
+        Self::MaterialReflectance,
+        Self::MaterialCubeHueBias,
+        Self::MaterialTetrahedronHueBias,
+        Self::MaterialOctahedronHueBias,
+        Self::MaterialDodecahedronHueBias,
+        Self::MaterialAccentEveryNLevels,
+        Self::MaterialLevelLightnessShift,
+        Self::MaterialLevelSaturationShift,
+        Self::MaterialLevelMetallicShift,
+        Self::MaterialLevelRoughnessShift,
+        Self::MaterialLevelReflectanceShift,
+    ];
+
+    const MATERIAL_LFO_CAPABLE: [Self; 17] = [
+        Self::GlobalOpacity,
+        Self::MaterialHueStepPerLevel,
+        Self::MaterialSaturation,
+        Self::MaterialLightness,
+        Self::MaterialMetallic,
+        Self::MaterialPerceptualRoughness,
+        Self::MaterialReflectance,
+        Self::MaterialCubeHueBias,
+        Self::MaterialTetrahedronHueBias,
+        Self::MaterialOctahedronHueBias,
+        Self::MaterialDodecahedronHueBias,
+        Self::MaterialAccentEveryNLevels,
+        Self::MaterialLevelLightnessShift,
+        Self::MaterialLevelSaturationShift,
+        Self::MaterialLevelMetallicShift,
+        Self::MaterialLevelRoughnessShift,
+        Self::MaterialLevelReflectanceShift,
+    ];
+
     pub(crate) fn all() -> &'static [Self] {
         &Self::ALL
+    }
+
+    fn lfo_capable() -> &'static [Self] {
+        &Self::LFO_CAPABLE
+    }
+
+    fn material_lfo_capable() -> &'static [Self] {
+        &Self::MATERIAL_LFO_CAPABLE
+    }
+
+    fn supports_lfo(self) -> bool {
+        Self::lfo_capable().contains(&self)
     }
 
     fn label(self) -> &'static str {
@@ -312,6 +362,22 @@ impl EffectTunerSceneParameter {
                 | Self::MaterialLevelRoughnessShift
                 | Self::MaterialLevelReflectanceShift
         )
+    }
+
+    fn lfo_scene_index(self) -> Option<usize> {
+        Self::lfo_capable()
+            .iter()
+            .position(|candidate| *candidate == self)
+    }
+
+    fn material_lfo_base_index(self) -> Option<usize> {
+        Self::material_lfo_capable()
+            .iter()
+            .position(|candidate| *candidate == self)
+    }
+
+    fn runtime_default_lfo_amplitude(self, context: &EffectTunerViewContext<'_>) -> f32 {
+        self.adjustment_step(context, false, false) * 5.0
     }
 
     fn generation_parameter(self) -> Option<GenerationParameter> {
@@ -475,92 +541,114 @@ impl EffectTunerSceneParameter {
                 let current = parameter_state.base_value();
                 parameter_state.adjust_clamped_base_value(value - current, spec)
             }
-            None => match self {
-                Self::GlobalOpacity => {
-                    let (min_opacity, max_opacity) = context.material_config.opacity_bounds();
-                    context.material_state.opacity = value.clamp(min_opacity, max_opacity);
-                    context.material_state.opacity
+            None => {
+                if let Some(applied) = self.apply_material_numeric_value(
+                    context.material_config,
+                    context.material_state,
+                    value,
+                ) {
+                    applied
+                } else {
+                    match self {
+                        Self::ChildKind
+                        | Self::SpawnPlacementMode
+                        | Self::SpawnAddMode
+                        | Self::StageEnabled
+                        | Self::StageFloorEnabled
+                        | Self::StageBackdropEnabled
+                        | Self::MaterialSurfaceMode
+                        | Self::MaterialBaseSurface
+                        | Self::MaterialRootSurface
+                        | Self::MaterialAccentSurface => 0.0,
+                        Self::ChildScaleRatio
+                        | Self::ChildTwistPerVertexRadians
+                        | Self::ChildOutwardOffsetRatio
+                        | Self::ChildSpawnExclusionProbability => unreachable!(),
+                        _ => unreachable!(),
+                    }
                 }
-                Self::MaterialHueStepPerLevel => {
-                    context.material_state.hue_step_per_level = value;
-                    context.material_state.hue_step_per_level
-                }
-                Self::MaterialSaturation => {
-                    context.material_state.saturation = value.clamp(0.0, 1.0);
-                    context.material_state.saturation
-                }
-                Self::MaterialLightness => {
-                    context.material_state.lightness = value.clamp(0.0, 1.0);
-                    context.material_state.lightness
-                }
-                Self::MaterialMetallic => {
-                    context.material_state.metallic = value.clamp(0.0, 1.0);
-                    context.material_state.metallic
-                }
-                Self::MaterialPerceptualRoughness => {
-                    context.material_state.perceptual_roughness = value.clamp(0.0, 1.0);
-                    context.material_state.perceptual_roughness
-                }
-                Self::MaterialReflectance => {
-                    context.material_state.reflectance = value.clamp(0.0, 1.0);
-                    context.material_state.reflectance
-                }
-                Self::MaterialCubeHueBias => {
-                    context.material_state.cube_hue_bias = value;
-                    context.material_state.cube_hue_bias
-                }
-                Self::MaterialTetrahedronHueBias => {
-                    context.material_state.tetrahedron_hue_bias = value;
-                    context.material_state.tetrahedron_hue_bias
-                }
-                Self::MaterialOctahedronHueBias => {
-                    context.material_state.octahedron_hue_bias = value;
-                    context.material_state.octahedron_hue_bias
-                }
-                Self::MaterialDodecahedronHueBias => {
-                    context.material_state.dodecahedron_hue_bias = value;
-                    context.material_state.dodecahedron_hue_bias
-                }
-                Self::MaterialAccentEveryNLevels => {
-                    context.material_state.accent_every_n_levels = value.round().max(0.0) as usize;
-                    context.material_state.accent_every_n_levels as f32
-                }
-                Self::MaterialLevelLightnessShift => {
-                    context.material_state.level_lightness_shift = value;
-                    context.material_state.level_lightness_shift
-                }
-                Self::MaterialLevelSaturationShift => {
-                    context.material_state.level_saturation_shift = value;
-                    context.material_state.level_saturation_shift
-                }
-                Self::MaterialLevelMetallicShift => {
-                    context.material_state.level_metallic_shift = value;
-                    context.material_state.level_metallic_shift
-                }
-                Self::MaterialLevelRoughnessShift => {
-                    context.material_state.level_roughness_shift = value;
-                    context.material_state.level_roughness_shift
-                }
-                Self::MaterialLevelReflectanceShift => {
-                    context.material_state.level_reflectance_shift = value;
-                    context.material_state.level_reflectance_shift
-                }
-                Self::ChildKind
-                | Self::SpawnPlacementMode
-                | Self::SpawnAddMode
-                | Self::StageEnabled
-                | Self::StageFloorEnabled
-                | Self::StageBackdropEnabled
-                | Self::MaterialSurfaceMode
-                | Self::MaterialBaseSurface
-                | Self::MaterialRootSurface
-                | Self::MaterialAccentSurface => 0.0,
-                Self::ChildScaleRatio
-                | Self::ChildTwistPerVertexRadians
-                | Self::ChildOutwardOffsetRatio
-                | Self::ChildSpawnExclusionProbability => unreachable!(),
-            },
+            }
         }
+    }
+
+    fn apply_material_numeric_value(
+        self,
+        material_config: &MaterialConfig,
+        material_state: &mut MaterialState,
+        value: f32,
+    ) -> Option<f32> {
+        Some(match self {
+            Self::GlobalOpacity => {
+                let (min_opacity, max_opacity) = material_config.opacity_bounds();
+                material_state.opacity = value.clamp(min_opacity, max_opacity);
+                material_state.opacity
+            }
+            Self::MaterialHueStepPerLevel => {
+                material_state.hue_step_per_level = value;
+                material_state.hue_step_per_level
+            }
+            Self::MaterialSaturation => {
+                material_state.saturation = value.clamp(0.0, 1.0);
+                material_state.saturation
+            }
+            Self::MaterialLightness => {
+                material_state.lightness = value.clamp(0.0, 1.0);
+                material_state.lightness
+            }
+            Self::MaterialMetallic => {
+                material_state.metallic = value.clamp(0.0, 1.0);
+                material_state.metallic
+            }
+            Self::MaterialPerceptualRoughness => {
+                material_state.perceptual_roughness = value.clamp(0.0, 1.0);
+                material_state.perceptual_roughness
+            }
+            Self::MaterialReflectance => {
+                material_state.reflectance = value.clamp(0.0, 1.0);
+                material_state.reflectance
+            }
+            Self::MaterialCubeHueBias => {
+                material_state.cube_hue_bias = value;
+                material_state.cube_hue_bias
+            }
+            Self::MaterialTetrahedronHueBias => {
+                material_state.tetrahedron_hue_bias = value;
+                material_state.tetrahedron_hue_bias
+            }
+            Self::MaterialOctahedronHueBias => {
+                material_state.octahedron_hue_bias = value;
+                material_state.octahedron_hue_bias
+            }
+            Self::MaterialDodecahedronHueBias => {
+                material_state.dodecahedron_hue_bias = value;
+                material_state.dodecahedron_hue_bias
+            }
+            Self::MaterialAccentEveryNLevels => {
+                material_state.accent_every_n_levels = value.round().max(0.0) as usize;
+                material_state.accent_every_n_levels as f32
+            }
+            Self::MaterialLevelLightnessShift => {
+                material_state.level_lightness_shift = value;
+                material_state.level_lightness_shift
+            }
+            Self::MaterialLevelSaturationShift => {
+                material_state.level_saturation_shift = value;
+                material_state.level_saturation_shift
+            }
+            Self::MaterialLevelMetallicShift => {
+                material_state.level_metallic_shift = value;
+                material_state.level_metallic_shift
+            }
+            Self::MaterialLevelRoughnessShift => {
+                material_state.level_roughness_shift = value;
+                material_state.level_roughness_shift
+            }
+            Self::MaterialLevelReflectanceShift => {
+                material_state.level_reflectance_shift = value;
+                material_state.level_reflectance_shift
+            }
+            _ => return None,
+        })
     }
 
     fn default_value(self, context: &EffectTunerViewContext<'_>) -> f32 {
@@ -666,6 +754,54 @@ impl EffectTunerSceneParameter {
             | Self::MaterialLevelRoughnessShift
             | Self::MaterialLevelReflectanceShift => format!("{:.3}", self.value(context)),
         }
+    }
+
+    fn display_numeric_value(self, value: f32) -> Option<String> {
+        if self == Self::MaterialAccentEveryNLevels {
+            return Some(value.round().max(0.0).to_string());
+        }
+
+        self.is_numeric().then(|| format!("{value:.3}"))
+    }
+
+    fn live_value(self, context: &EffectTunerViewContext<'_>) -> Option<f32> {
+        match self {
+            Self::ChildTwistPerVertexRadians => Some(
+                context
+                    .generation_state
+                    .twist_per_vertex_radians(context.generation_config),
+            ),
+            Self::ChildOutwardOffsetRatio => Some(
+                context
+                    .generation_state
+                    .vertex_offset_ratio(context.generation_config),
+            ),
+            _ if self.is_numeric() => Some(self.value(context)),
+            _ => None,
+        }
+    }
+
+    fn material_numeric_value(self, material_state: &MaterialState) -> Option<f32> {
+        Some(match self {
+            Self::GlobalOpacity => material_state.opacity,
+            Self::MaterialHueStepPerLevel => material_state.hue_step_per_level,
+            Self::MaterialSaturation => material_state.saturation,
+            Self::MaterialLightness => material_state.lightness,
+            Self::MaterialMetallic => material_state.metallic,
+            Self::MaterialPerceptualRoughness => material_state.perceptual_roughness,
+            Self::MaterialReflectance => material_state.reflectance,
+            Self::MaterialCubeHueBias => material_state.cube_hue_bias,
+            Self::MaterialTetrahedronHueBias => material_state.tetrahedron_hue_bias,
+            Self::MaterialOctahedronHueBias => material_state.octahedron_hue_bias,
+            Self::MaterialDodecahedronHueBias => material_state.dodecahedron_hue_bias,
+            Self::MaterialAccentEveryNLevels => material_state.accent_every_n_levels as f32,
+            Self::MaterialLevelLightnessShift => material_state.level_lightness_shift,
+            Self::MaterialLevelSaturationShift => material_state.level_saturation_shift,
+            Self::MaterialLevelMetallicShift => material_state.level_metallic_shift,
+            Self::MaterialLevelRoughnessShift => material_state.level_roughness_shift,
+            Self::MaterialLevelReflectanceShift => material_state.level_reflectance_shift,
+            _ => return None,
+        })
     }
 
     fn apply_numeric_input(&self, context: &mut EffectTunerEditContext<'_>, value: f32) -> bool {
@@ -827,124 +963,6 @@ impl EffectTunerSceneParameter {
             }
         }
     }
-
-    fn status_message(self, context: &EffectTunerViewContext<'_>) -> String {
-        match self {
-            Self::ChildKind => {
-                selected_child_shape_status_message(context.generation_state.selected_shape_kind)
-            }
-            Self::SpawnPlacementMode => {
-                spawn_placement_mode_status_message(context.generation_state.spawn_placement_mode)
-            }
-            Self::SpawnAddMode => {
-                spawn_add_mode_status_message(context.generation_state.spawn_add_mode)
-            }
-            Self::StageEnabled => {
-                format!(
-                    "Stage visibility: {}",
-                    boolean_value_text(context.stage_state.enabled)
-                )
-            }
-            Self::StageFloorEnabled => format!(
-                "Stage floor: {}",
-                boolean_value_text(context.stage_state.floor_enabled)
-            ),
-            Self::StageBackdropEnabled => format!(
-                "Stage backdrop: {}",
-                boolean_value_text(context.stage_state.backdrop_enabled)
-            ),
-            Self::ChildScaleRatio => {
-                format!("Child scale ratio: {:.2}", self.value(context))
-            }
-            Self::ChildTwistPerVertexRadians => {
-                let radians = self.value(context);
-                format!(
-                    "Child twist angle: {:.3} rad ({:.1} deg)",
-                    radians,
-                    radians * 180.0 / std::f32::consts::PI
-                )
-            }
-            Self::ChildOutwardOffsetRatio => {
-                format!(
-                    "Child outward offset: {:.2}x child radius",
-                    self.value(context).max(0.0)
-                )
-            }
-            Self::ChildSpawnExclusionProbability => {
-                format!(
-                    "Global spawn exclusion probability: {:.0}%",
-                    self.value(context).clamp(0.0, 1.0) * 100.0
-                )
-            }
-            Self::GlobalOpacity => opacity_status_message(self.value(context)),
-            Self::MaterialHueStepPerLevel => {
-                format!(
-                    "Material hue step per level: {:.1} deg",
-                    self.value(context)
-                )
-            }
-            Self::MaterialSaturation => format!("Material saturation: {:.3}", self.value(context)),
-            Self::MaterialLightness => format!("Material lightness: {:.3}", self.value(context)),
-            Self::MaterialMetallic => format!("Material metallic: {:.3}", self.value(context)),
-            Self::MaterialPerceptualRoughness => {
-                format!("Material roughness: {:.3}", self.value(context))
-            }
-            Self::MaterialReflectance => {
-                format!("Material reflectance: {:.3}", self.value(context))
-            }
-            Self::MaterialCubeHueBias => {
-                format!("Cube hue bias: {:.1} deg", self.value(context))
-            }
-            Self::MaterialTetrahedronHueBias => {
-                format!("Tetrahedron hue bias: {:.1} deg", self.value(context))
-            }
-            Self::MaterialOctahedronHueBias => {
-                format!("Octahedron hue bias: {:.1} deg", self.value(context))
-            }
-            Self::MaterialDodecahedronHueBias => {
-                format!("Dodecahedron hue bias: {:.1} deg", self.value(context))
-            }
-            Self::MaterialSurfaceMode => format!(
-                "Material surface mode: {}",
-                material_surface_mode_value_text(context.material_state.surface_mode)
-            ),
-            Self::MaterialBaseSurface => format!(
-                "Base surface family: {}",
-                material_surface_family_value_text(context.material_state.base_surface)
-            ),
-            Self::MaterialRootSurface => format!(
-                "Root surface family: {}",
-                material_surface_family_value_text(context.material_state.root_surface)
-            ),
-            Self::MaterialAccentSurface => format!(
-                "Accent surface family: {}",
-                material_surface_family_value_text(context.material_state.accent_surface)
-            ),
-            Self::MaterialAccentEveryNLevels => {
-                let cadence = context.material_state.accent_every_n_levels;
-                if cadence == 0 {
-                    "Accent surface cadence: disabled".to_string()
-                } else {
-                    format!("Accent surface every {cadence} levels")
-                }
-            }
-            Self::MaterialLevelLightnessShift => {
-                format!("Level lightness shift: {:.3}", self.value(context))
-            }
-            Self::MaterialLevelSaturationShift => {
-                format!("Level saturation shift: {:.3}", self.value(context))
-            }
-            Self::MaterialLevelMetallicShift => {
-                format!("Level metallic shift: {:.3}", self.value(context))
-            }
-            Self::MaterialLevelRoughnessShift => {
-                format!("Level roughness shift: {:.3}", self.value(context))
-            }
-            Self::MaterialLevelReflectanceShift => {
-                format!("Level reflectance shift: {:.3}", self.value(context))
-            }
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -1045,7 +1063,10 @@ impl EffectTunerParameter {
     }
 
     fn supports_lfo(self) -> bool {
-        matches!(self, Self::Effect(_))
+        match self {
+            Self::Effect(_) => true,
+            Self::Scene(parameter) => parameter.supports_lfo(),
+        }
     }
 
     fn value_accepts_numeric_input(self) -> bool {
@@ -1069,21 +1090,10 @@ impl EffectTunerParameter {
         }
     }
 
-    fn default_lfo_amplitude(self) -> f32 {
+    fn default_lfo_amplitude(self, context: &EffectTunerViewContext<'_>) -> f32 {
         match self {
             Self::Effect(parameter) => parameter.default_lfo_amplitude(),
-            Self::Scene(_) => 0.0,
-        }
-    }
-
-    fn display_value(
-        self,
-        effects: &EffectsConfig,
-        context: &EffectTunerViewContext<'_>,
-    ) -> String {
-        match self {
-            Self::Effect(parameter) => parameter.display_value(effects),
-            Self::Scene(parameter) => parameter.display_value(context),
+            Self::Scene(parameter) => parameter.runtime_default_lfo_amplitude(context),
         }
     }
 
@@ -1135,21 +1145,6 @@ impl EffectTunerParameter {
         match self {
             Self::Effect(parameter) => parameter.set_value(effects, parameter.value(defaults)),
             Self::Scene(parameter) => parameter.reset_value(context),
-        }
-    }
-
-    fn status_message(
-        self,
-        effects: &EffectsConfig,
-        context: &EffectTunerViewContext<'_>,
-    ) -> String {
-        match self {
-            Self::Effect(parameter) => format!(
-                "{} = {}",
-                parameter.label(),
-                parameter.display_value(effects)
-            ),
-            Self::Scene(parameter) => parameter.status_message(context),
         }
     }
 }
@@ -1210,11 +1205,20 @@ impl NumericEntryBuffer {
     }
 }
 
+#[derive(Default)]
+pub(crate) struct SceneLfoApplicationResult {
+    pub(crate) generation_changed: bool,
+    pub(crate) materials_changed: bool,
+}
+
 #[derive(Resource, Clone)]
 pub(crate) struct EffectTunerState {
     defaults: EffectsConfig,
     current: EffectsConfig,
     lfos: Vec<ParameterLfo>,
+    material_scene_lfo_bases: Vec<f32>,
+    generation_scene_lfo_applied: bool,
+    material_scene_lfo_applied: bool,
     selected_index: usize,
     page_mode: EffectTunerPageMode,
     edit_mode: EffectEditMode,
@@ -1233,6 +1237,9 @@ impl EffectTunerState {
             defaults: effects_config.clone(),
             current: effects_config.clone(),
             lfos: default_lfos(),
+            material_scene_lfo_bases: default_material_scene_lfo_bases(),
+            generation_scene_lfo_applied: false,
+            material_scene_lfo_applied: false,
             selected_index: 0,
             page_mode: EffectTunerPageMode::Compact,
             edit_mode: EffectEditMode::Value,
@@ -1266,8 +1273,26 @@ impl EffectTunerState {
         self.pinned || now_secs <= self.visible_until_secs
     }
 
-    pub(crate) fn has_active_lfos(&self) -> bool {
-        self.lfos.iter().copied().any(ParameterLfo::is_active)
+    pub(crate) fn has_active_effect_lfos(&self) -> bool {
+        let effect_count = EffectNumericParameter::all().len();
+        self.lfos[..effect_count]
+            .iter()
+            .copied()
+            .any(ParameterLfo::is_active)
+    }
+
+    pub(crate) fn has_active_scene_lfos(&self) -> bool {
+        let effect_count = EffectNumericParameter::all().len();
+        self.lfos[effect_count..]
+            .iter()
+            .copied()
+            .any(ParameterLfo::is_active)
+    }
+
+    pub(crate) fn needs_scene_lfo_application(&self) -> bool {
+        self.has_active_scene_lfos()
+            || self.generation_scene_lfo_applied
+            || self.material_scene_lfo_applied
     }
 
     pub(crate) fn runtime_snapshot(&self) -> EffectRuntimeSnapshot {
@@ -1280,6 +1305,9 @@ impl EffectTunerState {
     pub(crate) fn apply_runtime_snapshot(&mut self, snapshot: &EffectRuntimeSnapshot) {
         self.current = snapshot.current.clone();
         self.lfos = default_lfos();
+        self.material_scene_lfo_bases = default_material_scene_lfo_bases();
+        self.generation_scene_lfo_applied = false;
+        self.material_scene_lfo_applied = false;
         for (target, source) in self.lfos.iter_mut().zip(snapshot.lfos.iter().copied()) {
             *target = source;
         }
@@ -1288,6 +1316,180 @@ impl EffectTunerState {
         self.edit_mode = EffectEditMode::Value;
         self.clear_numeric_entry();
         self.reset_hold_states();
+    }
+
+    pub(crate) fn sync_material_scene_lfo_bases(&mut self, material_state: &MaterialState) {
+        for parameter in EffectTunerSceneParameter::material_lfo_capable() {
+            self.sync_scene_parameter_base_if_needed(
+                EffectTunerParameter::Scene(*parameter),
+                material_state,
+            );
+        }
+    }
+
+    pub(crate) fn restore_scene_parameter_base_if_needed(
+        &mut self,
+        parameter: EffectTunerParameter,
+        material_config: &MaterialConfig,
+        material_state: &mut MaterialState,
+    ) -> bool {
+        let EffectTunerParameter::Scene(parameter) = parameter else {
+            return false;
+        };
+        let Some(base_index) = parameter.material_lfo_base_index() else {
+            return false;
+        };
+        let base_value = self.material_scene_lfo_bases[base_index];
+        let Some(current_value) = parameter.material_numeric_value(material_state) else {
+            return false;
+        };
+        if (current_value - base_value).abs() <= 1.0e-6 {
+            return false;
+        }
+        parameter.apply_material_numeric_value(material_config, material_state, base_value);
+        true
+    }
+
+    pub(crate) fn sync_scene_parameter_base_if_needed(
+        &mut self,
+        parameter: EffectTunerParameter,
+        material_state: &MaterialState,
+    ) {
+        let EffectTunerParameter::Scene(parameter) = parameter else {
+            return;
+        };
+        let Some(base_index) = parameter.material_lfo_base_index() else {
+            return;
+        };
+        if let Some(value) = parameter.material_numeric_value(material_state) {
+            self.material_scene_lfo_bases[base_index] = value;
+        }
+    }
+
+    pub(crate) fn base_material_state(
+        &self,
+        material_config: &MaterialConfig,
+        material_state: &MaterialState,
+    ) -> MaterialState {
+        let mut base_state = material_state.clone();
+        for parameter in EffectTunerSceneParameter::material_lfo_capable() {
+            let Some(base_index) = parameter.material_lfo_base_index() else {
+                continue;
+            };
+            parameter.apply_material_numeric_value(
+                material_config,
+                &mut base_state,
+                self.material_scene_lfo_bases[base_index],
+            );
+        }
+        base_state
+    }
+
+    pub(crate) fn base_generation_state(
+        &self,
+        generation_config: &GenerationConfig,
+        generation_state: &GenerationState,
+    ) -> GenerationState {
+        let mut base_state = generation_state.clone();
+        for parameter in [
+            GenerationParameter::ChildTwistPerVertexRadians,
+            GenerationParameter::ChildOutwardOffsetRatio,
+        ] {
+            base_state.parameter_mut(parameter).set_additive_offset(0.0);
+        }
+        let twist_per_vertex_radians = base_state.twist_per_vertex_radians(generation_config);
+        let vertex_offset_ratio = base_state.vertex_offset_ratio(generation_config);
+        crate::shapes::recompute_spawn_tree(
+            &mut base_state.nodes,
+            &crate::shapes::ShapeCatalog::new(),
+            twist_per_vertex_radians,
+            vertex_offset_ratio,
+        );
+        base_state
+    }
+
+    pub(crate) fn apply_scene_lfos(
+        &mut self,
+        now_secs: f32,
+        _generation_config: &GenerationConfig,
+        generation_state: &mut GenerationState,
+        material_config: &MaterialConfig,
+        material_state: &mut MaterialState,
+    ) -> SceneLfoApplicationResult {
+        let mut result = SceneLfoApplicationResult::default();
+
+        let mut generation_lfo_active = false;
+        for parameter in [
+            EffectTunerSceneParameter::ChildTwistPerVertexRadians,
+            EffectTunerSceneParameter::ChildOutwardOffsetRatio,
+        ] {
+            let Some(lfo_index) = lfo_index_for_parameter(EffectTunerParameter::Scene(parameter))
+            else {
+                continue;
+            };
+            let lfo = self.lfos[lfo_index];
+            let offset = if lfo.is_active() {
+                generation_lfo_active = true;
+                lfo.amplitude
+                    * lfo
+                        .shape
+                        .sample(now_secs * lfo.frequency_hz, lfo_seed_for_index(lfo_index))
+            } else {
+                0.0
+            };
+            let generation_parameter = parameter
+                .generation_parameter()
+                .expect("generation LFO parameter should map to generation state");
+            generation_state
+                .parameter_mut(generation_parameter)
+                .set_additive_offset(offset);
+        }
+        if generation_lfo_active {
+            result.generation_changed = true;
+        } else if self.generation_scene_lfo_applied {
+            result.generation_changed = true;
+        }
+        self.generation_scene_lfo_applied = generation_lfo_active;
+
+        let mut material_lfo_active = false;
+        for parameter in EffectTunerSceneParameter::material_lfo_capable() {
+            let Some(lfo_index) = lfo_index_for_parameter(EffectTunerParameter::Scene(*parameter))
+            else {
+                continue;
+            };
+            let Some(base_index) = parameter.material_lfo_base_index() else {
+                continue;
+            };
+            let base_value = self.material_scene_lfo_bases[base_index];
+            let lfo = self.lfos[lfo_index];
+            let next_value = if lfo.is_active() {
+                material_lfo_active = true;
+                base_value
+                    + lfo.amplitude
+                        * lfo
+                            .shape
+                            .sample(now_secs * lfo.frequency_hz, lfo_seed_for_index(lfo_index))
+            } else {
+                base_value
+            };
+            let Some(previous_value) = parameter.material_numeric_value(material_state) else {
+                continue;
+            };
+            let Some(applied_value) =
+                parameter.apply_material_numeric_value(material_config, material_state, next_value)
+            else {
+                continue;
+            };
+            if (previous_value - applied_value).abs() > 1.0e-6 {
+                result.materials_changed = true;
+            }
+        }
+        if !material_lfo_active && self.material_scene_lfo_applied {
+            result.materials_changed = true;
+        }
+        self.material_scene_lfo_applied = material_lfo_active;
+
+        result
     }
 
     pub(crate) fn evaluated_effects(&self, now_secs: f32) -> EffectsConfig {
@@ -1308,6 +1510,46 @@ impl EffectTunerState {
         }
 
         effects
+    }
+
+    fn scene_parameter_base_numeric_value(
+        &self,
+        parameter: EffectTunerSceneParameter,
+        context: &EffectTunerViewContext<'_>,
+    ) -> Option<f32> {
+        if let Some(base_index) = parameter.material_lfo_base_index() {
+            return self.material_scene_lfo_bases.get(base_index).copied();
+        }
+        parameter.is_numeric().then(|| parameter.value(context))
+    }
+
+    fn parameter_value_text(
+        &self,
+        parameter: EffectTunerParameter,
+        context: &EffectTunerViewContext<'_>,
+    ) -> String {
+        match parameter {
+            EffectTunerParameter::Effect(parameter) => parameter.display_value(&self.current),
+            EffectTunerParameter::Scene(parameter) => self
+                .scene_parameter_base_numeric_value(parameter, context)
+                .and_then(|value| parameter.display_numeric_value(value))
+                .unwrap_or_else(|| parameter.display_value(context)),
+        }
+    }
+
+    fn parameter_live_value_text(
+        &self,
+        parameter: EffectTunerParameter,
+        live_effects: &EffectsConfig,
+        context: &EffectTunerViewContext<'_>,
+    ) -> String {
+        match parameter {
+            EffectTunerParameter::Effect(parameter) => parameter.display_value(live_effects),
+            EffectTunerParameter::Scene(parameter) => parameter
+                .live_value(context)
+                .and_then(|value| parameter.display_numeric_value(value))
+                .unwrap_or_else(|| parameter.display_value(context)),
+        }
     }
 
     pub(crate) fn overlay_snapshot(
@@ -1352,9 +1594,9 @@ impl EffectTunerState {
             parameter_label: parameter.short_label(),
             value_text: self.overlay_numeric_text(
                 EffectOverlayField::Value,
-                parameter.display_value(&self.current, context),
+                self.parameter_value_text(parameter, context),
             ),
-            live_value_text: parameter.display_value(&live_effects, context),
+            live_value_text: self.parameter_live_value_text(parameter, &live_effects, context),
             lfo_state_text,
             lfo_state_emphasized,
             amplitude_text,
@@ -1419,12 +1661,20 @@ impl EffectTunerState {
         Some(next_enabled)
     }
 
-    pub(crate) fn toggle_selected_lfo(&mut self, now_secs: f32) -> Option<bool> {
+    pub(crate) fn toggle_selected_lfo(
+        &mut self,
+        context: &EffectTunerViewContext<'_>,
+        now_secs: f32,
+    ) -> Option<bool> {
         if !self.selected_parameter().supports_lfo() {
             return None;
         }
 
         self.clear_numeric_entry();
+        if !self.selected_lfo().enabled && self.selected_lfo().amplitude <= f32::EPSILON {
+            self.selected_lfo_mut().amplitude =
+                self.selected_parameter().default_lfo_amplitude(context);
+        }
         let lfo = self.selected_lfo_mut();
         lfo.enabled = !lfo.enabled;
         let enabled = lfo.enabled;
@@ -1534,7 +1784,8 @@ impl EffectTunerState {
                 parameter.reset_value(&self.defaults, &mut self.current, context);
             }
             EffectEditMode::LfoAmplitude => {
-                self.selected_lfo_mut().amplitude = parameter.default_lfo_amplitude();
+                self.selected_lfo_mut().amplitude =
+                    parameter.default_lfo_amplitude(&context.view());
             }
             EffectEditMode::LfoFrequency => {
                 self.selected_lfo_mut().frequency_hz = DEFAULT_LFO_FREQUENCY_HZ;
@@ -1572,7 +1823,12 @@ impl EffectTunerState {
                     effect_parameter.display_value(&self.current),
                     effect_parameter.display_value(&live_effects)
                 ),
-                EffectTunerParameter::Scene(_) => parameter.status_message(&self.current, context),
+                EffectTunerParameter::Scene(scene_parameter) => format!(
+                    "{} = {} (live {})",
+                    scene_parameter.label(),
+                    self.parameter_value_text(parameter, context),
+                    self.parameter_live_value_text(parameter, &live_effects, context)
+                ),
             },
             EffectEditMode::LfoAmplitude => {
                 let lfo = self.selected_lfo();
@@ -1649,17 +1905,13 @@ impl EffectTunerState {
     }
 
     fn selected_lfo(&self) -> ParameterLfo {
-        let index = self
-            .selected_effect_parameter()
-            .and_then(effect_parameter_index)
+        let index = lfo_index_for_parameter(self.selected_parameter())
             .expect("selected parameter should support LFOs");
         self.lfos[index]
     }
 
     fn selected_lfo_mut(&mut self) -> &mut ParameterLfo {
-        let index = self
-            .selected_effect_parameter()
-            .and_then(effect_parameter_index)
+        let index = lfo_index_for_parameter(self.selected_parameter())
             .expect("selected parameter should support LFOs");
         &mut self.lfos[index]
     }
@@ -1695,18 +1947,8 @@ impl EffectTunerState {
         true
     }
 
-    fn selected_effect_parameter(&self) -> Option<EffectNumericParameter> {
-        match self.selected_parameter() {
-            EffectTunerParameter::Effect(parameter) => Some(parameter),
-            EffectTunerParameter::Scene(_) => None,
-        }
-    }
-
     fn lfo_for_parameter(&self, parameter: EffectTunerParameter) -> Option<ParameterLfo> {
-        let EffectTunerParameter::Effect(parameter) = parameter else {
-            return None;
-        };
-        let index = effect_parameter_index(parameter)?;
+        let index = lfo_index_for_parameter(parameter)?;
         self.lfos.get(index).copied()
     }
 
@@ -1794,12 +2036,12 @@ impl EffectTunerState {
             value_text: if selected {
                 self.overlay_numeric_text(
                     EffectOverlayField::Value,
-                    parameter.display_value(&self.current, context),
+                    self.parameter_value_text(parameter, context),
                 )
             } else {
-                parameter.display_value(&self.current, context)
+                self.parameter_value_text(parameter, context)
             },
-            live_value_text: parameter.display_value(live_effects, context),
+            live_value_text: self.parameter_live_value_text(parameter, live_effects, context),
             lfo_state_text,
             lfo_state_emphasized,
             selected,
@@ -1882,11 +2124,7 @@ fn shape_kind_value_text(kind: ShapeKind) -> &'static str {
 }
 
 fn boolean_value_text(enabled: bool) -> &'static str {
-    if enabled {
-        "on"
-    } else {
-        "off"
-    }
+    if enabled { "on" } else { "off" }
 }
 
 fn material_surface_mode_value_text(mode: MaterialSurfaceMode) -> &'static str {
@@ -1908,10 +2146,28 @@ fn material_surface_family_value_text(family: MaterialSurfaceFamily) -> &'static
 }
 
 fn default_lfos() -> Vec<ParameterLfo> {
-    EffectNumericParameter::all()
+    let mut lfos: Vec<_> = EffectNumericParameter::all()
         .iter()
         .copied()
         .map(ParameterLfo::default_for)
+        .collect();
+    lfos.extend(
+        EffectTunerSceneParameter::lfo_capable()
+            .iter()
+            .map(|_| ParameterLfo::new(0.0)),
+    );
+    lfos
+}
+
+fn default_material_scene_lfo_bases() -> Vec<f32> {
+    let material_state = MaterialState::from_config(&MaterialConfig::default());
+    EffectTunerSceneParameter::material_lfo_capable()
+        .iter()
+        .map(|parameter| {
+            parameter
+                .material_numeric_value(&material_state)
+                .unwrap_or_default()
+        })
         .collect()
 }
 
@@ -1921,19 +2177,33 @@ fn effect_parameter_index(parameter: EffectNumericParameter) -> Option<usize> {
         .position(|candidate| *candidate == parameter)
 }
 
+fn lfo_index_for_parameter(parameter: EffectTunerParameter) -> Option<usize> {
+    match parameter {
+        EffectTunerParameter::Effect(parameter) => effect_parameter_index(parameter),
+        EffectTunerParameter::Scene(parameter) => parameter
+            .lfo_scene_index()
+            .map(|index| EffectNumericParameter::all().len() + index),
+    }
+}
+
+fn lfo_seed_for_index(index: usize) -> u32 {
+    index as u32 + 1
+}
+
 #[cfg(test)]
 mod tests {
     use crate::config::{
         EffectGroup, EffectsConfig, GenerationConfig, MaterialConfig, MaterialSurfaceMode,
         StageConfig,
     };
-    use crate::effect_tuner::lfo::{LfoShape, DEFAULT_LFO_FREQUENCY_HZ};
+    use crate::effect_tuner::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LfoShape};
     use crate::effect_tuner::metadata::{EffectEditMode, EffectOverlayField};
     use crate::scene::{GenerationState, MaterialState, StageState};
 
     use super::{
-        EffectTunerEditContext, EffectTunerPageMode, EffectTunerParameter,
+        EffectNumericParameter, EffectTunerEditContext, EffectTunerPageMode, EffectTunerParameter,
         EffectTunerSceneParameter, EffectTunerState, EffectTunerViewContext, HoldInput,
+        lfo_index_for_parameter,
     };
 
     fn default_scene_state() -> (
@@ -2016,9 +2286,27 @@ mod tests {
     #[test]
     fn toggle_selected_lfo_updates_enabled_state() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (
+            generation_config,
+            generation_state,
+            material_config,
+            material_state,
+            stage_config,
+            stage_state,
+        ) = default_scene_state();
         effect_tuner.selected_index = 13;
 
-        let enabled = effect_tuner.toggle_selected_lfo(1.0);
+        let enabled = effect_tuner.toggle_selected_lfo(
+            &view_context(
+                &generation_config,
+                &generation_state,
+                &material_config,
+                &material_state,
+                &stage_config,
+                &stage_state,
+            ),
+            1.0,
+        );
 
         assert_eq!(enabled, Some(true));
         assert!(effect_tuner.selected_lfo().enabled);
@@ -2215,6 +2503,91 @@ mod tests {
     }
 
     #[test]
+    fn runtime_snapshot_accepts_older_effect_only_lfo_arrays() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let effect_index = lfo_index_for_parameter(EffectTunerParameter::Effect(
+            EffectNumericParameter::LensStrength,
+        ))
+        .expect("effect parameter should have an LFO slot");
+        effect_tuner.lfos[effect_index].enabled = true;
+        effect_tuner.lfos[effect_index].shape = LfoShape::Square;
+        effect_tuner.lfos[effect_index].amplitude = 0.42;
+
+        let mut snapshot = effect_tuner.runtime_snapshot();
+        snapshot.lfos.truncate(EffectNumericParameter::all().len());
+
+        let mut restored = EffectTunerState::from_config(&EffectsConfig::default());
+        restored.apply_runtime_snapshot(&snapshot);
+
+        assert!(restored.lfos[effect_index].enabled);
+        assert_eq!(restored.lfos[effect_index].shape, LfoShape::Square);
+        assert_eq!(restored.lfos[effect_index].amplitude, 0.42);
+
+        let scene_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
+            EffectTunerSceneParameter::GlobalOpacity,
+        ))
+        .expect("scene parameter should have an appended LFO slot");
+        assert!(!restored.lfos[scene_index].enabled);
+        assert_eq!(restored.lfos[scene_index].amplitude, 0.0);
+    }
+
+    #[test]
+    fn base_states_strip_active_scene_lfo_modulation() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (
+            generation_config,
+            mut generation_state,
+            material_config,
+            mut material_state,
+            _stage_config,
+            _stage_state,
+        ) = default_scene_state();
+        material_state.opacity = 0.6;
+        effect_tuner.sync_material_scene_lfo_bases(&material_state);
+
+        let twist_base = generation_state.twist_per_vertex_radians_base();
+        let opacity_base = material_state.opacity;
+
+        let twist_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
+            EffectTunerSceneParameter::ChildTwistPerVertexRadians,
+        ))
+        .expect("twist parameter should have an LFO slot");
+        effect_tuner.lfos[twist_index].enabled = true;
+        effect_tuner.lfos[twist_index].shape = LfoShape::Sine;
+        effect_tuner.lfos[twist_index].amplitude = 0.1;
+        effect_tuner.lfos[twist_index].frequency_hz = 1.0;
+
+        let opacity_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
+            EffectTunerSceneParameter::GlobalOpacity,
+        ))
+        .expect("opacity parameter should have an LFO slot");
+        effect_tuner.lfos[opacity_index].enabled = true;
+        effect_tuner.lfos[opacity_index].shape = LfoShape::Sine;
+        effect_tuner.lfos[opacity_index].amplitude = 0.2;
+        effect_tuner.lfos[opacity_index].frequency_hz = 1.0;
+
+        let result = effect_tuner.apply_scene_lfos(
+            0.25,
+            &generation_config,
+            &mut generation_state,
+            &material_config,
+            &mut material_state,
+        );
+
+        assert!(result.generation_changed);
+        assert!(result.materials_changed);
+        assert!(generation_state.twist_per_vertex_radians(&generation_config) > twist_base);
+        assert!(material_state.opacity > opacity_base);
+
+        let base_generation =
+            effect_tuner.base_generation_state(&generation_config, &generation_state);
+        let base_material = effect_tuner.base_material_state(&material_config, &material_state);
+
+        assert!((base_generation.twist_per_vertex_radians_base() - twist_base).abs() < 1.0e-6);
+        assert!((base_material.opacity - opacity_base).abs() < 1.0e-6);
+    }
+
+    #[test]
     fn numeric_entry_updates_selected_value() {
         let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
         let (
@@ -2348,9 +2721,7 @@ mod tests {
         assert_eq!(snapshot.active_field, EffectOverlayField::LfoAmplitude);
         assert_eq!(
             snapshot.value_text,
-            effect_tuner
-                .selected_parameter()
-                .display_value(&effect_tuner.current, &view)
+            effect_tuner.parameter_value_text(effect_tuner.selected_parameter(), &view)
         );
     }
 
@@ -2401,9 +2772,7 @@ mod tests {
         assert_eq!(snapshot.parameter_label, "mod");
         assert_eq!(
             snapshot.value_text,
-            effect_tuner
-                .selected_parameter()
-                .display_value(&effect_tuner.current, &view)
+            effect_tuner.parameter_value_text(effect_tuner.selected_parameter(), &view)
         );
     }
 
@@ -2469,6 +2838,41 @@ mod tests {
         assert_eq!(snapshot.lfo_state_text, "--");
         assert_eq!(snapshot.amplitude_text, "--");
         assert_eq!(snapshot.active_field, EffectOverlayField::Value);
+    }
+
+    #[test]
+    fn eligible_scene_numeric_parameters_expose_lfo_fields() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+        let (
+            generation_config,
+            generation_state,
+            material_config,
+            material_state,
+            stage_config,
+            stage_state,
+        ) = default_scene_state();
+        effect_tuner.sync_material_scene_lfo_bases(&material_state);
+        select_parameter(
+            &mut effect_tuner,
+            EffectTunerParameter::Scene(EffectTunerSceneParameter::GlobalOpacity),
+        );
+        effect_tuner.edit_mode = EffectEditMode::LfoShape;
+
+        let snapshot = effect_tuner.overlay_snapshot(
+            &view_context(
+                &generation_config,
+                &generation_state,
+                &material_config,
+                &material_state,
+                &stage_config,
+                &stage_state,
+            ),
+            0.0,
+        );
+
+        assert_eq!(snapshot.lfo_state_text, "OFF");
+        assert_eq!(snapshot.amplitude_text, "0.000");
+        assert_eq!(snapshot.active_field, EffectOverlayField::LfoShape);
     }
 
     #[test]

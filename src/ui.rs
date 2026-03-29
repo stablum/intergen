@@ -2,15 +2,15 @@ use std::path::Path;
 
 use bevy::{ecs::hierarchy::ChildSpawnerCommands, prelude::*};
 
-use crate::config::{srgb, srgba, AppConfig, UiConfig};
+use crate::config::{AppConfig, UiConfig, srgb, srgba};
 use crate::control_page::{ControlPage, ControlPageState};
 use crate::effect_tuner::{
     EffectOverlayField, EffectTunerPageMode, EffectTunerParameter, EffectTunerState,
     EffectTunerViewContext,
 };
-use crate::help_text::{overlay_help_entries, HelpEntry};
 #[cfg(test)]
 use crate::help_text::overlay_controls_text as shared_overlay_controls_text;
+use crate::help_text::{HelpEntry, overlay_help_entries};
 use crate::presets::PresetBrowserState;
 use crate::scene::{GenerationState, MaterialState};
 
@@ -2108,11 +2108,10 @@ pub(crate) fn font_status_line(font_source: UiFontSource) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::{
-        control_page_bottom, control_page_secondary_bottom, controls_overlay_text,
+        HelpOverlayMode, KEYBOARD_HELP_ROWS, KEYBOARD_HOME_ROW, KEYBOARD_TOP_LETTER_ROW,
+        UiFontSource, control_page_bottom, control_page_secondary_bottom, controls_overlay_text,
         effect_tuner_live_value_width, effect_tuner_numeric_field_width,
         effect_tuner_parameter_label_chars, effect_tuner_shape_label_chars, font_status_line,
-        HelpOverlayMode, UiFontSource, KEYBOARD_HELP_ROWS, KEYBOARD_HOME_ROW,
-        KEYBOARD_TOP_LETTER_ROW,
     };
 
     #[test]
@@ -2133,7 +2132,7 @@ mod tests {
         );
         assert!(text.contains("In F2 page: Up / Down adjust the active field"));
         assert!(text.contains("In F2 page: Space toggles the selected shader effect"));
-        assert!(text.contains("In F2 page: L toggles the selected shader-effect parameter LFO"));
+        assert!(text.contains("In F2 page: L toggles the selected parameter LFO when supported"));
         assert!(text.contains("In F2 page: Type digits / . / - / +"));
         assert!(text.contains("In F2 page: Backspace erases the typed numeric input"));
         assert!(text.contains("Shift + Enter: Reset all F2 controls"));
@@ -2174,12 +2173,16 @@ mod tests {
         assert!(specs.iter().any(|spec| spec.label == "F1" && spec.used));
         assert!(specs.iter().any(|spec| spec.label == "A" && !spec.used));
         assert!(specs.iter().any(|spec| spec.label == "F11" && !spec.used));
-        assert!(KEYBOARD_TOP_LETTER_ROW
-            .iter()
-            .any(|spec| spec.label == "\\"));
-        assert!(!KEYBOARD_TOP_LETTER_ROW
-            .iter()
-            .any(|spec| spec.label == "Enter"));
+        assert!(
+            KEYBOARD_TOP_LETTER_ROW
+                .iter()
+                .any(|spec| spec.label == "\\")
+        );
+        assert!(
+            !KEYBOARD_TOP_LETTER_ROW
+                .iter()
+                .any(|spec| spec.label == "Enter")
+        );
         assert!(KEYBOARD_HOME_ROW.iter().any(|spec| spec.label == "Enter"));
     }
 
@@ -2187,21 +2190,33 @@ mod tests {
     fn help_overlay_table_rows_cover_primary_bindings() {
         let entries = crate::help_text::overlay_help_entries().collect::<Vec<_>>();
 
-        assert!(entries
-            .iter()
-            .any(|entry| entry.binding == "F1 / H" && entry.explanation.contains("Cycle")));
-        assert!(entries
-            .iter()
-            .any(|entry| entry.binding == "Ctrl + Up / Down" && entry.explanation.contains("F2 page")));
-        assert!(entries
-            .iter()
-            .any(|entry| entry.binding == "S / Del / 00-99 / Up / Down + Enter"));
-        assert!(entries
-            .iter()
-            .any(|entry| entry.binding == "Arrow Up / Down"));
-        assert!(entries
-            .iter()
-            .any(|entry| entry.binding == "V / B" && entry.explanation.contains("spawn exclusion")));
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.binding == "F1 / H" && entry.explanation.contains("Cycle"))
+        );
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.binding == "Ctrl + Up / Down"
+                    && entry.explanation.contains("F2 page"))
+        );
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.binding == "S / Del / 00-99 / Up / Down + Enter")
+        );
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.binding == "Arrow Up / Down")
+        );
+        assert!(
+            entries
+                .iter()
+                .any(|entry| entry.binding == "V / B"
+                    && entry.explanation.contains("spawn exclusion"))
+        );
     }
 
     #[test]

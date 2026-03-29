@@ -72,15 +72,14 @@ const FX_HELP: [HelpEntry; 12] = [
         explanation: "In the F2 page, toggle the selected shader effect.",
     },
     HelpEntry {
-        startup: "L toggles the selected shader-effect parameter LFO",
-        overlay: "In F2 page: L toggles the selected shader-effect parameter LFO",
+        startup: "L toggles the selected parameter LFO when supported",
+        overlay: "In F2 page: L toggles the selected parameter LFO when supported",
         binding: "L",
-        explanation: "In the F2 page, toggle the selected shader-effect parameter LFO.",
+        explanation: "In the F2 page, toggle the selected parameter LFO when supported.",
     },
     HelpEntry {
         startup: "typing a number sets the active numeric field",
-        overlay:
-            "In F2 page: Type digits / . / - / + (for example 0.157) to set the active numeric field",
+        overlay: "In F2 page: Type digits / . / - / + (for example 0.157) to set the active numeric field",
         binding: "Digits / . / - / +",
         explanation: "In the F2 page, set the active numeric field directly.",
     },
@@ -118,8 +117,7 @@ const FX_HELP: [HelpEntry; 12] = [
 
 const PRESET_HELP: [HelpEntry; 1] = [HelpEntry {
     startup: "scene preset page supports save/free/load/collision resolution",
-    overlay:
-        "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions",
+    overlay: "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions",
     binding: "S / Del / 00-99 / Up / Down + Enter",
     explanation: "In the preset page, save, free slots, load presets, and resolve collisions.",
 }];
