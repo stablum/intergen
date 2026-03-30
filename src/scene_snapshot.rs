@@ -4,7 +4,9 @@ use serde::{Deserialize, Serialize};
 use crate::camera::CameraRig;
 use crate::config::{AppConfig, LightingConfig, MaterialConfig, RenderingConfig};
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
-use crate::scene::{GenerationParameters, GenerationState, MaterialState, StageState};
+use crate::scene::{
+    GenerationParameters, GenerationState, LightingState, MaterialState, RenderingState, StageState,
+};
 use crate::shapes::{
     AttachmentOccupancy, NodeOrigin, ShapeKind, ShapeNode, SpawnAddMode, SpawnAttachment,
     SpawnPlacementMode,
@@ -94,17 +96,20 @@ impl SceneStateSnapshot {
         app_config: &AppConfig,
         camera_rig: &CameraRig,
         generation_state: &GenerationState,
+        rendering_state: &RenderingState,
+        lighting_state: &LightingState,
         material_state: &MaterialState,
         stage_state: &StageState,
         effect_tuner: &EffectTunerState,
     ) -> Self {
         let runtime_materials = material_state.runtime_material_config(&app_config.materials);
-        let mut runtime_rendering = app_config.rendering.clone();
-        runtime_rendering.stage = stage_state.runtime_stage_config(&app_config.rendering.stage);
+        let runtime_rendering =
+            rendering_state.runtime_rendering_config(&app_config.rendering, stage_state);
+        let runtime_lighting = lighting_state.runtime_lighting_config(&app_config.lighting);
 
         Self {
             rendering: runtime_rendering,
-            lighting: app_config.lighting.clone(),
+            lighting: runtime_lighting,
             materials: runtime_materials,
             camera: CameraRigSnapshot::capture(camera_rig),
             generation: GenerationSnapshot::capture(generation_state),
@@ -117,23 +122,30 @@ impl SceneStateSnapshot {
         app_config: &AppConfig,
         camera_rig: &CameraRig,
         generation_state: &GenerationState,
+        rendering_state: &RenderingState,
+        lighting_state: &LightingState,
         material_state: &MaterialState,
         stage_state: &StageState,
         effect_tuner: &EffectTunerState,
     ) -> Self {
+        let base_camera = effect_tuner.base_camera_rig(&app_config.camera, camera_rig);
         let base_generation =
             effect_tuner.base_generation_state(&app_config.generation, generation_state);
+        let base_rendering_state = effect_tuner.base_rendering_state(rendering_state);
+        let base_lighting_state = effect_tuner.base_lighting_state(lighting_state);
         let base_material_state =
             effect_tuner.base_material_state(&app_config.materials, material_state);
+        let base_stage_state = effect_tuner.base_stage_state(stage_state);
         let runtime_materials = base_material_state.runtime_material_config(&app_config.materials);
-        let mut runtime_rendering = app_config.rendering.clone();
-        runtime_rendering.stage = stage_state.runtime_stage_config(&app_config.rendering.stage);
+        let runtime_rendering =
+            base_rendering_state.runtime_rendering_config(&app_config.rendering, &base_stage_state);
+        let runtime_lighting = base_lighting_state.runtime_lighting_config(&app_config.lighting);
 
         Self {
             rendering: runtime_rendering,
-            lighting: app_config.lighting.clone(),
+            lighting: runtime_lighting,
             materials: runtime_materials,
-            camera: CameraRigSnapshot::capture(camera_rig),
+            camera: CameraRigSnapshot::capture(&base_camera),
             generation: GenerationSnapshot::capture(&base_generation),
             material_state: MaterialRuntimeSnapshot::capture(&base_material_state),
             effects: effect_tuner.runtime_snapshot(),
@@ -349,13 +361,15 @@ mod tests {
     use crate::camera::CameraRig;
     use crate::config::AppConfig;
     use crate::effect_tuner::EffectTunerState;
-    use crate::scene::{GenerationState, MaterialState, StageState};
+    use crate::scene::{GenerationState, LightingState, MaterialState, RenderingState, StageState};
 
     #[test]
     fn capture_uses_runtime_stage_visibility() {
         let app_config = AppConfig::default();
         let camera_rig = CameraRig::from_config(&app_config.camera);
         let generation_state = GenerationState::from_config(&app_config.generation);
+        let rendering_state = RenderingState::from_config(&app_config.rendering);
+        let lighting_state = LightingState::from_config(&app_config.lighting);
         let material_state = MaterialState::from_config(&app_config.materials);
         let mut stage_state = StageState::from_config(&app_config.rendering.stage);
         let effect_tuner = EffectTunerState::from_config(&app_config.effects);
@@ -368,6 +382,8 @@ mod tests {
             &app_config,
             &camera_rig,
             &generation_state,
+            &rendering_state,
+            &lighting_state,
             &material_state,
             &stage_state,
             &effect_tuner,

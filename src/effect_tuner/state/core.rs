@@ -59,27 +59,44 @@ pub(crate) struct AdjustmentModifiers {
 }
 
 pub(crate) struct EffectTunerViewContext<'a> {
+    pub(crate) camera_config: &'a CameraConfig,
+    pub(crate) camera_rig: &'a CameraRig,
     pub(crate) generation_config: &'a GenerationConfig,
     pub(crate) generation_state: &'a GenerationState,
+    pub(crate) rendering_config: &'a RenderingConfig,
+    pub(crate) rendering_state: &'a RenderingState,
+    pub(crate) lighting_config: &'a LightingConfig,
+    pub(crate) lighting_state: &'a LightingState,
     pub(crate) material_config: &'a MaterialConfig,
     pub(crate) material_state: &'a MaterialState,
     pub(crate) stage_state: &'a StageState,
 }
 
 pub(crate) struct EffectTunerEditContext<'a> {
+    pub(crate) camera_config: &'a CameraConfig,
+    pub(crate) camera_rig: &'a mut CameraRig,
     pub(crate) generation_config: &'a GenerationConfig,
     pub(crate) generation_state: &'a mut GenerationState,
+    pub(crate) rendering_config: &'a RenderingConfig,
+    pub(crate) rendering_state: &'a mut RenderingState,
+    pub(crate) lighting_config: &'a LightingConfig,
+    pub(crate) lighting_state: &'a mut LightingState,
     pub(crate) material_config: &'a MaterialConfig,
     pub(crate) material_state: &'a mut MaterialState,
-    pub(crate) stage_config: &'a StageConfig,
     pub(crate) stage_state: &'a mut StageState,
 }
 
 impl EffectTunerEditContext<'_> {
     fn view(&self) -> EffectTunerViewContext<'_> {
         EffectTunerViewContext {
+            camera_config: self.camera_config,
+            camera_rig: &*self.camera_rig,
             generation_config: self.generation_config,
             generation_state: &*self.generation_state,
+            rendering_config: self.rendering_config,
+            rendering_state: &*self.rendering_state,
+            lighting_config: self.lighting_config,
+            lighting_state: &*self.lighting_state,
             material_config: self.material_config,
             material_state: &*self.material_state,
             stage_state: &*self.stage_state,
@@ -87,10 +104,133 @@ impl EffectTunerEditContext<'_> {
     }
 }
 
+fn mark_scene_lfo_change(
+    result: &mut SceneLfoApplicationResult,
+    parameter: EffectTunerSceneParameter,
+) {
+    match parameter {
+        EffectTunerSceneParameter::ChildTwistPerVertexRadians
+        | EffectTunerSceneParameter::ChildOutwardOffsetRatio => {
+            result.generation_changed = true;
+        }
+        EffectTunerSceneParameter::GlobalOpacity
+        | EffectTunerSceneParameter::MaterialHueStepPerLevel
+        | EffectTunerSceneParameter::MaterialSaturation
+        | EffectTunerSceneParameter::MaterialLightness
+        | EffectTunerSceneParameter::MaterialMetallic
+        | EffectTunerSceneParameter::MaterialPerceptualRoughness
+        | EffectTunerSceneParameter::MaterialReflectance
+        | EffectTunerSceneParameter::MaterialCubeHueBias
+        | EffectTunerSceneParameter::MaterialTetrahedronHueBias
+        | EffectTunerSceneParameter::MaterialOctahedronHueBias
+        | EffectTunerSceneParameter::MaterialDodecahedronHueBias
+        | EffectTunerSceneParameter::MaterialAccentEveryNLevels
+        | EffectTunerSceneParameter::MaterialLevelLightnessShift
+        | EffectTunerSceneParameter::MaterialLevelSaturationShift
+        | EffectTunerSceneParameter::MaterialLevelMetallicShift
+        | EffectTunerSceneParameter::MaterialLevelRoughnessShift
+        | EffectTunerSceneParameter::MaterialLevelReflectanceShift => {
+            result.materials_changed = true;
+        }
+        EffectTunerSceneParameter::CameraDistance
+        | EffectTunerSceneParameter::CameraAngularVelocityX
+        | EffectTunerSceneParameter::CameraAngularVelocityY
+        | EffectTunerSceneParameter::CameraAngularVelocityZ
+        | EffectTunerSceneParameter::CameraZoomVelocity => {
+            result.camera_changed = true;
+        }
+        EffectTunerSceneParameter::RenderingClearColorR
+        | EffectTunerSceneParameter::RenderingClearColorG
+        | EffectTunerSceneParameter::RenderingClearColorB
+        | EffectTunerSceneParameter::RenderingAmbientColorR
+        | EffectTunerSceneParameter::RenderingAmbientColorG
+        | EffectTunerSceneParameter::RenderingAmbientColorB
+        | EffectTunerSceneParameter::RenderingAmbientBrightness => {
+            result.rendering_changed = true;
+        }
+        EffectTunerSceneParameter::StageFloorColorR
+        | EffectTunerSceneParameter::StageFloorColorG
+        | EffectTunerSceneParameter::StageFloorColorB
+        | EffectTunerSceneParameter::StageFloorTranslationX
+        | EffectTunerSceneParameter::StageFloorTranslationY
+        | EffectTunerSceneParameter::StageFloorTranslationZ
+        | EffectTunerSceneParameter::StageFloorRotationX
+        | EffectTunerSceneParameter::StageFloorRotationY
+        | EffectTunerSceneParameter::StageFloorRotationZ
+        | EffectTunerSceneParameter::StageFloorSizeX
+        | EffectTunerSceneParameter::StageFloorSizeY
+        | EffectTunerSceneParameter::StageFloorThickness
+        | EffectTunerSceneParameter::StageFloorMetallic
+        | EffectTunerSceneParameter::StageFloorPerceptualRoughness
+        | EffectTunerSceneParameter::StageFloorReflectance
+        | EffectTunerSceneParameter::StageBackdropColorR
+        | EffectTunerSceneParameter::StageBackdropColorG
+        | EffectTunerSceneParameter::StageBackdropColorB
+        | EffectTunerSceneParameter::StageBackdropTranslationX
+        | EffectTunerSceneParameter::StageBackdropTranslationY
+        | EffectTunerSceneParameter::StageBackdropTranslationZ
+        | EffectTunerSceneParameter::StageBackdropRotationX
+        | EffectTunerSceneParameter::StageBackdropRotationY
+        | EffectTunerSceneParameter::StageBackdropRotationZ
+        | EffectTunerSceneParameter::StageBackdropSizeX
+        | EffectTunerSceneParameter::StageBackdropSizeY
+        | EffectTunerSceneParameter::StageBackdropThickness
+        | EffectTunerSceneParameter::StageBackdropMetallic
+        | EffectTunerSceneParameter::StageBackdropPerceptualRoughness
+        | EffectTunerSceneParameter::StageBackdropReflectance => {
+            result.stage_changed = true;
+        }
+        EffectTunerSceneParameter::LightingDirectionalColorR
+        | EffectTunerSceneParameter::LightingDirectionalColorG
+        | EffectTunerSceneParameter::LightingDirectionalColorB
+        | EffectTunerSceneParameter::LightingDirectionalIlluminance
+        | EffectTunerSceneParameter::LightingDirectionalTranslationX
+        | EffectTunerSceneParameter::LightingDirectionalTranslationY
+        | EffectTunerSceneParameter::LightingDirectionalTranslationZ
+        | EffectTunerSceneParameter::LightingDirectionalLookAtX
+        | EffectTunerSceneParameter::LightingDirectionalLookAtY
+        | EffectTunerSceneParameter::LightingDirectionalLookAtZ
+        | EffectTunerSceneParameter::LightingPointColorR
+        | EffectTunerSceneParameter::LightingPointColorG
+        | EffectTunerSceneParameter::LightingPointColorB
+        | EffectTunerSceneParameter::LightingPointIntensity
+        | EffectTunerSceneParameter::LightingPointRange
+        | EffectTunerSceneParameter::LightingPointTranslationX
+        | EffectTunerSceneParameter::LightingPointTranslationY
+        | EffectTunerSceneParameter::LightingPointTranslationZ
+        | EffectTunerSceneParameter::LightingAccentColorR
+        | EffectTunerSceneParameter::LightingAccentColorG
+        | EffectTunerSceneParameter::LightingAccentColorB
+        | EffectTunerSceneParameter::LightingAccentIntensity
+        | EffectTunerSceneParameter::LightingAccentRange
+        | EffectTunerSceneParameter::LightingAccentTranslationX
+        | EffectTunerSceneParameter::LightingAccentTranslationY
+        | EffectTunerSceneParameter::LightingAccentTranslationZ => {
+            result.lighting_changed = true;
+        }
+        EffectTunerSceneParameter::ChildKind
+        | EffectTunerSceneParameter::SpawnPlacementMode
+        | EffectTunerSceneParameter::SpawnAddMode
+        | EffectTunerSceneParameter::ChildScaleRatio
+        | EffectTunerSceneParameter::ChildSpawnExclusionProbability
+        | EffectTunerSceneParameter::StageEnabled
+        | EffectTunerSceneParameter::StageFloorEnabled
+        | EffectTunerSceneParameter::StageBackdropEnabled
+        | EffectTunerSceneParameter::MaterialSurfaceMode
+        | EffectTunerSceneParameter::MaterialBaseSurface
+        | EffectTunerSceneParameter::MaterialRootSurface
+        | EffectTunerSceneParameter::MaterialAccentSurface => {}
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct SceneLfoApplicationResult {
     pub(crate) generation_changed: bool,
     pub(crate) materials_changed: bool,
+    pub(crate) rendering_changed: bool,
+    pub(crate) stage_changed: bool,
+    pub(crate) lighting_changed: bool,
+    pub(crate) camera_changed: bool,
 }
 
 #[derive(Resource, Clone)]
@@ -98,9 +238,9 @@ pub(crate) struct EffectTunerState {
     defaults: EffectsConfig,
     current: EffectsConfig,
     lfos: Vec<ParameterLfo>,
-    material_scene_lfo_bases: Vec<f32>,
+    scene_lfo_bases: Vec<f32>,
     generation_scene_lfo_applied: bool,
-    material_scene_lfo_applied: bool,
+    scene_numeric_lfo_applied: bool,
     selected_index: usize,
     page_mode: EffectTunerPageMode,
     edit_mode: EffectEditMode,
@@ -120,9 +260,9 @@ impl EffectTunerState {
             defaults: effects_config.clone(),
             current: effects_config.clone(),
             lfos: default_lfos(),
-            material_scene_lfo_bases: default_material_scene_lfo_bases(),
+            scene_lfo_bases: default_scene_lfo_bases(),
             generation_scene_lfo_applied: false,
-            material_scene_lfo_applied: false,
+            scene_numeric_lfo_applied: false,
             selected_index: 0,
             page_mode: EffectTunerPageMode::Compact,
             edit_mode: EffectEditMode::Value,
@@ -176,7 +316,7 @@ impl EffectTunerState {
     pub(crate) fn needs_scene_lfo_application(&self) -> bool {
         self.has_active_scene_lfos()
             || self.generation_scene_lfo_applied
-            || self.material_scene_lfo_applied
+            || self.scene_numeric_lfo_applied
     }
 
     pub(crate) fn runtime_snapshot(&self) -> EffectRuntimeSnapshot {
@@ -189,9 +329,9 @@ impl EffectTunerState {
     pub(crate) fn apply_runtime_snapshot(&mut self, snapshot: &EffectRuntimeSnapshot) {
         self.current = snapshot.current.clone();
         self.lfos = default_lfos();
-        self.material_scene_lfo_bases = default_material_scene_lfo_bases();
+        self.scene_lfo_bases = default_scene_lfo_bases();
         self.generation_scene_lfo_applied = false;
-        self.material_scene_lfo_applied = false;
+        self.scene_numeric_lfo_applied = false;
         for (target, source) in self.lfos.iter_mut().zip(snapshot.lfos.iter().copied()) {
             *target = source;
         }
@@ -202,51 +342,48 @@ impl EffectTunerState {
         self.reset_hold_states();
     }
 
-    pub(crate) fn sync_material_scene_lfo_bases(&mut self, material_state: &MaterialState) {
-        for parameter in EffectTunerSceneParameter::material_lfo_capable() {
-            self.sync_scene_parameter_base_if_needed(
-                EffectTunerParameter::Scene(*parameter),
-                material_state,
-            );
+    pub(crate) fn sync_scene_lfo_bases(&mut self, context: &EffectTunerViewContext<'_>) {
+        for parameter in EffectTunerSceneParameter::lfo_capable() {
+            self.sync_scene_parameter_base_if_needed(EffectTunerParameter::Scene(*parameter), context);
         }
     }
 
     pub(crate) fn restore_scene_parameter_base_if_needed(
         &mut self,
         parameter: EffectTunerParameter,
-        material_config: &MaterialConfig,
-        material_state: &mut MaterialState,
+        context: &mut EffectTunerEditContext<'_>,
     ) -> bool {
         let EffectTunerParameter::Scene(parameter) = parameter else {
             return false;
         };
-        let Some(base_index) = parameter.material_lfo_base_index() else {
+        if parameter.is_generation_lfo_parameter() {
+            return false;
+        }
+        let Some(base_index) = parameter.lfo_scene_index() else {
             return false;
         };
-        let base_value = self.material_scene_lfo_bases[base_index];
-        let Some(current_value) = parameter.material_numeric_value(material_state) else {
-            return false;
-        };
+        let base_value = self.scene_lfo_bases[base_index];
+        let current_value = parameter.value(&context.view());
         if (current_value - base_value).abs() <= 1.0e-6 {
             return false;
         }
-        parameter.apply_material_numeric_value(material_config, material_state, base_value);
-        true
+        let applied_value = parameter.set_value(context, base_value);
+        (applied_value - current_value).abs() > 1.0e-6
     }
 
     pub(crate) fn sync_scene_parameter_base_if_needed(
         &mut self,
         parameter: EffectTunerParameter,
-        material_state: &MaterialState,
+        context: &EffectTunerViewContext<'_>,
     ) {
         let EffectTunerParameter::Scene(parameter) = parameter else {
             return;
         };
-        let Some(base_index) = parameter.material_lfo_base_index() else {
+        let Some(base_index) = parameter.lfo_scene_index() else {
             return;
         };
-        if let Some(value) = parameter.material_numeric_value(material_state) {
-            self.material_scene_lfo_bases[base_index] = value;
+        if parameter.is_numeric() {
+            self.scene_lfo_bases[base_index] = parameter.value(context);
         }
     }
 
@@ -257,13 +394,70 @@ impl EffectTunerState {
     ) -> MaterialState {
         let mut base_state = material_state.clone();
         for parameter in EffectTunerSceneParameter::material_lfo_capable() {
-            let Some(base_index) = parameter.material_lfo_base_index() else {
+            let Some(base_index) = parameter.lfo_scene_index() else {
                 continue;
             };
             parameter.apply_material_numeric_value(
                 material_config,
                 &mut base_state,
-                self.material_scene_lfo_bases[base_index],
+                self.scene_lfo_bases[base_index],
+            );
+        }
+        base_state
+    }
+
+    pub(crate) fn base_stage_state(&self, stage_state: &StageState) -> StageState {
+        let mut base_state = stage_state.clone();
+        for parameter in EffectTunerSceneParameter::lfo_capable() {
+            let Some(base_index) = parameter.lfo_scene_index() else {
+                continue;
+            };
+            let _ = parameter.apply_stage_numeric_value(&mut base_state, self.scene_lfo_bases[base_index]);
+        }
+        base_state
+    }
+
+    pub(crate) fn base_rendering_state(&self, rendering_state: &RenderingState) -> RenderingState {
+        let mut base_state = rendering_state.clone();
+        for parameter in EffectTunerSceneParameter::lfo_capable() {
+            let Some(base_index) = parameter.lfo_scene_index() else {
+                continue;
+            };
+            let _ = parameter.apply_rendering_numeric_value(&mut base_state, self.scene_lfo_bases[base_index]);
+        }
+        base_state
+    }
+
+    pub(crate) fn base_lighting_state(&self, lighting_state: &LightingState) -> LightingState {
+        let mut base_state = lighting_state.clone();
+        for parameter in EffectTunerSceneParameter::lfo_capable() {
+            let Some(base_index) = parameter.lfo_scene_index() else {
+                continue;
+            };
+            let _ = parameter.apply_lighting_numeric_value(&mut base_state, self.scene_lfo_bases[base_index]);
+        }
+        base_state
+    }
+
+    pub(crate) fn base_camera_rig(
+        &self,
+        camera_config: &CameraConfig,
+        camera_rig: &CameraRig,
+    ) -> CameraRig {
+        let mut base_state = CameraRig {
+            orientation: camera_rig.orientation,
+            angular_velocity: camera_rig.angular_velocity,
+            distance: camera_rig.distance,
+            zoom_velocity: camera_rig.zoom_velocity,
+        };
+        for parameter in EffectTunerSceneParameter::lfo_capable() {
+            let Some(base_index) = parameter.lfo_scene_index() else {
+                continue;
+            };
+            let _ = parameter.apply_camera_numeric_value(
+                camera_config,
+                &mut base_state,
+                self.scene_lfo_bases[base_index],
             );
         }
         base_state
@@ -295,10 +489,7 @@ impl EffectTunerState {
     pub(crate) fn apply_scene_lfos(
         &mut self,
         now_secs: f32,
-        _generation_config: &GenerationConfig,
-        generation_state: &mut GenerationState,
-        material_config: &MaterialConfig,
-        material_state: &mut MaterialState,
+        context: &mut EffectTunerEditContext<'_>,
     ) -> SceneLfoApplicationResult {
         let mut result = SceneLfoApplicationResult::default();
 
@@ -324,30 +515,32 @@ impl EffectTunerState {
             let generation_parameter = parameter
                 .generation_parameter()
                 .expect("generation LFO parameter should map to generation state");
-            generation_state
+            context
+                .generation_state
                 .parameter_mut(generation_parameter)
                 .set_additive_offset(offset);
         }
-        if generation_lfo_active {
-            result.generation_changed = true;
-        } else if self.generation_scene_lfo_applied {
+        if generation_lfo_active || self.generation_scene_lfo_applied {
             result.generation_changed = true;
         }
         self.generation_scene_lfo_applied = generation_lfo_active;
 
-        let mut material_lfo_active = false;
-        for parameter in EffectTunerSceneParameter::material_lfo_capable() {
+        let mut scene_numeric_lfo_active = false;
+        for parameter in EffectTunerSceneParameter::lfo_capable() {
+            if parameter.is_generation_lfo_parameter() {
+                continue;
+            }
             let Some(lfo_index) = lfo_index_for_parameter(EffectTunerParameter::Scene(*parameter))
             else {
                 continue;
             };
-            let Some(base_index) = parameter.material_lfo_base_index() else {
+            let Some(base_index) = parameter.lfo_scene_index() else {
                 continue;
             };
-            let base_value = self.material_scene_lfo_bases[base_index];
+            let base_value = self.scene_lfo_bases[base_index];
             let lfo = self.lfos[lfo_index];
             let next_value = if lfo.is_active() {
-                material_lfo_active = true;
+                scene_numeric_lfo_active = true;
                 base_value
                     + lfo.amplitude
                         * lfo
@@ -356,22 +549,13 @@ impl EffectTunerState {
             } else {
                 base_value
             };
-            let Some(previous_value) = parameter.material_numeric_value(material_state) else {
-                continue;
-            };
-            let Some(applied_value) =
-                parameter.apply_material_numeric_value(material_config, material_state, next_value)
-            else {
-                continue;
-            };
+            let previous_value = parameter.value(&context.view());
+            let applied_value = parameter.set_value(context, next_value);
             if (previous_value - applied_value).abs() > 1.0e-6 {
-                result.materials_changed = true;
+                mark_scene_lfo_change(&mut result, *parameter);
             }
         }
-        if !material_lfo_active && self.material_scene_lfo_applied {
-            result.materials_changed = true;
-        }
-        self.material_scene_lfo_applied = material_lfo_active;
+        self.scene_numeric_lfo_applied = scene_numeric_lfo_active;
 
         result
     }
@@ -401,8 +585,8 @@ impl EffectTunerState {
         parameter: EffectTunerSceneParameter,
         context: &EffectTunerViewContext<'_>,
     ) -> Option<f32> {
-        if let Some(base_index) = parameter.material_lfo_base_index() {
-            return self.material_scene_lfo_bases.get(base_index).copied();
+        if let Some(base_index) = parameter.lfo_scene_index() {
+            return self.scene_lfo_bases.get(base_index).copied();
         }
         parameter.is_numeric().then(|| parameter.value(context))
     }

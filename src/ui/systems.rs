@@ -1,3 +1,33 @@
+#[derive(SystemParam)]
+pub(crate) struct EffectTunerUiViewAccess<'w, 's> {
+    pub(crate) app_config: Res<'w, AppConfig>,
+    pub(crate) camera_rig: Res<'w, CameraRig>,
+    pub(crate) generation_state: Res<'w, GenerationState>,
+    pub(crate) rendering_state: Res<'w, RenderingState>,
+    pub(crate) lighting_state: Res<'w, LightingState>,
+    pub(crate) material_state: Res<'w, MaterialState>,
+    pub(crate) stage_state: Res<'w, StageState>,
+    _marker: std::marker::PhantomData<&'s ()>,
+}
+
+impl<'w, 's> EffectTunerUiViewAccess<'w, 's> {
+    fn effect_tuner_view_context(&self) -> EffectTunerViewContext<'_> {
+        EffectTunerViewContext {
+            camera_config: &self.app_config.camera,
+            camera_rig: &self.camera_rig,
+            generation_config: &self.app_config.generation,
+            generation_state: &self.generation_state,
+            rendering_config: &self.app_config.rendering,
+            rendering_state: &self.rendering_state,
+            lighting_config: &self.app_config.lighting,
+            lighting_state: &self.lighting_state,
+            material_config: &self.app_config.materials,
+            material_state: &self.material_state,
+            stage_state: &self.stage_state,
+        }
+    }
+}
+
 pub(crate) fn toggle_help_overlay_system(
     help_overlay: Res<HelpOverlayState>,
     mut text_overlay_query: Query<
@@ -60,12 +90,9 @@ pub(crate) fn update_keyboard_help_overlay_system(
 
 pub(crate) fn update_effect_tuner_overlay_system(
     time: Res<Time>,
-    app_config: Res<AppConfig>,
     control_page: Res<ControlPageState>,
     effect_tuner: Res<EffectTunerState>,
-    generation_state: Res<GenerationState>,
-    material_state: Res<MaterialState>,
-    stage_state: Res<crate::scene::StageState>,
+    view: EffectTunerUiViewAccess,
     mut overlay_query: Query<(&mut Visibility, &mut Node), With<EffectTunerOverlay>>,
     mut pinned_badge_query: Query<
         &mut Visibility,
@@ -88,17 +115,8 @@ pub(crate) fn update_effect_tuner_overlay_system(
     mut field_query: Query<(&EffectTunerEditableField, &mut BackgroundColor)>,
 ) {
     let now_secs = time.elapsed_secs();
-    let snapshot = effect_tuner.overlay_snapshot(
-        &EffectTunerViewContext {
-            generation_config: &app_config.generation,
-            generation_state: &generation_state,
-            material_config: &app_config.materials,
-            material_state: &material_state,
-            stage_state: &stage_state,
-        },
-        now_secs,
-    );
-    let ui_config = &app_config.ui;
+    let snapshot = effect_tuner.overlay_snapshot(&view.effect_tuner_view_context(), now_secs);
+    let ui_config = &view.app_config.ui;
 
     let Ok((mut overlay_visibility, mut overlay_node)) = overlay_query.single_mut() else {
         return;
@@ -201,12 +219,9 @@ pub(crate) fn update_effect_tuner_overlay_system(
 
 pub(crate) fn update_effect_tuner_list_overlay_system(
     time: Res<Time>,
-    app_config: Res<AppConfig>,
     control_page: Res<ControlPageState>,
     effect_tuner: Res<EffectTunerState>,
-    generation_state: Res<GenerationState>,
-    material_state: Res<MaterialState>,
-    stage_state: Res<crate::scene::StageState>,
+    view: EffectTunerUiViewAccess,
     mut overlay_query: Query<(&mut Visibility, &mut Node), With<EffectTunerListOverlay>>,
     mut pinned_badge_query: Query<
         &mut Visibility,
@@ -276,17 +291,11 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
 ) {
     let now_secs = time.elapsed_secs();
     let snapshot = effect_tuner.list_overlay_snapshot(
-        &EffectTunerViewContext {
-            generation_config: &app_config.generation,
-            generation_state: &generation_state,
-            material_config: &app_config.materials,
-            material_state: &material_state,
-            stage_state: &stage_state,
-        },
+        &view.effect_tuner_view_context(),
         now_secs,
         EFFECT_TUNER_LIST_VISIBLE_ROWS,
     );
-    let ui_config = &app_config.ui;
+    let ui_config = &view.app_config.ui;
     let visible = control_page.page_has_focus(ControlPage::EffectTuner)
         && effect_tuner.page_mode() == EffectTunerPageMode::List
         && effect_tuner.is_visible(now_secs);

@@ -125,9 +125,15 @@ fn current_unix_ms() -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+    use std::path::Path;
     use std::time::Duration;
 
+    use crate::config::EffectsConfig;
+    use crate::effect_tuner::EffectTunerState;
     use crate::timestamp::format_utc_timestamp;
+
+    use super::read_preset_file;
 
     #[test]
     fn preset_filename_timestamp_matches_screenshot_style() {
@@ -143,5 +149,57 @@ mod tests {
             filename,
             "scene-preset-2025-03-03_16-11-36-045-0000-example.toml"
         );
+    }
+
+    #[test]
+    fn checked_in_scene_presets_still_load_and_apply_effect_snapshots() {
+        let preset_dir = Path::new("scene-presets");
+        assert!(
+            preset_dir.exists(),
+            "expected checked-in scene-presets directory to exist"
+        );
+
+        let mut preset_paths = fs::read_dir(preset_dir)
+            .expect("should read checked-in presets")
+            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
+            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("toml"))
+            .collect::<Vec<_>>();
+        preset_paths.sort();
+        assert!(
+            !preset_paths.is_empty(),
+            "expected at least one checked-in scene preset"
+        );
+
+        for path in preset_paths {
+            let file = read_preset_file(&path)
+                .unwrap_or_else(|error| panic!("{} should parse: {error}", path.display()));
+            assert!(
+                matches!(file.scene.effects.lfos.len(), 24 | 43),
+                "{} should use one of the currently stored LFO layouts",
+                path.display()
+            );
+            file.scene
+                .prepare_runtime()
+                .unwrap_or_else(|error| panic!("{} should prepare: {error}", path.display()));
+
+            let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+            effect_tuner.apply_runtime_snapshot(&file.scene.effects);
+            let restored = effect_tuner.runtime_snapshot();
+
+            assert!(
+                restored.lfos.len() >= file.scene.effects.lfos.len(),
+                "{} should fit into the current runtime LFO layout",
+                path.display()
+            );
+
+            for (restored_lfo, expected_lfo) in
+                restored.lfos.iter().zip(file.scene.effects.lfos.iter())
+            {
+                assert_eq!(restored_lfo.enabled, expected_lfo.enabled);
+                assert_eq!(restored_lfo.shape, expected_lfo.shape);
+                assert_eq!(restored_lfo.amplitude, expected_lfo.amplitude);
+                assert_eq!(restored_lfo.frequency_hz, expected_lfo.frequency_hz);
+            }
+        }
     }
 }

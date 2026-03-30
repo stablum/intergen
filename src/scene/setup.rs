@@ -11,14 +11,36 @@ pub(crate) fn setup_scene(
     let shape_assets = ShapeAssets::new(&mut meshes);
     let root = root_generation_node(&shape_assets.catalog, &app_config.generation);
     let stage_state = StageState::from_config(&app_config.rendering.stage);
+    let rendering_state = RenderingState::from_config(&app_config.rendering);
     let material_state = MaterialState::from_config(&app_config.materials);
-    effect_tuner.sync_material_scene_lfo_bases(&material_state);
+    let lighting_state = LightingState::from_config(&app_config.lighting);
+    effect_tuner.sync_scene_lfo_bases(&crate::effect_tuner::EffectTunerViewContext {
+        camera_config: &app_config.camera,
+        camera_rig: &camera_rig,
+        generation_config: &app_config.generation,
+        generation_state: &GenerationState {
+            nodes: vec![root.clone()],
+            selected_shape_kind: app_config.generation.default_child_shape_kind,
+            spawn_placement_mode: app_config.generation.default_spawn_placement_mode,
+            spawn_add_mode: SpawnAddMode::default(),
+            parameters: GenerationParameters::from_config(&app_config.generation),
+            spawn_hold: HoldRepeatState::default(),
+        },
+        rendering_config: &app_config.rendering,
+        rendering_state: &rendering_state,
+        lighting_config: &app_config.lighting,
+        lighting_state: &lighting_state,
+        material_config: &app_config.materials,
+        material_state: &material_state,
+        stage_state: &stage_state,
+    });
     let runtime_material_config = material_state.runtime_material_config(&app_config.materials);
+    let runtime_rendering =
+        rendering_state.runtime_rendering_config(&app_config.rendering, &stage_state);
+    let runtime_lighting = lighting_state.runtime_lighting_config(&app_config.lighting);
     let initial_opacity = material_state.opacity;
 
-    spawn_scene_lights(&mut commands, &app_config);
-    let mut runtime_rendering = app_config.rendering.clone();
-    runtime_rendering.stage = stage_state.runtime_stage_config(&app_config.rendering.stage);
+    spawn_scene_lights(&mut commands, &runtime_lighting);
     spawn_stage_entities(
         &mut commands,
         &mut meshes,
@@ -72,6 +94,8 @@ pub(crate) fn setup_scene(
     });
     commands.insert_resource(material_state);
     commands.insert_resource(stage_state);
+    commands.insert_resource(rendering_state);
+    commands.insert_resource(lighting_state);
 
     println!("{}", startup_controls_message());
     println!("{}", startup_fx_message());
@@ -101,46 +125,94 @@ pub(crate) fn setup_scene(
     }
 }
 
-pub(crate) fn spawn_scene_lights(commands: &mut Commands, app_config: &AppConfig) {
+pub(crate) fn spawn_scene_lights(commands: &mut Commands, lighting: &LightingConfig) {
     commands.spawn((
         SceneLightEntity,
         SceneDirectionalLight,
         DirectionalLight {
-            color: app_config.lighting.directional.color(),
-            illuminance: app_config.lighting.directional.illuminance,
-            shadows_enabled: app_config.lighting.directional.shadows_enabled,
+            color: lighting.directional.color(),
+            illuminance: lighting.directional.illuminance,
+            shadows_enabled: lighting.directional.shadows_enabled,
             ..default()
         },
-        Transform::from_translation(app_config.lighting.directional.translation())
-            .looking_at(app_config.lighting.directional.look_at(), Vec3::Y),
+        Transform::from_translation(lighting.directional.translation())
+            .looking_at(lighting.directional.look_at(), Vec3::Y),
     ));
 
     commands.spawn((
         SceneLightEntity,
         ScenePointLight,
         PointLight {
-            color: app_config.lighting.point.color(),
-            intensity: app_config.lighting.point.intensity,
-            range: app_config.lighting.point.range,
-            shadows_enabled: app_config.lighting.point.shadows_enabled,
+            color: lighting.point.color(),
+            intensity: lighting.point.intensity,
+            range: lighting.point.range,
+            shadows_enabled: lighting.point.shadows_enabled,
             ..default()
         },
-        Transform::from_translation(app_config.lighting.point.translation()),
+        Transform::from_translation(lighting.point.translation()),
     ));
 
-    if app_config.lighting.accent.enabled {
+    if lighting.accent.enabled {
         commands.spawn((
             SceneLightEntity,
             SceneAccentLight,
             PointLight {
-                color: app_config.lighting.accent.color(),
-                intensity: app_config.lighting.accent.intensity,
-                range: app_config.lighting.accent.range,
-                shadows_enabled: app_config.lighting.accent.shadows_enabled,
+                color: lighting.accent.color(),
+                intensity: lighting.accent.intensity,
+                range: lighting.accent.range,
+                shadows_enabled: lighting.accent.shadows_enabled,
                 ..default()
             },
-            Transform::from_translation(app_config.lighting.accent.translation()),
+            Transform::from_translation(lighting.accent.translation()),
         ));
+    }
+}
+
+pub(crate) fn apply_live_rendering_state(
+    rendering: &RenderingConfig,
+    clear_color: &mut ClearColor,
+    ambient_light: &mut GlobalAmbientLight,
+) {
+    clear_color.0 = rendering.clear_color();
+    ambient_light.color = rendering.ambient_light_color();
+    ambient_light.brightness = rendering.ambient_light_brightness;
+}
+
+pub(crate) fn apply_live_lighting_state<
+    DirectionalFilter: bevy::ecs::query::QueryFilter,
+    PointFilter: bevy::ecs::query::QueryFilter,
+    AccentFilter: bevy::ecs::query::QueryFilter,
+>(
+    lighting: &LightingConfig,
+    directional_lights: &mut Query<
+        (&mut DirectionalLight, &mut Transform),
+        DirectionalFilter,
+    >,
+    point_lights: &mut Query<(&mut PointLight, &mut Transform), PointFilter>,
+    accent_lights: &mut Query<(&mut PointLight, &mut Transform), AccentFilter>,
+) {
+    if let Ok((mut light, mut transform)) = directional_lights.single_mut() {
+        light.color = lighting.directional.color();
+        light.illuminance = lighting.directional.illuminance;
+        light.shadows_enabled = lighting.directional.shadows_enabled;
+        *transform = Transform::from_translation(lighting.directional.translation())
+            .looking_at(lighting.directional.look_at(), Vec3::Y);
+    }
+
+    if let Ok((mut light, mut transform)) = point_lights.single_mut() {
+        light.color = lighting.point.color();
+        light.intensity = lighting.point.intensity;
+        light.range = lighting.point.range;
+        light.shadows_enabled = lighting.point.shadows_enabled;
+        *transform = Transform::from_translation(lighting.point.translation());
+    }
+
+    if let Ok((mut light, mut transform)) = accent_lights.single_mut() {
+        light.color = lighting.accent.color();
+        light.intensity = lighting.accent.intensity;
+        light.range = lighting.accent.range;
+        light.shadows_enabled = lighting.accent.shadows_enabled;
+        *transform = Transform::from_translation(lighting.accent.translation());
     }
 }
 
@@ -180,16 +252,13 @@ pub(crate) fn sync_stage_entities(
     meshes: &mut Assets<Mesh>,
     materials: &mut Assets<StandardMaterial>,
     rendering: &RenderingConfig,
-    stage_state: &StageState,
     stage_entities: &Query<Entity, With<SceneStageEntity>>,
 ) {
     for entity in stage_entities.iter() {
         commands.entity(entity).despawn();
     }
 
-    let mut runtime_rendering = rendering.clone();
-    runtime_rendering.stage = stage_state.runtime_stage_config(&rendering.stage);
-    spawn_stage_entities(commands, meshes, materials, &runtime_rendering);
+    spawn_stage_entities(commands, meshes, materials, rendering);
 }
 
 fn spawn_stage_surface(
@@ -263,9 +332,9 @@ pub(crate) fn spawn_shape_entity(
     ));
 }
 
-pub(crate) fn sync_shape_transforms(
+pub(crate) fn sync_shape_transforms<F: bevy::ecs::query::QueryFilter>(
     nodes: &[ShapeNode],
-    shape_transforms: &mut Query<(&ShapeEntity, &mut Transform)>,
+    shape_transforms: &mut Query<(&ShapeEntity, &mut Transform), F>,
 ) {
     for (shape_entity, mut transform) in shape_transforms.iter_mut() {
         let Some(node) = nodes.get(shape_entity.node_index) else {

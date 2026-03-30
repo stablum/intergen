@@ -4,8 +4,8 @@ use bevy::prelude::*;
 
 use crate::camera::{CameraRig, SceneCamera};
 use crate::config::{
-    AppConfig, GenerationConfig, MaterialConfig, MaterialSurfaceFamily, MaterialSurfaceMode,
-    RenderingConfig, StageConfig, StageSurfaceConfig,
+    AppConfig, GenerationConfig, LightingConfig, MaterialConfig, MaterialSurfaceFamily,
+    MaterialSurfaceMode, RenderingConfig, StageConfig, StageSurfaceConfig,
 };
 use crate::effects::{camera_effects_from_config, effects_status_messages};
 use crate::generation::{

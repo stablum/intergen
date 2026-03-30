@@ -1,12 +1,13 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
+use crate::camera::CameraRig;
 use crate::config::{
-    EffectGroup, EffectNumericParameter, EffectsConfig, GenerationConfig, MaterialConfig,
-    MaterialSurfaceFamily, MaterialSurfaceMode, StageConfig,
+    CameraConfig, EffectGroup, EffectNumericParameter, EffectsConfig, GenerationConfig,
+    LightingConfig, MaterialConfig, MaterialSurfaceFamily, MaterialSurfaceMode, RenderingConfig,
 };
 use crate::parameters::{GenerationParameter, HoldInput, HoldRepeatState};
-use crate::scene::{GenerationState, MaterialState, StageState};
+use crate::scene::{GenerationState, LightingState, MaterialState, RenderingState, StageState};
 use crate::shapes::{ShapeKind, SpawnAddMode, SpawnPlacementMode};
 
 use super::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LFO_FREQUENCY_STEP_HZ, LfoShape, ParameterLfo};

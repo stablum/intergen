@@ -6,16 +6,16 @@ use bevy::{
     prelude::*,
 };
 
-use crate::camera::SceneCamera;
+use crate::camera::{SceneCamera, sync_scene_camera_transform};
 use crate::control_page::{ControlPage, ControlPageState};
 use crate::effects::{CameraEffectsSettings, camera_effects_from_config};
 use crate::generation::{apply_live_material_state, recompute_generation_tree};
 use crate::runtime_scene::GenerationSceneAccess;
-use crate::scene::sync_stage_entities;
+use crate::scene::{apply_live_lighting_state, apply_live_rendering_state, sync_stage_entities};
 
 use super::state::{
     AdjustmentModifiers, EffectTunerEditContext, EffectTunerParameter, EffectTunerSceneParameter,
-    EffectTunerState, EffectTunerViewContext,
+    EffectTunerState, EffectTunerViewContext, SceneLfoApplicationResult,
 };
 use crate::parameters::HoldInput;
 
@@ -58,7 +58,10 @@ pub(crate) fn effect_tuner_input_system(
         let selected_parameter = effect_tuner.selected_parameter();
         let view = effect_tuner_view_context(
             &scene.app_config,
+            &scene.camera_rig,
             &scene.generation_state,
+            &scene.rendering_state,
+            &scene.lighting_state,
             &scene.material_state,
             &scene.stage_state,
         );
@@ -148,7 +151,10 @@ pub(crate) fn effect_tuner_input_system(
         restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
         let mut context = effect_tuner_edit_context(
             &scene.app_config,
+            &mut scene.camera_rig,
             &mut scene.generation_state,
+            &mut scene.rendering_state,
+            &mut scene.lighting_state,
             &mut scene.material_state,
             &mut scene.stage_state,
         );
@@ -173,7 +179,10 @@ pub(crate) fn effect_tuner_input_system(
             effect_tuner.selected_status_message(
                 &effect_tuner_view_context(
                     &scene.app_config,
+                    &scene.camera_rig,
                     &scene.generation_state,
+                    &scene.rendering_state,
+                    &scene.lighting_state,
                     &scene.material_state,
                     &scene.stage_state,
                 ),
@@ -186,7 +195,10 @@ pub(crate) fn effect_tuner_input_system(
         restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
         let mut context = effect_tuner_edit_context(
             &scene.app_config,
+            &mut scene.camera_rig,
             &mut scene.generation_state,
+            &mut scene.rendering_state,
+            &mut scene.lighting_state,
             &mut scene.material_state,
             &mut scene.stage_state,
         );
@@ -211,7 +223,10 @@ pub(crate) fn effect_tuner_input_system(
             effect_tuner.selected_status_message(
                 &effect_tuner_view_context(
                     &scene.app_config,
+                    &scene.camera_rig,
                     &scene.generation_state,
+                    &scene.rendering_state,
+                    &scene.lighting_state,
                     &scene.material_state,
                     &scene.stage_state,
                 ),
@@ -227,13 +242,24 @@ pub(crate) fn effect_tuner_input_system(
             {
                 let mut context = effect_tuner_edit_context(
                     &scene.app_config,
+                    &mut scene.camera_rig,
                     &mut scene.generation_state,
+                    &mut scene.rendering_state,
+                    &mut scene.lighting_state,
                     &mut scene.material_state,
                     &mut scene.stage_state,
                 );
                 effect_tuner.reset_all(&mut context, now_secs);
             }
-            effect_tuner.sync_material_scene_lfo_bases(&scene.material_state);
+            effect_tuner.sync_scene_lfo_bases(&effect_tuner_view_context(
+                &scene.app_config,
+                &scene.camera_rig,
+                &scene.generation_state,
+                &scene.rendering_state,
+                &scene.lighting_state,
+                &scene.material_state,
+                &scene.stage_state,
+            ));
             apply_reset_all_side_effects(&mut scene);
             println!("Reset all F2 controls to defaults.");
         } else if effect_tuner.finalize_numeric_entry(now_secs) {
@@ -242,7 +268,10 @@ pub(crate) fn effect_tuner_input_system(
                 effect_tuner.selected_status_message(
                     &effect_tuner_view_context(
                         &scene.app_config,
+                        &scene.camera_rig,
                         &scene.generation_state,
+                        &scene.rendering_state,
+                        &scene.lighting_state,
                         &scene.material_state,
                         &scene.stage_state,
                     ),
@@ -255,21 +284,26 @@ pub(crate) fn effect_tuner_input_system(
             {
                 let mut context = effect_tuner_edit_context(
                     &scene.app_config,
+                    &mut scene.camera_rig,
                     &mut scene.generation_state,
+                    &mut scene.rendering_state,
+                    &mut scene.lighting_state,
                     &mut scene.material_state,
                     &mut scene.stage_state,
                 );
                 effect_tuner.reset_selected(&mut context, now_secs);
             }
             apply_selected_parameter_side_effects(selected_parameter, &mut scene);
-            effect_tuner
-                .sync_scene_parameter_base_if_needed(selected_parameter, &scene.material_state);
+            sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
             println!(
                 "Reset {}.",
                 effect_tuner.selected_status_message(
                     &effect_tuner_view_context(
                         &scene.app_config,
+                        &scene.camera_rig,
                         &scene.generation_state,
+                        &scene.rendering_state,
+                        &scene.lighting_state,
                         &scene.material_state,
                         &scene.stage_state,
                     ),
@@ -285,7 +319,10 @@ pub(crate) fn effect_tuner_input_system(
             restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
             let mut context = effect_tuner_edit_context(
                 &scene.app_config,
+                &mut scene.camera_rig,
                 &mut scene.generation_state,
+                &mut scene.rendering_state,
+                &mut scene.lighting_state,
                 &mut scene.material_state,
                 &mut scene.stage_state,
             );
@@ -293,8 +330,7 @@ pub(crate) fn effect_tuner_input_system(
         };
         if changed {
             apply_selected_parameter_side_effects(selected_parameter, &mut scene);
-            effect_tuner
-                .sync_scene_parameter_base_if_needed(selected_parameter, &scene.material_state);
+            sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
         }
     }
 
@@ -320,7 +356,10 @@ pub(crate) fn effect_tuner_input_system(
                 restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
                 let mut context = effect_tuner_edit_context(
                     &scene.app_config,
+                    &mut scene.camera_rig,
                     &mut scene.generation_state,
+                    &mut scene.rendering_state,
+                    &mut scene.lighting_state,
                     &mut scene.material_state,
                     &mut scene.stage_state,
                 );
@@ -328,8 +367,7 @@ pub(crate) fn effect_tuner_input_system(
             };
             if changed {
                 apply_selected_parameter_side_effects(selected_parameter, &mut scene);
-                effect_tuner
-                    .sync_scene_parameter_base_if_needed(selected_parameter, &scene.material_state);
+                sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
             }
         }
     }
@@ -343,25 +381,19 @@ pub(crate) fn apply_effect_tuner_system(
 ) {
     let should_update_effects = effect_tuner.is_changed() || effect_tuner.has_active_effect_lfos();
     if effect_tuner.needs_scene_lfo_application() {
-        let lfo_result = effect_tuner.apply_scene_lfos(
-            time.elapsed_secs(),
-            &scene.app_config.generation,
-            &mut scene.generation_state,
-            &scene.app_config.materials,
-            &mut scene.material_state,
-        );
-        if lfo_result.generation_changed {
-            recompute_generation_tree(&mut scene);
-        }
-        if lfo_result.materials_changed {
-            apply_live_material_state(
-                &scene.generation_state,
-                &scene.app_config.materials,
-                &scene.material_state,
-                &mut scene.materials,
-                &scene.shape_materials,
+        let lfo_result = {
+            let mut context = effect_tuner_edit_context(
+                &scene.app_config,
+                &mut scene.camera_rig,
+                &mut scene.generation_state,
+                &mut scene.rendering_state,
+                &mut scene.lighting_state,
+                &mut scene.material_state,
+                &mut scene.stage_state,
             );
-        }
+            effect_tuner.apply_scene_lfos(time.elapsed_secs(), &mut context)
+        };
+        apply_scene_lfo_side_effects(lfo_result, &mut scene);
     }
 
     if !should_update_effects {
@@ -409,32 +441,52 @@ fn restore_selected_scene_parameter_base_if_needed(
     scene: &mut GenerationSceneAccess<'_, '_>,
 ) {
     let selected_parameter = effect_tuner.selected_parameter();
-    effect_tuner.restore_scene_parameter_base_if_needed(
-        selected_parameter,
-        &scene.app_config.materials,
+    let mut context = effect_tuner_edit_context(
+        &scene.app_config,
+        &mut scene.camera_rig,
+        &mut scene.generation_state,
+        &mut scene.rendering_state,
+        &mut scene.lighting_state,
         &mut scene.material_state,
+        &mut scene.stage_state,
     );
+    effect_tuner.restore_scene_parameter_base_if_needed(selected_parameter, &mut context);
 }
 
 fn sync_selected_scene_parameter_base_if_needed(
     effect_tuner: &mut EffectTunerState,
     scene: &GenerationSceneAccess<'_, '_>,
 ) {
-    effect_tuner.sync_scene_parameter_base_if_needed(
-        effect_tuner.selected_parameter(),
+    let view = effect_tuner_view_context(
+        &scene.app_config,
+        &scene.camera_rig,
+        &scene.generation_state,
+        &scene.rendering_state,
+        &scene.lighting_state,
         &scene.material_state,
+        &scene.stage_state,
     );
+    effect_tuner.sync_scene_parameter_base_if_needed(effect_tuner.selected_parameter(), &view);
 }
 
 fn effect_tuner_view_context<'a>(
     app_config: &'a crate::config::AppConfig,
+    camera_rig: &'a crate::camera::CameraRig,
     generation_state: &'a crate::scene::GenerationState,
+    rendering_state: &'a crate::scene::RenderingState,
+    lighting_state: &'a crate::scene::LightingState,
     material_state: &'a crate::scene::MaterialState,
     stage_state: &'a crate::scene::StageState,
 ) -> EffectTunerViewContext<'a> {
     EffectTunerViewContext {
+        camera_config: &app_config.camera,
+        camera_rig,
         generation_config: &app_config.generation,
         generation_state,
+        rendering_config: &app_config.rendering,
+        rendering_state,
+        lighting_config: &app_config.lighting,
+        lighting_state,
         material_config: &app_config.materials,
         material_state,
         stage_state,
@@ -443,16 +495,24 @@ fn effect_tuner_view_context<'a>(
 
 fn effect_tuner_edit_context<'a>(
     app_config: &'a crate::config::AppConfig,
+    camera_rig: &'a mut crate::camera::CameraRig,
     generation_state: &'a mut crate::scene::GenerationState,
+    rendering_state: &'a mut crate::scene::RenderingState,
+    lighting_state: &'a mut crate::scene::LightingState,
     material_state: &'a mut crate::scene::MaterialState,
     stage_state: &'a mut crate::scene::StageState,
 ) -> EffectTunerEditContext<'a> {
     EffectTunerEditContext {
+        camera_config: &app_config.camera,
+        camera_rig,
         generation_config: &app_config.generation,
         generation_state,
+        rendering_config: &app_config.rendering,
+        rendering_state,
+        lighting_config: &app_config.lighting,
+        lighting_state,
         material_config: &app_config.materials,
         material_state,
-        stage_config: &app_config.rendering.stage,
         stage_state,
     }
 }
@@ -497,14 +557,107 @@ fn apply_selected_parameter_side_effects(
         }
         EffectTunerParameter::Scene(EffectTunerSceneParameter::StageEnabled)
         | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorEnabled)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropEnabled) => {
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropEnabled)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorColorR)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorColorG)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorColorB)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorTranslationX)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorTranslationY)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorTranslationZ)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorRotationX)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorRotationY)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorRotationZ)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorSizeX)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorSizeY)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorThickness)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorMetallic)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorPerceptualRoughness)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorReflectance)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropColorR)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropColorG)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropColorB)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropTranslationX)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropTranslationY)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropTranslationZ)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropRotationX)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropRotationY)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropRotationZ)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropSizeX)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropSizeY)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropThickness)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropMetallic)
+        | EffectTunerParameter::Scene(
+            EffectTunerSceneParameter::StageBackdropPerceptualRoughness,
+        )
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropReflectance) => {
+            let runtime_rendering = scene
+                .rendering_state
+                .runtime_rendering_config(&scene.app_config.rendering, &scene.stage_state);
             sync_stage_entities(
                 &mut scene.commands,
                 &mut scene.meshes,
                 &mut scene.materials,
-                &scene.app_config.rendering,
-                &scene.stage_state,
+                &runtime_rendering,
                 &scene.stage_entities,
+            );
+        }
+        EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingClearColorR)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingClearColorG)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingClearColorB)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingAmbientColorR)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingAmbientColorG)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingAmbientColorB)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingAmbientBrightness) => {
+            let runtime_rendering = scene
+                .rendering_state
+                .runtime_rendering_config(&scene.app_config.rendering, &scene.stage_state);
+            apply_live_rendering_state(
+                &runtime_rendering,
+                &mut scene.clear_color,
+                &mut scene.ambient_light,
+            );
+        }
+        EffectTunerParameter::Scene(EffectTunerSceneParameter::CameraDistance)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::CameraAngularVelocityX)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::CameraAngularVelocityY)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::CameraAngularVelocityZ)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::CameraZoomVelocity) => {
+            sync_scene_camera_transform(&scene.camera_rig, &mut scene.camera_transforms);
+        }
+        EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalColorR)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalColorG)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalColorB)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalIlluminance)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalTranslationX)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalTranslationY)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalTranslationZ)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalLookAtX)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalLookAtY)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalLookAtZ)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointColorR)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointColorG)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointColorB)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointIntensity)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointRange)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointTranslationX)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointTranslationY)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointTranslationZ)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentColorR)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentColorG)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentColorB)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentIntensity)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentRange)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentTranslationX)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentTranslationY)
+        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentTranslationZ) => {
+            let runtime_lighting = scene
+                .lighting_state
+                .runtime_lighting_config(&scene.app_config.lighting);
+            apply_live_lighting_state(
+                &runtime_lighting,
+                &mut scene.directional_lights,
+                &mut scene.point_lights,
+                &mut scene.accent_lights,
             );
         }
         EffectTunerParameter::Effect(_)
@@ -526,14 +679,87 @@ fn apply_reset_all_side_effects(scene: &mut GenerationSceneAccess<'_, '_>) {
         &mut scene.materials,
         &scene.shape_materials,
     );
+    let runtime_rendering = scene
+        .rendering_state
+        .runtime_rendering_config(&scene.app_config.rendering, &scene.stage_state);
+    apply_live_rendering_state(
+        &runtime_rendering,
+        &mut scene.clear_color,
+        &mut scene.ambient_light,
+    );
     sync_stage_entities(
         &mut scene.commands,
         &mut scene.meshes,
         &mut scene.materials,
-        &scene.app_config.rendering,
-        &scene.stage_state,
+        &runtime_rendering,
         &scene.stage_entities,
     );
+    let runtime_lighting = scene
+        .lighting_state
+        .runtime_lighting_config(&scene.app_config.lighting);
+    apply_live_lighting_state(
+        &runtime_lighting,
+        &mut scene.directional_lights,
+        &mut scene.point_lights,
+        &mut scene.accent_lights,
+    );
+    sync_scene_camera_transform(&scene.camera_rig, &mut scene.camera_transforms);
+}
+
+fn apply_scene_lfo_side_effects(
+    side_effects: SceneLfoApplicationResult,
+    scene: &mut GenerationSceneAccess<'_, '_>,
+) {
+    if side_effects.generation_changed {
+        recompute_generation_tree(scene);
+    }
+    if side_effects.materials_changed {
+        apply_live_material_state(
+            &scene.generation_state,
+            &scene.app_config.materials,
+            &scene.material_state,
+            &mut scene.materials,
+            &scene.shape_materials,
+        );
+    }
+    let runtime_rendering =
+        (side_effects.rendering_changed || side_effects.stage_changed).then(|| {
+            scene
+                .rendering_state
+                .runtime_rendering_config(&scene.app_config.rendering, &scene.stage_state)
+        });
+    if let Some(runtime_rendering) = runtime_rendering.as_ref() {
+        if side_effects.rendering_changed {
+            apply_live_rendering_state(
+                runtime_rendering,
+                &mut scene.clear_color,
+                &mut scene.ambient_light,
+            );
+        }
+        if side_effects.stage_changed {
+            sync_stage_entities(
+                &mut scene.commands,
+                &mut scene.meshes,
+                &mut scene.materials,
+                runtime_rendering,
+                &scene.stage_entities,
+            );
+        }
+    }
+    if side_effects.lighting_changed {
+        let runtime_lighting = scene
+            .lighting_state
+            .runtime_lighting_config(&scene.app_config.lighting);
+        apply_live_lighting_state(
+            &runtime_lighting,
+            &mut scene.directional_lights,
+            &mut scene.point_lights,
+            &mut scene.accent_lights,
+        );
+    }
+    if side_effects.camera_changed {
+        sync_scene_camera_transform(&scene.camera_rig, &mut scene.camera_transforms);
+    }
 }
 
 #[cfg(test)]

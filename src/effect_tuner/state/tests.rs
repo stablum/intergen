@@ -1,10 +1,10 @@
 use crate::config::{
-    EffectGroup, EffectsConfig, GenerationConfig, MaterialConfig, MaterialSurfaceMode,
-    StageConfig,
+    CameraConfig, EffectGroup, EffectsConfig, GenerationConfig, LightingConfig, MaterialConfig,
+    MaterialSurfaceMode, RenderingConfig, StageConfig,
 };
 use crate::effect_tuner::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LfoShape};
 use crate::effect_tuner::metadata::{EffectEditMode, EffectOverlayField};
-use crate::scene::{GenerationState, MaterialState, StageState};
+use crate::{camera::CameraRig, scene::{GenerationState, LightingState, MaterialState, RenderingState, StageState}};
 
 use super::{
     EffectNumericParameter, EffectTunerEditContext, EffectTunerPageMode, EffectTunerParameter,
@@ -44,9 +44,23 @@ fn view_context<'a>(
     _stage_config: &'a StageConfig,
     stage_state: &'a StageState,
 ) -> EffectTunerViewContext<'a> {
+    let camera_config: &'a CameraConfig = Box::leak(Box::new(CameraConfig::default()));
+    let camera_rig: &'a CameraRig = Box::leak(Box::new(CameraRig::from_config(camera_config)));
+    let rendering_config: &'a RenderingConfig = Box::leak(Box::new(RenderingConfig::default()));
+    let rendering_state: &'a RenderingState =
+        Box::leak(Box::new(RenderingState::from_config(rendering_config)));
+    let lighting_config: &'a LightingConfig = Box::leak(Box::new(LightingConfig::default()));
+    let lighting_state: &'a LightingState =
+        Box::leak(Box::new(LightingState::from_config(lighting_config)));
     EffectTunerViewContext {
+        camera_config,
+        camera_rig,
         generation_config,
         generation_state,
+        rendering_config,
+        rendering_state,
+        lighting_config,
+        lighting_state,
         material_config,
         material_state,
         stage_state,
@@ -58,15 +72,28 @@ fn edit_context<'a>(
     generation_state: &'a mut GenerationState,
     material_config: &'a MaterialConfig,
     material_state: &'a mut MaterialState,
-    stage_config: &'a StageConfig,
+    _stage_config: &'a StageConfig,
     stage_state: &'a mut StageState,
 ) -> EffectTunerEditContext<'a> {
+    let camera_config: &'a CameraConfig = Box::leak(Box::new(CameraConfig::default()));
+    let camera_rig: &'a mut CameraRig = Box::leak(Box::new(CameraRig::from_config(camera_config)));
+    let rendering_config: &'a RenderingConfig = Box::leak(Box::new(RenderingConfig::default()));
+    let rendering_state: &'a mut RenderingState =
+        Box::leak(Box::new(RenderingState::from_config(rendering_config)));
+    let lighting_config: &'a LightingConfig = Box::leak(Box::new(LightingConfig::default()));
+    let lighting_state: &'a mut LightingState =
+        Box::leak(Box::new(LightingState::from_config(lighting_config)));
     EffectTunerEditContext {
+        camera_config,
+        camera_rig,
         generation_config,
         generation_state,
+        rendering_config,
+        rendering_state,
+        lighting_config,
+        lighting_state,
         material_config,
         material_state,
-        stage_config,
         stage_state,
     }
 }
@@ -224,7 +251,10 @@ fn list_overlay_snapshot_scrolls_to_keep_selection_visible() {
         snapshot.total_parameters
     );
     assert!(snapshot.rows.last().is_some_and(|row| row.selected));
-    assert_eq!(snapshot.detail.parameter_label, "lvl refl");
+    assert_eq!(
+        snapshot.detail.parameter_label,
+        effect_tuner.selected_parameter().short_label()
+    );
 }
 
 #[test]
@@ -347,6 +377,41 @@ fn runtime_snapshot_accepts_older_effect_only_lfo_arrays() {
 }
 
 #[test]
+fn runtime_snapshot_accepts_current_stored_scene_lfo_arrays() {
+    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+    let legacy_scene_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
+        EffectTunerSceneParameter::MaterialLevelReflectanceShift,
+    ))
+    .expect("legacy scene parameter should have an LFO slot");
+    effect_tuner.lfos[legacy_scene_index].enabled = true;
+    effect_tuner.lfos[legacy_scene_index].shape = LfoShape::BrownianMotion;
+    effect_tuner.lfos[legacy_scene_index].amplitude = 0.31;
+    effect_tuner.lfos[legacy_scene_index].frequency_hz = 1.7;
+
+    let mut snapshot = effect_tuner.runtime_snapshot();
+    snapshot
+        .lfos
+        .truncate(EffectNumericParameter::all().len() + 19);
+
+    let mut restored = EffectTunerState::from_config(&EffectsConfig::default());
+    restored.apply_runtime_snapshot(&snapshot);
+
+    assert!(restored.lfos[legacy_scene_index].enabled);
+    assert_eq!(
+        restored.lfos[legacy_scene_index].shape,
+        LfoShape::BrownianMotion
+    );
+    assert_eq!(restored.lfos[legacy_scene_index].amplitude, 0.31);
+    assert_eq!(restored.lfos[legacy_scene_index].frequency_hz, 1.7);
+
+    let first_runtime_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
+        EffectTunerSceneParameter::CameraDistance,
+    ))
+    .expect("camera distance should have an appended LFO slot");
+    assert!(!restored.lfos[first_runtime_index].enabled);
+}
+
+#[test]
 fn base_states_strip_active_scene_lfo_modulation() {
     let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
     let (
@@ -355,10 +420,17 @@ fn base_states_strip_active_scene_lfo_modulation() {
         material_config,
         mut material_state,
         _stage_config,
-        _stage_state,
+        mut _stage_state,
     ) = default_scene_state();
     material_state.opacity = 0.6;
-    effect_tuner.sync_material_scene_lfo_bases(&material_state);
+    effect_tuner.sync_scene_lfo_bases(&view_context(
+        &generation_config,
+        &generation_state,
+        &material_config,
+        &material_state,
+        &_stage_config,
+        &_stage_state,
+    ));
 
     let twist_base = generation_state.twist_per_vertex_radians_base();
     let opacity_base = material_state.opacity;
@@ -383,10 +455,14 @@ fn base_states_strip_active_scene_lfo_modulation() {
 
     let result = effect_tuner.apply_scene_lfos(
         0.25,
-        &generation_config,
-        &mut generation_state,
-        &material_config,
-        &mut material_state,
+        &mut edit_context(
+            &generation_config,
+            &mut generation_state,
+            &material_config,
+            &mut material_state,
+            &_stage_config,
+            &mut _stage_state,
+        ),
     );
 
     assert!(result.generation_changed);
@@ -916,7 +992,14 @@ fn eligible_scene_numeric_parameters_expose_lfo_fields() {
         stage_config,
         stage_state,
     ) = default_scene_state();
-    effect_tuner.sync_material_scene_lfo_bases(&material_state);
+    effect_tuner.sync_scene_lfo_bases(&view_context(
+        &generation_config,
+        &generation_state,
+        &material_config,
+        &material_state,
+        &stage_config,
+        &stage_state,
+    ));
     select_parameter(
         &mut effect_tuner,
         EffectTunerParameter::Scene(EffectTunerSceneParameter::GlobalOpacity),

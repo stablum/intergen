@@ -16,7 +16,9 @@ use crate::config::{
 use crate::control_page::{ControlPageInputMask, just_pressed_unmasked};
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
 use crate::runtime_scene::SceneSnapshotAccess;
-use crate::scene::{GenerationState, MaterialState, ShapeAssets, material_appearance};
+use crate::scene::{
+    GenerationState, LightingState, MaterialState, RenderingState, ShapeAssets, material_appearance,
+};
 use crate::scene_snapshot::{
     CameraRigSnapshot, GenerationSnapshot, MaterialRuntimeSnapshot, NodeOriginSnapshot,
     SceneStateSnapshot, ShapeNodeSnapshot,
@@ -191,6 +193,8 @@ impl BlendExportFile {
         effect_tuner: &EffectTunerState,
         shape_assets: &ShapeAssets,
         generation_state: &GenerationState,
+        rendering_state: &RenderingState,
+        lighting_state: &LightingState,
         material_state: &MaterialState,
         stage_state: &crate::scene::StageState,
         now_secs: f32,
@@ -200,6 +204,8 @@ impl BlendExportFile {
             app_config,
             camera_rig,
             generation_state,
+            rendering_state,
+            lighting_state,
             material_state,
             stage_state,
             effect_tuner,
@@ -211,19 +217,23 @@ impl BlendExportFile {
         let camera_forward_bevy = safe_normalize(-camera_position_bevy, Vec3::NEG_Z);
         let camera_up_bevy = safe_normalize(camera_rig.orientation * Vec3::Y, Vec3::Y);
 
-        let directional_translation = app_config.lighting.directional.translation();
+        let directional_translation = state_snapshot.lighting.directional.translation();
         let directional_forward = safe_normalize(
-            app_config.lighting.directional.look_at() - directional_translation,
+            state_snapshot.lighting.directional.look_at() - directional_translation,
             Vec3::NEG_Y,
         );
-        let point_translation = app_config.lighting.point.translation();
-        let accent = app_config.lighting.accent.enabled.then(|| BlendPointLight {
-            position: bevy_point_to_blender_array(app_config.lighting.accent.translation()),
-            color: app_config.lighting.accent.color,
-            intensity: app_config.lighting.accent.intensity,
-            range: app_config.lighting.accent.range,
-            shadows_enabled: app_config.lighting.accent.shadows_enabled,
-        });
+        let point_translation = state_snapshot.lighting.point.translation();
+        let accent = state_snapshot
+            .lighting
+            .accent
+            .enabled
+            .then(|| BlendPointLight {
+                position: bevy_point_to_blender_array(state_snapshot.lighting.accent.translation()),
+                color: state_snapshot.lighting.accent.color,
+                intensity: state_snapshot.lighting.accent.intensity,
+                range: state_snapshot.lighting.accent.range,
+                shadows_enabled: state_snapshot.lighting.accent.shadows_enabled,
+            });
 
         Self {
             format_version: BLEND_EXPORT_FORMAT_VERSION,
@@ -231,13 +241,13 @@ impl BlendExportFile {
             exported_at_unix_ms: current_unix_ms(),
             world: BlendWorld {
                 clear_color: [
-                    app_config.rendering.clear_color[0],
-                    app_config.rendering.clear_color[1],
-                    app_config.rendering.clear_color[2],
+                    state_snapshot.rendering.clear_color[0],
+                    state_snapshot.rendering.clear_color[1],
+                    state_snapshot.rendering.clear_color[2],
                     1.0,
                 ],
-                ambient_color: app_config.rendering.ambient_light_color,
-                ambient_brightness: app_config.rendering.ambient_light_brightness,
+                ambient_color: state_snapshot.rendering.ambient_light_color,
+                ambient_brightness: state_snapshot.rendering.ambient_light_brightness,
             },
             camera: BlendCamera {
                 position: bevy_point_to_blender_array(camera_position_bevy),
@@ -248,16 +258,16 @@ impl BlendExportFile {
                 directional: BlendDirectionalLight {
                     position: bevy_point_to_blender_array(directional_translation),
                     forward: bevy_direction_to_blender_array(directional_forward),
-                    color: app_config.lighting.directional.color,
-                    illuminance: app_config.lighting.directional.illuminance,
-                    shadows_enabled: app_config.lighting.directional.shadows_enabled,
+                    color: state_snapshot.lighting.directional.color,
+                    illuminance: state_snapshot.lighting.directional.illuminance,
+                    shadows_enabled: state_snapshot.lighting.directional.shadows_enabled,
                 },
                 point: BlendPointLight {
                     position: bevy_point_to_blender_array(point_translation),
-                    color: app_config.lighting.point.color,
-                    intensity: app_config.lighting.point.intensity,
-                    range: app_config.lighting.point.range,
-                    shadows_enabled: app_config.lighting.point.shadows_enabled,
+                    color: state_snapshot.lighting.point.color,
+                    intensity: state_snapshot.lighting.point.intensity,
+                    range: state_snapshot.lighting.point.range,
+                    shadows_enabled: state_snapshot.lighting.point.shadows_enabled,
                 },
                 accent,
             },
@@ -491,6 +501,8 @@ fn export_current_scene(
         scene.effect_tuner.as_ref(),
         scene.shape_assets.as_ref(),
         scene.generation_state.as_ref(),
+        scene.rendering_state.as_ref(),
+        scene.lighting_state.as_ref(),
         scene.material_state.as_ref(),
         scene.stage_state.as_ref(),
         now_secs,

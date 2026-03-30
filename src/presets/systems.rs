@@ -3,14 +3,14 @@ use bevy::prelude::*;
 
 use super::browser::{AutomatedScenePresetLoad, PresetBrowserState, PresetCommand, PresetIndex};
 use super::storage::{ScenePresetFile, read_preset_file, unique_preset_path, write_preset_file};
-use crate::camera::CameraRig;
+use crate::camera::{CameraRig, sync_scene_camera_transform};
 use crate::config::AppConfig;
 use crate::control_page::{ControlPage, ControlPageState};
 use crate::effect_tuner::EffectTunerState;
 use crate::runtime_scene::SceneMutationAccess;
 use crate::scene::{
-    GenerationState, MaterialState, StageState, spawn_scene_lights, spawn_shape_entity,
-    spawn_stage_entities,
+    GenerationState, LightingState, MaterialState, RenderingState, StageState,
+    apply_live_rendering_state, spawn_scene_lights, spawn_shape_entity, spawn_stage_entities,
 };
 use crate::scene_snapshot::SceneStateSnapshot;
 
@@ -99,6 +99,8 @@ pub(crate) fn preset_input_system(
             &scene.app_config,
             &scene.camera_rig,
             &scene.generation_state,
+            &scene.rendering_state,
+            &scene.lighting_state,
             &scene.material_state,
             &scene.stage_state,
             &scene.effect_tuner,
@@ -151,6 +153,8 @@ fn save_scene_preset(
     app_config: &AppConfig,
     camera_rig: &CameraRig,
     generation_state: &GenerationState,
+    rendering_state: &RenderingState,
+    lighting_state: &LightingState,
     material_state: &MaterialState,
     stage_state: &StageState,
     effect_tuner: &EffectTunerState,
@@ -159,6 +163,8 @@ fn save_scene_preset(
         app_config,
         camera_rig,
         generation_state,
+        rendering_state,
+        lighting_state,
         material_state,
         stage_state,
         effect_tuner,
@@ -255,21 +261,31 @@ fn apply_scene_preset(
     runtime.app_config.lighting = prepared.lighting;
     runtime.app_config.materials = prepared.materials;
 
-    runtime.clear_color.0 = runtime.app_config.rendering.clear_color();
-    runtime.ambient_light.color = runtime.app_config.rendering.ambient_light_color();
-    runtime.ambient_light.brightness = runtime.app_config.rendering.ambient_light_brightness;
-
     *runtime.camera_rig = prepared.camera_rig;
     runtime
         .effect_tuner
         .apply_runtime_snapshot(&prepared.effects);
     *runtime.generation_state = prepared.generation;
+    *runtime.rendering_state = RenderingState::from_config(&runtime.app_config.rendering);
+    *runtime.lighting_state = LightingState::from_config(&runtime.app_config.lighting);
     *runtime.material_state = MaterialState::from_config(&runtime.app_config.materials);
     runtime.material_state.opacity = prepared.material_opacity;
+    *runtime.stage_state = StageState::from_config(&runtime.app_config.rendering.stage);
     runtime
         .effect_tuner
-        .sync_material_scene_lfo_bases(&runtime.material_state);
-    *runtime.stage_state = StageState::from_config(&runtime.app_config.rendering.stage);
+        .sync_scene_lfo_bases(&crate::effect_tuner::EffectTunerViewContext {
+            camera_config: &runtime.app_config.camera,
+            camera_rig: &runtime.camera_rig,
+            generation_config: &runtime.app_config.generation,
+            generation_state: &runtime.generation_state,
+            rendering_config: &runtime.app_config.rendering,
+            rendering_state: &runtime.rendering_state,
+            lighting_config: &runtime.app_config.lighting,
+            lighting_state: &runtime.lighting_state,
+            material_config: &runtime.app_config.materials,
+            material_state: &runtime.material_state,
+            stage_state: &runtime.stage_state,
+        });
 
     for entity in runtime.light_entities.iter() {
         runtime.commands.entity(entity).despawn();
@@ -281,7 +297,13 @@ fn apply_scene_preset(
         runtime.commands.entity(entity).despawn();
     }
 
-    spawn_scene_lights(&mut runtime.commands, &runtime.app_config);
+    apply_live_rendering_state(
+        &runtime.app_config.rendering,
+        &mut runtime.clear_color,
+        &mut runtime.ambient_light,
+    );
+    sync_scene_camera_transform(&runtime.camera_rig, &mut runtime.camera_transforms);
+    spawn_scene_lights(&mut runtime.commands, &runtime.app_config.lighting);
     spawn_stage_entities(
         &mut runtime.commands,
         &mut runtime.meshes,

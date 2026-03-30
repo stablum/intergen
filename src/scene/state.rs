@@ -256,11 +256,53 @@ pub(crate) struct MaterialState {
     pub(crate) level_reflectance_shift: f32,
 }
 
+#[derive(Clone, Debug)]
+pub(crate) struct StageSurfaceState {
+    pub(crate) color: [f32; 3],
+    pub(crate) translation: [f32; 3],
+    pub(crate) rotation_degrees: [f32; 3],
+    pub(crate) size: [f32; 2],
+    pub(crate) thickness: f32,
+    pub(crate) metallic: f32,
+    pub(crate) perceptual_roughness: f32,
+    pub(crate) reflectance: f32,
+}
+
+impl StageSurfaceState {
+    fn from_config(surface: &StageSurfaceConfig) -> Self {
+        Self {
+            color: surface.color,
+            translation: surface.translation,
+            rotation_degrees: surface.rotation_degrees,
+            size: surface.size,
+            thickness: surface.thickness,
+            metallic: surface.metallic,
+            perceptual_roughness: surface.perceptual_roughness,
+            reflectance: surface.reflectance,
+        }
+    }
+
+    fn runtime_stage_surface_config(&self, defaults: &StageSurfaceConfig) -> StageSurfaceConfig {
+        let mut surface = defaults.clone();
+        surface.color = self.color;
+        surface.translation = self.translation;
+        surface.rotation_degrees = self.rotation_degrees;
+        surface.size = [self.size[0].max(0.01), self.size[1].max(0.01)];
+        surface.thickness = self.thickness.max(0.01);
+        surface.metallic = self.metallic.clamp(0.0, 1.0);
+        surface.perceptual_roughness = self.perceptual_roughness.clamp(0.0, 1.0);
+        surface.reflectance = self.reflectance.clamp(0.0, 1.0);
+        surface
+    }
+}
+
 #[derive(Clone, Resource)]
 pub(crate) struct StageState {
     pub(crate) enabled: bool,
     pub(crate) floor_enabled: bool,
     pub(crate) backdrop_enabled: bool,
+    pub(crate) floor: StageSurfaceState,
+    pub(crate) backdrop: StageSurfaceState,
 }
 
 impl StageState {
@@ -269,15 +311,159 @@ impl StageState {
             enabled: stage_config.enabled,
             floor_enabled: stage_config.floor.enabled,
             backdrop_enabled: stage_config.backdrop.enabled,
+            floor: StageSurfaceState::from_config(&stage_config.floor),
+            backdrop: StageSurfaceState::from_config(&stage_config.backdrop),
         }
     }
 
     pub(crate) fn runtime_stage_config(&self, defaults: &StageConfig) -> StageConfig {
         let mut stage = defaults.clone();
         stage.enabled = self.enabled;
+        stage.floor = self.floor.runtime_stage_surface_config(&defaults.floor);
+        stage.backdrop = self.backdrop.runtime_stage_surface_config(&defaults.backdrop);
         stage.floor.enabled = self.floor_enabled;
         stage.backdrop.enabled = self.backdrop_enabled;
         stage
+    }
+}
+
+#[derive(Clone, Resource)]
+pub(crate) struct RenderingState {
+    pub(crate) clear_color: [f32; 3],
+    pub(crate) ambient_light_color: [f32; 3],
+    pub(crate) ambient_light_brightness: f32,
+}
+
+impl RenderingState {
+    pub(crate) fn from_config(rendering_config: &RenderingConfig) -> Self {
+        Self {
+            clear_color: rendering_config.clear_color,
+            ambient_light_color: rendering_config.ambient_light_color,
+            ambient_light_brightness: rendering_config.ambient_light_brightness,
+        }
+    }
+
+    pub(crate) fn runtime_rendering_config(
+        &self,
+        defaults: &RenderingConfig,
+        stage_state: &StageState,
+    ) -> RenderingConfig {
+        let mut rendering = defaults.clone();
+        rendering.clear_color = self.clear_color;
+        rendering.ambient_light_color = self.ambient_light_color;
+        rendering.ambient_light_brightness = self.ambient_light_brightness.max(0.0);
+        rendering.stage = stage_state.runtime_stage_config(&defaults.stage);
+        rendering
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct DirectionalLightState {
+    pub(crate) color: [f32; 3],
+    pub(crate) illuminance: f32,
+    pub(crate) translation: [f32; 3],
+    pub(crate) look_at: [f32; 3],
+}
+
+impl DirectionalLightState {
+    fn from_config(config: &crate::config::DirectionalLightConfig) -> Self {
+        Self {
+            color: config.color,
+            illuminance: config.illuminance,
+            translation: config.translation,
+            look_at: config.look_at,
+        }
+    }
+
+    fn runtime_directional_light_config(
+        &self,
+        defaults: &crate::config::DirectionalLightConfig,
+    ) -> crate::config::DirectionalLightConfig {
+        let mut config = defaults.clone();
+        config.color = self.color;
+        config.illuminance = self.illuminance.max(0.0);
+        config.translation = self.translation;
+        config.look_at = self.look_at;
+        config
+    }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) struct PointLightState {
+    pub(crate) color: [f32; 3],
+    pub(crate) intensity: f32,
+    pub(crate) range: f32,
+    pub(crate) translation: [f32; 3],
+}
+
+impl PointLightState {
+    fn from_point_config(config: &crate::config::PointLightConfig) -> Self {
+        Self {
+            color: config.color,
+            intensity: config.intensity,
+            range: config.range,
+            translation: config.translation,
+        }
+    }
+
+    fn from_accent_config(config: &crate::config::AccentLightConfig) -> Self {
+        Self {
+            color: config.color,
+            intensity: config.intensity,
+            range: config.range,
+            translation: config.translation,
+        }
+    }
+
+    fn runtime_point_light_config(
+        &self,
+        defaults: &crate::config::PointLightConfig,
+    ) -> crate::config::PointLightConfig {
+        let mut config = defaults.clone();
+        config.color = self.color;
+        config.intensity = self.intensity.max(0.0);
+        config.range = self.range.max(0.0);
+        config.translation = self.translation;
+        config
+    }
+
+    fn runtime_accent_light_config(
+        &self,
+        defaults: &crate::config::AccentLightConfig,
+    ) -> crate::config::AccentLightConfig {
+        let mut config = defaults.clone();
+        config.color = self.color;
+        config.intensity = self.intensity.max(0.0);
+        config.range = self.range.max(0.0);
+        config.translation = self.translation;
+        config
+    }
+}
+
+#[derive(Clone, Resource)]
+pub(crate) struct LightingState {
+    pub(crate) directional: DirectionalLightState,
+    pub(crate) point: PointLightState,
+    pub(crate) accent: PointLightState,
+}
+
+impl LightingState {
+    pub(crate) fn from_config(lighting_config: &LightingConfig) -> Self {
+        Self {
+            directional: DirectionalLightState::from_config(&lighting_config.directional),
+            point: PointLightState::from_point_config(&lighting_config.point),
+            accent: PointLightState::from_accent_config(&lighting_config.accent),
+        }
+    }
+
+    pub(crate) fn runtime_lighting_config(&self, defaults: &LightingConfig) -> LightingConfig {
+        let mut lighting = defaults.clone();
+        lighting.directional = self
+            .directional
+            .runtime_directional_light_config(&defaults.directional);
+        lighting.point = self.point.runtime_point_light_config(&defaults.point);
+        lighting.accent = self.accent.runtime_accent_light_config(&defaults.accent);
+        lighting
     }
 }
 

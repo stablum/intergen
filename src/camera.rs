@@ -1,3 +1,4 @@
+use bevy::ecs::query::QueryFilter;
 use bevy::prelude::*;
 
 use crate::config::{AppConfig, CameraConfig};
@@ -75,10 +76,6 @@ pub(crate) fn camera_motion_system(
     mut camera_rig: ResMut<CameraRig>,
     mut query: Query<&mut Transform, With<SceneCamera>>,
 ) {
-    let Ok(mut transform) = query.single_mut() else {
-        return;
-    };
-
     let dt = time.delta_secs();
     if camera_rig.angular_velocity.length_squared() > 0.0 {
         let delta = Quat::from_scaled_axis(camera_rig.angular_velocity * dt);
@@ -95,6 +92,17 @@ pub(crate) fn camera_motion_system(
     let (min_distance, max_distance) = app_config.camera.distance_bounds();
     camera_rig.distance =
         (camera_rig.distance + camera_rig.zoom_velocity * dt).clamp(min_distance, max_distance);
+
+    sync_scene_camera_transform(&camera_rig, &mut query);
+}
+
+pub(crate) fn sync_scene_camera_transform<F: QueryFilter>(
+    camera_rig: &CameraRig,
+    query: &mut Query<&mut Transform, F>,
+) {
+    let Ok(mut transform) = query.single_mut() else {
+        return;
+    };
 
     let translation = camera_rig.orientation * Vec3::new(0.0, 0.0, camera_rig.distance);
     *transform = Transform::from_translation(translation)

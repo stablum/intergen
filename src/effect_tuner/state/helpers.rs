@@ -107,15 +107,34 @@ fn default_lfos() -> Vec<ParameterLfo> {
     lfos
 }
 
-fn default_material_scene_lfo_bases() -> Vec<f32> {
-    let material_state = MaterialState::from_config(&MaterialConfig::default());
-    EffectTunerSceneParameter::material_lfo_capable()
+fn default_scene_lfo_bases() -> Vec<f32> {
+    let camera_config = CameraConfig::default();
+    let camera_rig = CameraRig::from_config(&camera_config);
+    let generation_config = GenerationConfig::default();
+    let generation_state = GenerationState::from_config(&generation_config);
+    let rendering_config = RenderingConfig::default();
+    let rendering_state = RenderingState::from_config(&rendering_config);
+    let lighting_config = LightingConfig::default();
+    let lighting_state = LightingState::from_config(&lighting_config);
+    let material_config = MaterialConfig::default();
+    let material_state = MaterialState::from_config(&material_config);
+    let stage_state = StageState::from_config(&rendering_config.stage);
+    let context = EffectTunerViewContext {
+        camera_config: &camera_config,
+        camera_rig: &camera_rig,
+        generation_config: &generation_config,
+        generation_state: &generation_state,
+        rendering_config: &rendering_config,
+        rendering_state: &rendering_state,
+        lighting_config: &lighting_config,
+        lighting_state: &lighting_state,
+        material_config: &material_config,
+        material_state: &material_state,
+        stage_state: &stage_state,
+    };
+    EffectTunerSceneParameter::lfo_capable()
         .iter()
-        .map(|parameter| {
-            parameter
-                .material_numeric_value(&material_state)
-                .unwrap_or_default()
-        })
+        .map(|parameter| parameter.value(&context))
         .collect()
 }
 

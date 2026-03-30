@@ -3,7 +3,10 @@ use bevy::prelude::*;
 use crate::control_page::{
     ControlPageInputMask, just_pressed_unmasked, just_released_unmasked, pressed_unmasked,
 };
-use crate::effect_tuner::{EffectTunerParameter, EffectTunerSceneParameter, EffectTunerState};
+use crate::effect_tuner::{
+    EffectTunerEditContext, EffectTunerParameter, EffectTunerSceneParameter, EffectTunerState,
+    EffectTunerViewContext,
+};
 use crate::parameters::GenerationParameter;
 use crate::runtime_scene::GenerationSceneAccess;
 use crate::scene::{
@@ -188,11 +191,10 @@ fn handle_opacity_input(
     let mut opacity_changed = false;
     let opacity_parameter = EffectTunerParameter::Scene(EffectTunerSceneParameter::GlobalOpacity);
     if just_pressed_unmasked(keys, input_mask, KeyCode::KeyO) {
-        effect_tuner.restore_scene_parameter_base_if_needed(
-            opacity_parameter,
-            &scene.app_config.materials,
-            &mut scene.material_state,
-        );
+        {
+            let mut context = effect_tuner_edit_context(scene);
+            effect_tuner.restore_scene_parameter_base_if_needed(opacity_parameter, &mut context);
+        }
         scene.material_state.opacity = adjust_clamped_value(
             scene.material_state.opacity,
             -scene.app_config.materials.opacity_adjust_step,
@@ -203,11 +205,10 @@ fn handle_opacity_input(
         println!("{}", opacity_status_message(scene.material_state.opacity));
     }
     if just_pressed_unmasked(keys, input_mask, KeyCode::KeyP) {
-        effect_tuner.restore_scene_parameter_base_if_needed(
-            opacity_parameter,
-            &scene.app_config.materials,
-            &mut scene.material_state,
-        );
+        {
+            let mut context = effect_tuner_edit_context(scene);
+            effect_tuner.restore_scene_parameter_base_if_needed(opacity_parameter, &mut context);
+        }
         scene.material_state.opacity = adjust_clamped_value(
             scene.material_state.opacity,
             scene.app_config.materials.opacity_adjust_step,
@@ -218,11 +219,10 @@ fn handle_opacity_input(
         println!("{}", opacity_status_message(scene.material_state.opacity));
     }
     if just_pressed_unmasked(keys, input_mask, KeyCode::KeyI) {
-        effect_tuner.restore_scene_parameter_base_if_needed(
-            opacity_parameter,
-            &scene.app_config.materials,
-            &mut scene.material_state,
-        );
+        {
+            let mut context = effect_tuner_edit_context(scene);
+            effect_tuner.restore_scene_parameter_base_if_needed(opacity_parameter, &mut context);
+        }
         scene.material_state.opacity = scene.app_config.materials.default_opacity_clamped();
         opacity_changed = true;
         println!(
@@ -231,7 +231,8 @@ fn handle_opacity_input(
         );
     }
     if opacity_changed {
-        effect_tuner.sync_scene_parameter_base_if_needed(opacity_parameter, &scene.material_state);
+        let view = effect_tuner_view_context(scene);
+        effect_tuner.sync_scene_parameter_base_if_needed(opacity_parameter, &view);
         apply_live_material_state(
             &scene.generation_state,
             &scene.app_config.materials,
@@ -239,6 +240,42 @@ fn handle_opacity_input(
             &mut scene.materials,
             &scene.shape_materials,
         );
+    }
+}
+
+fn effect_tuner_view_context<'a>(
+    scene: &'a GenerationSceneAccess<'_, '_>,
+) -> EffectTunerViewContext<'a> {
+    EffectTunerViewContext {
+        camera_config: &scene.app_config.camera,
+        camera_rig: &scene.camera_rig,
+        generation_config: &scene.app_config.generation,
+        generation_state: &scene.generation_state,
+        rendering_config: &scene.app_config.rendering,
+        rendering_state: &scene.rendering_state,
+        lighting_config: &scene.app_config.lighting,
+        lighting_state: &scene.lighting_state,
+        material_config: &scene.app_config.materials,
+        material_state: &scene.material_state,
+        stage_state: &scene.stage_state,
+    }
+}
+
+fn effect_tuner_edit_context<'a>(
+    scene: &'a mut GenerationSceneAccess<'_, '_>,
+) -> EffectTunerEditContext<'a> {
+    EffectTunerEditContext {
+        camera_config: &scene.app_config.camera,
+        camera_rig: &mut scene.camera_rig,
+        generation_config: &scene.app_config.generation,
+        generation_state: &mut scene.generation_state,
+        rendering_config: &scene.app_config.rendering,
+        rendering_state: &mut scene.rendering_state,
+        lighting_config: &scene.app_config.lighting,
+        lighting_state: &mut scene.lighting_state,
+        material_config: &scene.app_config.materials,
+        material_state: &mut scene.material_state,
+        stage_state: &mut scene.stage_state,
     }
 }
 
