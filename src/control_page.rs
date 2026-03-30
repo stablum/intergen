@@ -17,16 +17,16 @@ const EFFECT_TUNER_BINDINGS: [KeyBindingPattern; 10] = [
     KeyBindingPattern::any_modifiers(KeyCode::Backspace),
 ];
 const EFFECT_TUNER_NUMERIC_BINDINGS: [KeyBindingPattern; 27] = [
-    KeyBindingPattern::unmodified(KeyCode::Digit0),
-    KeyBindingPattern::unmodified(KeyCode::Digit1),
-    KeyBindingPattern::unmodified(KeyCode::Digit2),
-    KeyBindingPattern::unmodified(KeyCode::Digit3),
-    KeyBindingPattern::unmodified(KeyCode::Digit4),
-    KeyBindingPattern::unmodified(KeyCode::Digit5),
-    KeyBindingPattern::unmodified(KeyCode::Digit6),
-    KeyBindingPattern::unmodified(KeyCode::Digit7),
-    KeyBindingPattern::unmodified(KeyCode::Digit8),
-    KeyBindingPattern::unmodified(KeyCode::Digit9),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Digit0),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Digit1),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Digit2),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Digit3),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Digit4),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Digit5),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Digit6),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Digit7),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Digit8),
+    KeyBindingPattern::no_ctrl_or_alt(KeyCode::Digit9),
     KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad0),
     KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad1),
     KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad2),
@@ -450,6 +450,7 @@ mod tests {
         assert!(mask.captures_binding(binding(KeyCode::Space)));
         assert!(mask.captures_binding(binding(KeyCode::ArrowUp)));
         assert!(mask.captures_binding(binding(KeyCode::Digit1)));
+        assert!(mask.captures_binding(shifted_binding(KeyCode::Digit1)));
         assert!(mask.captures_binding(binding(KeyCode::Comma)));
         assert!(mask.captures_binding(binding(KeyCode::Minus)));
         assert!(mask.captures_binding(shifted_binding(KeyCode::Equal)));
