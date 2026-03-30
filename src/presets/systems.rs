@@ -2,7 +2,10 @@ use bevy::app::AppExit;
 use bevy::prelude::*;
 
 use super::browser::{AutomatedScenePresetLoad, PresetBrowserState, PresetCommand, PresetIndex};
-use super::storage::{ScenePresetFile, read_preset_file, unique_preset_path, write_preset_file};
+use super::storage::{
+    ScenePresetFile, preset_record_from_file, read_preset_file, unique_preset_path,
+    write_preset_file,
+};
 use crate::camera::{CameraRig, sync_scene_camera_transform};
 use crate::config::AppConfig;
 use crate::control_page::{ControlPage, ControlPageState};
@@ -169,10 +172,10 @@ fn save_scene_preset(
         stage_state,
         effect_tuner,
     );
-    let file = ScenePresetFile::new(index, scene.clone());
     let path = unique_preset_path(scene.file_slug().as_str())?;
+    let file = ScenePresetFile::new(index, scene);
     write_preset_file(&path, &file)?;
-    preset_browser.refresh()?;
+    preset_browser.upsert_record(preset_record_from_file(path, file.clone())?);
 
     if preset_browser.records_for_index(index).len() > 1 {
         reset_command_state(preset_browser);
@@ -202,12 +205,16 @@ fn free_assigned_slot(
         return Ok(None);
     }
 
+    let mut updated_records = Vec::new();
     for mut record in records {
         record.file.assignment = None;
         write_preset_file(&record.path, &record.file)?;
+        updated_records.push(preset_record_from_file(record.path, record.file)?);
     }
 
-    preset_browser.refresh()?;
+    for record in updated_records {
+        preset_browser.upsert_record(record);
+    }
     Ok(finish_with_status(
         preset_browser,
         format!("Freed scene preset slot {}.", index.code()),
@@ -226,6 +233,7 @@ fn resolve_collision(
         return Ok(None);
     };
 
+    let mut updated_records = Vec::new();
     for (candidate_index, mut candidate) in chooser.candidates.into_iter().enumerate() {
         candidate.file.assignment = if candidate_index == chooser.selected {
             Some(chooser.index)
@@ -233,9 +241,12 @@ fn resolve_collision(
             None
         };
         write_preset_file(&candidate.path, &candidate.file)?;
+        updated_records.push(preset_record_from_file(candidate.path, candidate.file)?);
     }
 
-    preset_browser.refresh()?;
+    for record in updated_records {
+        preset_browser.upsert_record(record);
+    }
 
     if chooser.load_after_resolution {
         apply_scene_preset(&chosen.file.scene, scene)?;

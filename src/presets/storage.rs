@@ -1,5 +1,7 @@
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use serde::{Deserialize, Serialize};
 
@@ -13,7 +15,14 @@ const PRESET_FORMAT_VERSION: u32 = 1;
 #[derive(Clone)]
 pub(super) struct PresetRecord {
     pub(super) path: PathBuf,
+    pub(super) stamp: PresetFileStamp,
     pub(super) file: ScenePresetFile,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(super) struct PresetFileStamp {
+    pub(super) len: u64,
+    pub(super) modified: Option<SystemTime>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -42,31 +51,48 @@ impl ScenePresetFile {
 }
 
 pub(super) fn load_preset_records() -> Result<Vec<PresetRecord>, String> {
-    let preset_dir = ensure_preset_dir()?;
     let mut records = Vec::new();
 
-    let entries = fs::read_dir(&preset_dir)
-        .map_err(|error| format!("Could not read {}: {error}", preset_dir.display()))?;
-    for entry in entries {
-        let entry = match entry {
-            Ok(entry) => entry,
-            Err(error) => {
-                eprintln!("Skipping preset directory entry: {error}");
-                continue;
-            }
-        };
-        let path = entry.path();
-        if path.extension().and_then(|value| value.to_str()) != Some("toml") {
-            continue;
-        }
-        match read_preset_file(&path) {
-            Ok(file) => records.push(PresetRecord { path, file }),
+    for path in preset_paths()? {
+        match read_preset_record(&path) {
+            Ok(record) => records.push(record),
             Err(error) => eprintln!("{error}"),
         }
     }
 
-    records.sort_by(|left, right| right.file.saved_at_unix_ms.cmp(&left.file.saved_at_unix_ms));
+    sort_preset_records(&mut records);
     Ok(records)
+}
+
+pub(super) fn sync_preset_records(records: &mut Vec<PresetRecord>) -> Result<(), String> {
+    let mut cached_records = records
+        .drain(..)
+        .map(|record| (record.path.clone(), record))
+        .collect::<HashMap<_, _>>();
+    let mut synced_records = Vec::new();
+
+    for path in preset_paths()? {
+        let stamp = match read_preset_file_stamp(&path) {
+            Ok(stamp) => stamp,
+            Err(error) => {
+                eprintln!("{error}");
+                cached_records.remove(&path);
+                continue;
+            }
+        };
+
+        match cached_records.remove(&path) {
+            Some(record) if record.stamp == stamp => synced_records.push(record),
+            _ => match read_preset_record_with_stamp(&path, stamp) {
+                Ok(record) => synced_records.push(record),
+                Err(error) => eprintln!("{error}"),
+            },
+        }
+    }
+
+    sort_preset_records(&mut synced_records);
+    *records = synced_records;
+    Ok(())
 }
 
 pub(super) fn read_preset_file(path: &Path) -> Result<ScenePresetFile, String> {
@@ -82,6 +108,14 @@ pub(super) fn read_preset_file(path: &Path) -> Result<ScenePresetFile, String> {
         ));
     }
     Ok(file)
+}
+
+pub(super) fn preset_record_from_file(
+    path: PathBuf,
+    file: ScenePresetFile,
+) -> Result<PresetRecord, String> {
+    let stamp = read_preset_file_stamp(&path)?;
+    Ok(PresetRecord { path, stamp, file })
 }
 
 pub(super) fn write_preset_file(path: &Path, file: &ScenePresetFile) -> Result<(), String> {
@@ -112,11 +146,65 @@ pub(super) fn unique_preset_path(file_slug: &str) -> Result<PathBuf, String> {
     Ok(candidate)
 }
 
+pub(super) fn sort_preset_records(records: &mut [PresetRecord]) {
+    records.sort_by(|left, right| right.file.saved_at_unix_ms.cmp(&left.file.saved_at_unix_ms));
+}
+
 fn ensure_preset_dir() -> Result<PathBuf, String> {
     let path = Path::new(PRESET_DIR);
     fs::create_dir_all(path)
         .map_err(|error| format!("Could not create {}: {error}", path.display()))?;
     Ok(path.to_path_buf())
+}
+
+fn preset_paths() -> Result<Vec<PathBuf>, String> {
+    let preset_dir = ensure_preset_dir()?;
+    let mut paths = Vec::new();
+
+    let entries = fs::read_dir(&preset_dir)
+        .map_err(|error| format!("Could not read {}: {error}", preset_dir.display()))?;
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) => {
+                eprintln!("Skipping preset directory entry: {error}");
+                continue;
+            }
+        };
+
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) == Some("toml") {
+            paths.push(path);
+        }
+    }
+
+    Ok(paths)
+}
+
+fn read_preset_record(path: &Path) -> Result<PresetRecord, String> {
+    let stamp = read_preset_file_stamp(path)?;
+    read_preset_record_with_stamp(path, stamp)
+}
+
+fn read_preset_record_with_stamp(
+    path: &Path,
+    stamp: PresetFileStamp,
+) -> Result<PresetRecord, String> {
+    let file = read_preset_file(path)?;
+    Ok(PresetRecord {
+        path: path.to_path_buf(),
+        stamp,
+        file,
+    })
+}
+
+fn read_preset_file_stamp(path: &Path) -> Result<PresetFileStamp, String> {
+    let metadata = fs::metadata(path)
+        .map_err(|error| format!("Could not stat {}: {error}", path.display()))?;
+    Ok(PresetFileStamp {
+        len: metadata.len(),
+        modified: metadata.modified().ok(),
+    })
 }
 
 fn current_unix_ms() -> u64 {

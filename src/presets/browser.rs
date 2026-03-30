@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-use super::storage::{PresetRecord, load_preset_records};
+use super::storage::{PresetRecord, load_preset_records, sort_preset_records, sync_preset_records};
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, PartialEq, Hash)]
 pub(crate) struct PresetIndex {
@@ -77,8 +77,9 @@ impl Default for PresetBrowserState {
 impl PresetBrowserState {
     pub(crate) fn load_from_disk() -> Self {
         let mut state = Self::default();
-        if let Err(error) = state.refresh() {
-            state.status_message = error;
+        match load_preset_records() {
+            Ok(records) => state.records = records,
+            Err(error) => state.status_message = error,
         }
         state
     }
@@ -208,8 +209,21 @@ impl PresetBrowserState {
     }
 
     pub(super) fn refresh(&mut self) -> Result<(), String> {
-        self.records = load_preset_records()?;
+        sync_preset_records(&mut self.records)?;
         Ok(())
+    }
+
+    pub(super) fn upsert_record(&mut self, record: PresetRecord) {
+        if let Some(index) = self
+            .records
+            .iter()
+            .position(|existing| existing.path == record.path)
+        {
+            self.records[index] = record;
+        } else {
+            self.records.push(record);
+        }
+        sort_preset_records(&mut self.records);
     }
 }
 
@@ -217,7 +231,7 @@ impl PresetBrowserState {
 mod tests {
     use super::{PresetBrowserState, PresetIndex};
     use crate::config::{EffectsConfig, LightingConfig, MaterialConfig, RenderingConfig};
-    use crate::presets::storage::ScenePresetFile;
+    use crate::presets::storage::{PresetFileStamp, ScenePresetFile};
     use crate::scene_snapshot::{
         CameraRigSnapshot, GenerationSnapshot, MaterialRuntimeSnapshot, NodeOriginSnapshot,
         SceneStateSnapshot, ShapeNodeSnapshot,
@@ -230,6 +244,10 @@ mod tests {
         state.records = vec![
             super::PresetRecord {
                 path: "one.toml".into(),
+                stamp: PresetFileStamp {
+                    len: 0,
+                    modified: None,
+                },
                 file: ScenePresetFile {
                     format_version: 1,
                     id: "one".to_string(),
@@ -241,6 +259,10 @@ mod tests {
             },
             super::PresetRecord {
                 path: "two.toml".into(),
+                stamp: PresetFileStamp {
+                    len: 0,
+                    modified: None,
+                },
                 file: ScenePresetFile {
                     format_version: 1,
                     id: "two".to_string(),
@@ -253,6 +275,46 @@ mod tests {
         ];
 
         assert_eq!(state.bank_occupancy(2).chars().nth(3), Some('!'));
+    }
+
+    #[test]
+    fn upsert_record_replaces_matching_path_without_duplication() {
+        let mut state = PresetBrowserState::default();
+        state.records = vec![record_with_saved_at("one.toml", 1)];
+
+        state.upsert_record(record_with_saved_at("one.toml", 2));
+
+        assert_eq!(state.records.len(), 1);
+        assert_eq!(state.records[0].file.saved_at_unix_ms, 2);
+    }
+
+    #[test]
+    fn upsert_record_keeps_newest_record_first() {
+        let mut state = PresetBrowserState::default();
+        state.records = vec![record_with_saved_at("old.toml", 1)];
+
+        state.upsert_record(record_with_saved_at("new.toml", 2));
+
+        assert_eq!(state.records[0].path, std::path::PathBuf::from("new.toml"));
+        assert_eq!(state.records[1].path, std::path::PathBuf::from("old.toml"));
+    }
+
+    fn record_with_saved_at(path: &str, saved_at_unix_ms: u64) -> super::PresetRecord {
+        super::PresetRecord {
+            path: path.into(),
+            stamp: PresetFileStamp {
+                len: saved_at_unix_ms,
+                modified: None,
+            },
+            file: ScenePresetFile {
+                format_version: 1,
+                id: path.to_string(),
+                saved_at_unix_ms,
+                summary: path.to_string(),
+                assignment: None,
+                scene: dummy_scene(),
+            },
+        }
     }
 
     fn dummy_scene() -> SceneStateSnapshot {
