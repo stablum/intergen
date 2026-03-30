@@ -79,8 +79,8 @@ const FX_HELP: [HelpEntry; 12] = [
     },
     HelpEntry {
         startup: "typing a number sets the active numeric field",
-        overlay: "In F2 page: Type digits / . / - / + (for example 0.157) to set the active numeric field",
-        binding: "Digits / . / - / +",
+        overlay: "In F2 page: Type digits / . / , / - / + (for example 0.157) to set the active numeric field",
+        binding: "Digits / . / , / - / +",
         explanation: "In the F2 page, set the active numeric field directly.",
     },
     HelpEntry {

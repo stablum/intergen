@@ -27,7 +27,7 @@ fn overlay_text_lists_help_and_spawn_controls() {
     assert!(text.contains("In F2 page: Up / Down adjust the active field"));
     assert!(text.contains("In F2 page: Space toggles the selected shader effect"));
     assert!(text.contains("In F2 page: L toggles the selected parameter LFO when supported"));
-    assert!(text.contains("In F2 page: Type digits / . / - / +"));
+    assert!(text.contains("In F2 page: Type digits / . / , / - / +"));
     assert!(text.contains("In F2 page: Backspace erases the typed numeric input"));
     assert!(text.contains("Shift + Enter: Reset all F2 controls"));
     assert!(text.contains(

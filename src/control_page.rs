@@ -16,7 +16,7 @@ const EFFECT_TUNER_BINDINGS: [KeyBindingPattern; 10] = [
     KeyBindingPattern::any_modifiers(KeyCode::NumpadEnter),
     KeyBindingPattern::any_modifiers(KeyCode::Backspace),
 ];
-const EFFECT_TUNER_NUMERIC_BINDINGS: [KeyBindingPattern; 26] = [
+const EFFECT_TUNER_NUMERIC_BINDINGS: [KeyBindingPattern; 27] = [
     KeyBindingPattern::unmodified(KeyCode::Digit0),
     KeyBindingPattern::unmodified(KeyCode::Digit1),
     KeyBindingPattern::unmodified(KeyCode::Digit2),
@@ -38,6 +38,7 @@ const EFFECT_TUNER_NUMERIC_BINDINGS: [KeyBindingPattern; 26] = [
     KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad8),
     KeyBindingPattern::no_ctrl_or_alt(KeyCode::Numpad9),
     KeyBindingPattern::unmodified(KeyCode::Period),
+    KeyBindingPattern::unmodified(KeyCode::Comma),
     KeyBindingPattern::unmodified(KeyCode::Minus),
     KeyBindingPattern::shifted(KeyCode::Equal),
     KeyBindingPattern::no_ctrl_or_alt(KeyCode::NumpadDecimal),
@@ -449,13 +450,13 @@ mod tests {
         assert!(mask.captures_binding(binding(KeyCode::Space)));
         assert!(mask.captures_binding(binding(KeyCode::ArrowUp)));
         assert!(mask.captures_binding(binding(KeyCode::Digit1)));
+        assert!(mask.captures_binding(binding(KeyCode::Comma)));
         assert!(mask.captures_binding(binding(KeyCode::Minus)));
         assert!(mask.captures_binding(shifted_binding(KeyCode::Equal)));
         assert!(mask.captures_binding(binding(KeyCode::NumpadAdd)));
 
         assert!(!mask.captures_binding(binding(KeyCode::KeyG)));
         assert!(!mask.captures_binding(binding(KeyCode::KeyW)));
-        assert!(!mask.captures_binding(binding(KeyCode::Comma)));
         assert!(!mask.captures_binding(binding(KeyCode::Equal)));
     }
 

@@ -388,7 +388,7 @@ fn mouse_wheel_selection_whole_steps(lines: f32) -> isize {
 }
 
 fn is_numeric_entry_char(character: char) -> bool {
-    matches!(character, '0'..='9' | '.' | '-' | '+')
+    matches!(character, '0'..='9' | '.' | ',' | '-' | '+')
 }
 
 fn restore_selected_scene_parameter_base_if_needed(

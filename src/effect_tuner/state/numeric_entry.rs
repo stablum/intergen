@@ -14,7 +14,7 @@ impl NumericEntryBuffer {
                 self.buffer.push(character);
                 true
             }
-            '.' => {
+            '.' | ',' => {
                 if self.buffer.contains('.') {
                     return false;
                 }

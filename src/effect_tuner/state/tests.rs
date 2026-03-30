@@ -445,6 +445,98 @@ fn numeric_entry_updates_selected_value() {
 }
 
 #[test]
+fn lens_strength_accepts_direct_small_decimal_input() {
+    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+    let (
+        generation_config,
+        mut generation_state,
+        material_config,
+        mut material_state,
+        stage_config,
+        mut stage_state,
+    ) = default_scene_state();
+    select_parameter(
+        &mut effect_tuner,
+        EffectTunerParameter::Effect(EffectNumericParameter::LensStrength),
+    );
+
+    for character in ['0', '.', '0', '1'] {
+        assert!(effect_tuner.append_numeric_input(
+            character,
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+                &stage_config,
+                &mut stage_state,
+            ),
+            1.0,
+        ));
+    }
+
+    let snapshot = effect_tuner.overlay_snapshot(
+        &view_context(
+            &generation_config,
+            &generation_state,
+            &material_config,
+            &material_state,
+            &stage_config,
+            &stage_state,
+        ),
+        1.0,
+    );
+    assert_eq!(snapshot.value_text, "0.01");
+    assert!((effect_tuner.current.lens_distortion.strength - 0.01).abs() < 1.0e-6);
+}
+
+#[test]
+fn numeric_entry_accepts_comma_decimal_separator() {
+    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+    let (
+        generation_config,
+        mut generation_state,
+        material_config,
+        mut material_state,
+        stage_config,
+        mut stage_state,
+    ) = default_scene_state();
+    select_parameter(
+        &mut effect_tuner,
+        EffectTunerParameter::Effect(EffectNumericParameter::LensStrength),
+    );
+
+    for character in ['0', ',', '0', '1'] {
+        assert!(effect_tuner.append_numeric_input(
+            character,
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+                &stage_config,
+                &mut stage_state,
+            ),
+            1.0,
+        ));
+    }
+
+    let snapshot = effect_tuner.overlay_snapshot(
+        &view_context(
+            &generation_config,
+            &generation_state,
+            &material_config,
+            &material_state,
+            &stage_config,
+            &stage_state,
+        ),
+        1.0,
+    );
+    assert_eq!(snapshot.value_text, "0.01");
+    assert!((effect_tuner.current.lens_distortion.strength - 0.01).abs() < 1.0e-6);
+}
+
+#[test]
 fn numeric_entry_updates_lfo_frequency_and_backspace_reparses() {
     let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
     let (

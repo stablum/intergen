@@ -143,7 +143,7 @@ The in-app F2 control page starts from the values loaded from `config.toml` at l
 - `Up` / `Down` adjust the active F2 field. `Shift` makes the step coarser and `Alt` makes it finer.
 - `Space` toggles the selected shader effect on or off.
 - `L` toggles the selected parameter LFO on or off when the selected parameter supports LFOs.
-- Type digits, `.`, `-`, or `+` to set the active numeric field directly. `Backspace` erases the typed numeric input.
+- Type digits, `.`, `,`, `-`, or `+` to set the active numeric field directly. `Backspace` erases the typed numeric input.
 - LFO shapes currently available are `sine`, `triangle`, `saw`, `square`, `stepped random`, and `brownian motion`.
 - `Enter` resets the selected F2 field.
 - `Shift + Enter` resets all F2 controls to their startup defaults.
