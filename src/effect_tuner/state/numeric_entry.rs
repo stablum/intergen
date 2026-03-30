@@ -8,6 +8,13 @@ impl NumericEntryBuffer {
         (!self.buffer.is_empty()).then_some(self.buffer.as_str())
     }
 
+    fn should_restart_after_idle(&self) -> bool {
+        !matches!(
+            self.buffer.as_str(),
+            "" | "-" | "+" | "." | "-." | "+."
+        ) && !self.buffer.ends_with('.')
+    }
+
     fn push(&mut self, character: char) -> bool {
         match character {
             '0'..='9' => {

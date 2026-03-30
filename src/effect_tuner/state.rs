@@ -15,6 +15,7 @@ use super::metadata::{EffectEditMode, EffectOverlayField};
 const OVERLAY_HOLD_SECS: f32 = 2.5;
 const HOLD_DELAY_SECS: f32 = 0.32;
 const REPEAT_INTERVAL_SECS: f32 = 0.08;
+const NUMERIC_ENTRY_RESTART_SECS: f32 = 1.0;
 
 include!("state/core.rs");
 include!("state/scene_parameter.rs");

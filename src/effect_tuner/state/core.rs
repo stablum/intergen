@@ -105,6 +105,7 @@ pub(crate) struct EffectTunerState {
     page_mode: EffectTunerPageMode,
     edit_mode: EffectEditMode,
     numeric_entry: NumericEntryBuffer,
+    last_numeric_entry_edit_secs: Option<f32>,
     pinned: bool,
     visible_until_secs: f32,
     select_previous_hold: HoldRepeatState,
@@ -126,6 +127,7 @@ impl EffectTunerState {
             page_mode: EffectTunerPageMode::Compact,
             edit_mode: EffectEditMode::Value,
             numeric_entry: NumericEntryBuffer::default(),
+            last_numeric_entry_edit_secs: None,
             pinned: false,
             visible_until_secs: 0.0,
             select_previous_hold: HoldRepeatState::default(),
@@ -648,10 +650,15 @@ impl EffectTunerState {
             return false;
         }
 
+        if self.should_restart_numeric_entry(now_secs) {
+            self.clear_numeric_entry();
+        }
+
         if !self.numeric_entry.push(character) {
             return false;
         }
 
+        self.last_numeric_entry_edit_secs = Some(now_secs);
         self.apply_numeric_entry_to_selected(context);
         self.note_interaction(now_secs);
         true
@@ -666,6 +673,7 @@ impl EffectTunerState {
             return false;
         }
 
+        self.last_numeric_entry_edit_secs = self.numeric_entry.displayed_text().map(|_| now_secs);
         self.apply_numeric_entry_to_selected(context);
         self.note_interaction(now_secs);
         true
@@ -883,6 +891,14 @@ impl EffectTunerState {
 
     fn clear_numeric_entry(&mut self) {
         self.numeric_entry.clear();
+        self.last_numeric_entry_edit_secs = None;
+    }
+
+    fn should_restart_numeric_entry(&self, now_secs: f32) -> bool {
+        self.numeric_entry.should_restart_after_idle()
+            && self
+                .last_numeric_entry_edit_secs
+                .is_some_and(|last_edit| now_secs - last_edit >= NUMERIC_ENTRY_RESTART_SECS)
     }
 
     fn reset_hold_states(&mut self) {
