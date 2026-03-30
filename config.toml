@@ -5,12 +5,12 @@ height = 960
 present_mode = "auto_vsync"
 
 [rendering]
-clear_color = [0.015, 0.02, 0.035]
+clear_color = [0.0, 0.0, 0.0]
 ambient_light_color = [0.42, 0.47, 0.55]
 ambient_light_brightness = 3.5
 
 [rendering.stage]
-enabled = true
+enabled = false
 
 [rendering.stage.floor]
 enabled = false

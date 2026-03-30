@@ -1,11 +1,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 
 use super::browser::PresetIndex;
 use crate::scene_snapshot::SceneStateSnapshot;
+use crate::timestamp::{current_unix_timestamp, format_utc_timestamp};
 
 const PRESET_DIR: &str = "scene-presets";
 const PRESET_FORMAT_VERSION: u32 = 1;
@@ -93,13 +93,21 @@ pub(super) fn write_preset_file(path: &Path, file: &ScenePresetFile) -> Result<(
 
 pub(super) fn unique_preset_path(file_slug: &str) -> Result<PathBuf, String> {
     let preset_dir = ensure_preset_dir()?;
-    let timestamp = current_unix_ms();
-    let base = format!("scene-preset-{timestamp}-{file_slug}");
-    let mut candidate = preset_dir.join(format!("{base}.toml"));
-    let mut suffix = 1_u32;
+    let timestamp = current_unix_timestamp();
+    let timestamp = format!(
+        "{}-{:03}",
+        format_utc_timestamp(timestamp),
+        timestamp.subsec_millis()
+    );
+    let mut suffix = 0_u32;
+    let mut candidate = preset_dir.join(format!(
+        "scene-preset-{timestamp}-{suffix:04}-{file_slug}.toml"
+    ));
     while candidate.exists() {
-        candidate = preset_dir.join(format!("{base}-{suffix}.toml"));
         suffix += 1;
+        candidate = preset_dir.join(format!(
+            "scene-preset-{timestamp}-{suffix:04}-{file_slug}.toml"
+        ));
     }
     Ok(candidate)
 }
@@ -112,8 +120,28 @@ fn ensure_preset_dir() -> Result<PathBuf, String> {
 }
 
 fn current_unix_ms() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|duration| duration.as_millis() as u64)
-        .unwrap_or(0)
+    current_unix_timestamp().as_millis() as u64
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use crate::timestamp::format_utc_timestamp;
+
+    #[test]
+    fn preset_filename_timestamp_matches_screenshot_style() {
+        let timestamp = Duration::new(1_741_018_296, 45_000_000);
+        let filename = format!(
+            "scene-preset-{}-{:03}-{:04}-example.toml",
+            format_utc_timestamp(timestamp),
+            timestamp.subsec_millis(),
+            0
+        );
+
+        assert_eq!(
+            filename,
+            "scene-preset-2025-03-03_16-11-36-045-0000-example.toml"
+        );
+    }
 }

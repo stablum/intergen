@@ -15,6 +15,7 @@ mod scene;
 mod scene_snapshot;
 #[path = "polyhedra/mod.rs"]
 mod shapes;
+mod timestamp;
 mod ui;
 
 pub use app::run;
