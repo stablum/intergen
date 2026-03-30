@@ -236,6 +236,19 @@ pub(crate) fn effect_tuner_input_system(
             effect_tuner.sync_material_scene_lfo_bases(&scene.material_state);
             apply_reset_all_side_effects(&mut scene);
             println!("Reset all F2 controls to defaults.");
+        } else if effect_tuner.finalize_numeric_entry(now_secs) {
+            println!(
+                "Set {}.",
+                effect_tuner.selected_status_message(
+                    &effect_tuner_view_context(
+                        &scene.app_config,
+                        &scene.generation_state,
+                        &scene.material_state,
+                        &scene.stage_state,
+                    ),
+                    now_secs,
+                )
+            );
         } else {
             let selected_parameter = effect_tuner.selected_parameter();
             restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);

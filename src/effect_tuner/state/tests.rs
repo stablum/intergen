@@ -644,6 +644,56 @@ fn paused_numeric_entry_starts_a_fresh_value() {
 }
 
 #[test]
+fn finalizing_numeric_entry_keeps_the_typed_value() {
+    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+    let (
+        generation_config,
+        mut generation_state,
+        material_config,
+        mut material_state,
+        stage_config,
+        mut stage_state,
+    ) = default_scene_state();
+    select_parameter(
+        &mut effect_tuner,
+        EffectTunerParameter::Effect(EffectNumericParameter::LensStrength),
+    );
+
+    for (offset, character) in [(0.0, '0'), (0.1, '.'), (0.2, '0'), (0.3, '0'), (0.4, '1')] {
+        assert!(effect_tuner.append_numeric_input(
+            character,
+            &mut edit_context(
+                &generation_config,
+                &mut generation_state,
+                &material_config,
+                &mut material_state,
+                &stage_config,
+                &mut stage_state,
+            ),
+            1.0 + offset,
+        ));
+    }
+
+    assert!(effect_tuner.has_numeric_entry());
+    assert!(effect_tuner.finalize_numeric_entry(1.5));
+    assert!(!effect_tuner.has_numeric_entry());
+
+    let snapshot = effect_tuner.overlay_snapshot(
+        &view_context(
+            &generation_config,
+            &generation_state,
+            &material_config,
+            &material_state,
+            &stage_config,
+            &stage_state,
+        ),
+        1.5,
+    );
+    assert_eq!(snapshot.value_text, "0.001");
+    assert!((effect_tuner.current.lens_distortion.strength - 0.001).abs() < 1.0e-6);
+}
+
+#[test]
 fn numeric_entry_updates_lfo_frequency_and_backspace_reparses() {
     let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
     let (

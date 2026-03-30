@@ -145,7 +145,7 @@ The in-app F2 control page starts from the values loaded from `config.toml` at l
 - `L` toggles the selected parameter LFO on or off when the selected parameter supports LFOs.
 - Type digits, `.`, `,`, `-`, or `+` to set the active numeric field directly. `Backspace` erases the typed numeric input.
 - LFO shapes currently available are `sine`, `triangle`, `saw`, `square`, `stepped random`, and `brownian motion`.
-- `Enter` resets the selected F2 field.
+- `Enter` confirms typed numeric F2 input, or resets the selected F2 field when no numeric input is active.
 - `Shift + Enter` resets all F2 controls to their startup defaults.
 - Shader-effect parameters expose LFO fields, and so do the supported numeric scene/material parameters that update the current scene immediately. Other scene, stage, and material controls remain value-only.
 - `Esc` closes the current F-page, including help, F2, or F3.
@@ -261,7 +261,7 @@ cargo test-plain
 - `L` in F2: toggle the selected parameter LFO on or off when supported
 - `Shift` in F2: coarse adjustment modifier
 - `Alt` in F2: fine adjustment modifier
-- `Enter` in F2: reset the active F2 field
+- `Enter` in F2: confirm typed numeric input, or reset the active F2 field when no numeric input is active
 - `Shift + Enter` in F2: reset all F2 controls to their startup defaults
 - `F4`: export the current scene to `blend-exports/` as a Blender `.blend`
 - `F12`: save a screenshot to `screenshots/`

@@ -679,6 +679,20 @@ impl EffectTunerState {
         true
     }
 
+    pub(crate) fn has_numeric_entry(&self) -> bool {
+        self.numeric_entry.displayed_text().is_some()
+    }
+
+    pub(crate) fn finalize_numeric_entry(&mut self, now_secs: f32) -> bool {
+        if !self.has_numeric_entry() {
+            return false;
+        }
+
+        self.clear_numeric_entry();
+        self.note_interaction(now_secs);
+        true
+    }
+
     pub(crate) fn reset_selected(
         &mut self,
         context: &mut EffectTunerEditContext<'_>,
