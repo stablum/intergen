@@ -503,7 +503,6 @@ pub(crate) fn update_preset_overlay_system(
         (
             With<PresetStripCommandText>,
             Without<PresetStripTargetText>,
-            Without<PresetStripBanksText>,
             Without<PresetStripStatusText>,
             Without<PresetChooserText>,
         ),
@@ -513,15 +512,14 @@ pub(crate) fn update_preset_overlay_system(
         (
             With<PresetStripTargetText>,
             Without<PresetStripCommandText>,
-            Without<PresetStripBanksText>,
             Without<PresetStripStatusText>,
             Without<PresetChooserText>,
         ),
     >,
-    mut strip_banks_text: Query<
-        &mut Text,
+    mut strip_bank_text: Query<
+        (&PresetStripBankText, &mut Text, &mut TextColor),
         (
-            With<PresetStripBanksText>,
+            With<PresetStripBankText>,
             Without<PresetStripCommandText>,
             Without<PresetStripTargetText>,
             Without<PresetStripStatusText>,
@@ -534,7 +532,6 @@ pub(crate) fn update_preset_overlay_system(
             With<PresetStripStatusText>,
             Without<PresetStripCommandText>,
             Without<PresetStripTargetText>,
-            Without<PresetStripBanksText>,
             Without<PresetChooserText>,
         ),
     >,
@@ -579,10 +576,35 @@ pub(crate) fn update_preset_overlay_system(
         TextColor(srgb(ui_config.body_text))
     };
 
-    let Ok(mut strip_banks_text) = strip_banks_text.single_mut() else {
-        return;
-    };
-    *strip_banks_text = Text::new(strip_segments.banks);
+    for (bank_text_meta, mut bank_text, mut bank_text_color) in strip_bank_text.iter_mut() {
+        let Some(bank_segment) = strip_segments
+            .banks
+            .iter()
+            .find(|segment| segment.bank == bank_text_meta.bank)
+        else {
+            *bank_text = Text::new("");
+            *bank_text_color = TextColor(srgb(ui_config.body_text));
+            continue;
+        };
+
+        let (value, emphasized) = match bank_text_meta.kind {
+            PresetStripBankTextKind::Label => {
+                (bank_segment.label.as_str(), bank_segment.emphasize_bank)
+            }
+            PresetStripBankTextKind::Prefix => (bank_segment.prefix.as_str(), false),
+            PresetStripBankTextKind::SelectedSlot => (
+                bank_segment.selected_slot.as_str(),
+                bank_segment.emphasize_selected_slot,
+            ),
+            PresetStripBankTextKind::Suffix => (bank_segment.suffix.as_str(), false),
+        };
+        *bank_text = Text::new(value);
+        *bank_text_color = if emphasized {
+            TextColor(lfo_enabled_text_color())
+        } else {
+            TextColor(srgb(ui_config.body_text))
+        };
+    }
 
     let Ok(mut strip_status_text) = strip_status_text.single_mut() else {
         return;

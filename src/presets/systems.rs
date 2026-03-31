@@ -140,6 +140,7 @@ fn load_assigned_preset(
 
     let record = &records[0];
     apply_scene_preset(&record.file.scene, scene)?;
+    preset_browser.highlight_index(index);
     Ok(finish_with_status(
         preset_browser,
         format!(
@@ -250,6 +251,7 @@ fn resolve_collision(
 
     if chooser.load_after_resolution {
         apply_scene_preset(&chosen.file.scene, scene)?;
+        preset_browser.highlight_index(chooser.index);
     }
 
     Ok(finish_with_status(

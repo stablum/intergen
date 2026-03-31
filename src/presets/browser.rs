@@ -37,10 +37,20 @@ impl PresetCommand {
 pub(crate) struct PresetStripSegments {
     pub(crate) command: &'static str,
     pub(crate) target: String,
-    pub(crate) banks: String,
+    pub(crate) banks: Vec<PresetStripBankSegment>,
     pub(crate) status: String,
     pub(crate) emphasize_command: bool,
     pub(crate) emphasize_target: bool,
+}
+
+pub(crate) struct PresetStripBankSegment {
+    pub(crate) bank: u8,
+    pub(crate) label: String,
+    pub(crate) prefix: String,
+    pub(crate) selected_slot: String,
+    pub(crate) suffix: String,
+    pub(crate) emphasize_bank: bool,
+    pub(crate) emphasize_selected_slot: bool,
 }
 
 #[derive(Clone)]
@@ -58,6 +68,7 @@ pub(crate) struct PresetBrowserState {
     pub(super) status_message: String,
     pub(super) records: Vec<PresetRecord>,
     pub(super) chooser: Option<CollisionResolutionState>,
+    pub(super) highlighted_index: Option<PresetIndex>,
 }
 
 #[derive(Resource)]
@@ -79,6 +90,7 @@ impl Default for PresetBrowserState {
             status_message: String::new(),
             records: Vec::new(),
             chooser: None,
+            highlighted_index: None,
         }
     }
 }
@@ -103,9 +115,8 @@ impl PresetBrowserState {
             None => String::new(),
         };
         let banks = (0_u8..10)
-            .map(|bank| format!("{}[{}]", bank, self.bank_occupancy(bank)))
-            .collect::<Vec<_>>()
-            .join(" ");
+            .map(|bank| self.strip_bank_segment(bank))
+            .collect::<Vec<_>>();
         let status = if self.status_message.is_empty() {
             String::new()
         } else {
@@ -114,10 +125,49 @@ impl PresetBrowserState {
         PresetStripSegments {
             command: self.command.label(),
             target,
-            banks: format!(" {}", banks),
+            banks,
             status,
             emphasize_command: self.command == PresetCommand::Save,
             emphasize_target: self.first_digit.is_some(),
+        }
+    }
+
+    fn strip_bank_segment(&self, bank: u8) -> PresetStripBankSegment {
+        let occupancy = self.bank_occupancy(bank);
+        let Some(highlighted_index) = self.highlighted_index.filter(|index| index.bank == bank)
+        else {
+            return PresetStripBankSegment {
+                bank,
+                label: bank.to_string(),
+                prefix: format!("[{}]", occupancy),
+                selected_slot: String::new(),
+                suffix: String::new(),
+                emphasize_bank: false,
+                emphasize_selected_slot: false,
+            };
+        };
+
+        let slot_index = highlighted_index.slot as usize;
+        let prefix = format!("[{}", &occupancy[..slot_index]);
+        let selected_slot = occupancy
+            .as_bytes()
+            .get(slot_index)
+            .map(|character| (*character as char).to_string())
+            .unwrap_or_default();
+        let suffix = if slot_index < occupancy.len() {
+            format!("{}]", &occupancy[slot_index + 1..])
+        } else {
+            "]".to_string()
+        };
+
+        PresetStripBankSegment {
+            bank,
+            label: bank.to_string(),
+            prefix,
+            selected_slot: selected_slot.clone(),
+            suffix,
+            emphasize_bank: true,
+            emphasize_selected_slot: !selected_slot.is_empty(),
         }
     }
 
@@ -235,6 +285,10 @@ impl PresetBrowserState {
         }
         sort_preset_records(&mut self.records);
     }
+
+    pub(super) fn highlight_index(&mut self, index: PresetIndex) {
+        self.highlighted_index = Some(index);
+    }
 }
 
 #[cfg(test)]
@@ -321,6 +375,38 @@ mod tests {
         assert_eq!(segments.target, " 4_");
         assert!(segments.emphasize_command);
         assert!(segments.emphasize_target);
+    }
+
+    #[test]
+    fn strip_segments_highlight_loaded_bank_and_slot() {
+        let mut state = PresetBrowserState::default();
+        state.records = vec![super::PresetRecord {
+            path: "loaded.toml".into(),
+            stamp: PresetFileStamp {
+                len: 0,
+                modified: None,
+            },
+            file: ScenePresetFile {
+                format_version: 1,
+                id: "loaded".to_string(),
+                saved_at_unix_ms: 1,
+                summary: "loaded".to_string(),
+                assignment: Some(PresetIndex { bank: 4, slot: 2 }),
+                scene: dummy_scene(),
+            },
+        }];
+        state.highlight_index(PresetIndex { bank: 4, slot: 2 });
+
+        let segments = state.strip_segments();
+        let bank = segments
+            .banks
+            .iter()
+            .find(|bank| bank.bank == 4)
+            .expect("bank 4 should be present");
+
+        assert!(bank.emphasize_bank);
+        assert!(bank.emphasize_selected_slot);
+        assert_eq!(bank.selected_slot, "2");
     }
 
     fn record_with_saved_at(path: &str, saved_at_unix_ms: u64) -> super::PresetRecord {

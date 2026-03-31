@@ -857,13 +857,55 @@ fn spawn_preset_ui(
                             effect_tuner_text_layout(Justify::Left),
                             PresetStripTargetText,
                         ));
-                        row.spawn((
-                            Text::new(""),
-                            ui_theme.text_font(strip_font_size),
-                            TextColor(srgb(ui_config.body_text)),
-                            effect_tuner_text_layout(Justify::Left),
-                            PresetStripBanksText,
-                        ));
+                        for bank in 0_u8..10 {
+                            row.spawn(Node {
+                                flex_direction: FlexDirection::Row,
+                                margin: UiRect::right(px(8.0)),
+                                ..default()
+                            })
+                            .with_children(|bank_row| {
+                                bank_row.spawn((
+                                    Text::new(""),
+                                    ui_theme.text_font(strip_font_size),
+                                    TextColor(srgb(ui_config.body_text)),
+                                    effect_tuner_text_layout(Justify::Left),
+                                    PresetStripBankText {
+                                        bank,
+                                        kind: PresetStripBankTextKind::Label,
+                                    },
+                                ));
+                                bank_row.spawn((
+                                    Text::new(""),
+                                    ui_theme.text_font(strip_font_size),
+                                    TextColor(srgb(ui_config.body_text)),
+                                    effect_tuner_text_layout(Justify::Left),
+                                    PresetStripBankText {
+                                        bank,
+                                        kind: PresetStripBankTextKind::Prefix,
+                                    },
+                                ));
+                                bank_row.spawn((
+                                    Text::new(""),
+                                    ui_theme.text_font(strip_font_size),
+                                    TextColor(srgb(ui_config.body_text)),
+                                    effect_tuner_text_layout(Justify::Left),
+                                    PresetStripBankText {
+                                        bank,
+                                        kind: PresetStripBankTextKind::SelectedSlot,
+                                    },
+                                ));
+                                bank_row.spawn((
+                                    Text::new(""),
+                                    ui_theme.text_font(strip_font_size),
+                                    TextColor(srgb(ui_config.body_text)),
+                                    effect_tuner_text_layout(Justify::Left),
+                                    PresetStripBankText {
+                                        bank,
+                                        kind: PresetStripBankTextKind::Suffix,
+                                    },
+                                ));
+                            });
+                        }
                         row.spawn((
                             Text::new(""),
                             ui_theme.text_font(strip_font_size),

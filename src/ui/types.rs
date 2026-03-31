@@ -260,10 +260,21 @@ pub(crate) struct PresetStripCommandText;
 pub(crate) struct PresetStripTargetText;
 
 #[derive(Component)]
-pub(crate) struct PresetStripBanksText;
-
-#[derive(Component)]
 pub(crate) struct PresetStripStatusText;
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct PresetStripBankText {
+    pub(crate) bank: u8,
+    pub(crate) kind: PresetStripBankTextKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum PresetStripBankTextKind {
+    Label,
+    Prefix,
+    SelectedSlot,
+    Suffix,
+}
 
 #[derive(Component)]
 pub(crate) struct PresetChooserOverlay;
