@@ -831,12 +831,47 @@ fn spawn_preset_ui(
                     BackgroundColor(srgba(ui_config.panel_background)),
                 ))
                 .with_children(|panel| {
-                    panel.spawn((
-                        Text::new(""),
-                        ui_theme.text_font(strip_font_size),
-                        TextColor(srgb(ui_config.body_text)),
-                        PresetStripText,
-                    ));
+                    panel.spawn(Node {
+                        flex_direction: FlexDirection::Row,
+                        flex_wrap: FlexWrap::Wrap,
+                        ..default()
+                    })
+                    .with_children(|row| {
+                        row.spawn((
+                            Text::new("PRESETS "),
+                            ui_theme.text_font(strip_font_size),
+                            TextColor(srgb(ui_config.body_text)),
+                            effect_tuner_text_layout(Justify::Left),
+                        ));
+                        row.spawn((
+                            Text::new(""),
+                            ui_theme.text_font(strip_font_size),
+                            TextColor(srgb(ui_config.body_text)),
+                            effect_tuner_text_layout(Justify::Left),
+                            PresetStripCommandText,
+                        ));
+                        row.spawn((
+                            Text::new(""),
+                            ui_theme.text_font(strip_font_size),
+                            TextColor(srgb(ui_config.body_text)),
+                            effect_tuner_text_layout(Justify::Left),
+                            PresetStripTargetText,
+                        ));
+                        row.spawn((
+                            Text::new(""),
+                            ui_theme.text_font(strip_font_size),
+                            TextColor(srgb(ui_config.body_text)),
+                            effect_tuner_text_layout(Justify::Left),
+                            PresetStripBanksText,
+                        ));
+                        row.spawn((
+                            Text::new(""),
+                            ui_theme.text_font(strip_font_size),
+                            TextColor(srgb(ui_config.body_text)),
+                            effect_tuner_text_layout(Justify::Left),
+                            PresetStripStatusText,
+                        ));
+                    });
                 });
         });
 

@@ -34,6 +34,15 @@ impl PresetCommand {
     }
 }
 
+pub(crate) struct PresetStripSegments {
+    pub(crate) command: &'static str,
+    pub(crate) target: String,
+    pub(crate) banks: String,
+    pub(crate) status: String,
+    pub(crate) emphasize_command: bool,
+    pub(crate) emphasize_target: bool,
+}
+
 #[derive(Clone)]
 pub(super) struct CollisionResolutionState {
     pub(super) index: PresetIndex,
@@ -88,7 +97,7 @@ impl PresetBrowserState {
         self.chooser.is_some()
     }
 
-    pub(crate) fn strip_text(&self) -> String {
+    pub(crate) fn strip_segments(&self) -> PresetStripSegments {
         let target = match self.first_digit {
             Some(bank) => format!(" {}_", bank),
             None => String::new(),
@@ -102,13 +111,14 @@ impl PresetBrowserState {
         } else {
             format!(" | {}", self.status_message)
         };
-        format!(
-            "PRESETS {}{} {}{}",
-            self.command.label(),
+        PresetStripSegments {
+            command: self.command.label(),
             target,
-            banks,
-            status
-        )
+            banks: format!(" {}", banks),
+            status,
+            emphasize_command: self.command == PresetCommand::Save,
+            emphasize_target: self.first_digit.is_some(),
+        }
     }
 
     pub(crate) fn chooser_text(&self) -> Option<String> {
@@ -297,6 +307,20 @@ mod tests {
 
         assert_eq!(state.records[0].path, std::path::PathBuf::from("new.toml"));
         assert_eq!(state.records[1].path, std::path::PathBuf::from("old.toml"));
+    }
+
+    #[test]
+    fn strip_segments_highlight_save_and_selected_target() {
+        let mut state = PresetBrowserState::default();
+        state.arm_save();
+        state.first_digit = Some(4);
+
+        let segments = state.strip_segments();
+
+        assert_eq!(segments.command, "save");
+        assert_eq!(segments.target, " 4_");
+        assert!(segments.emphasize_command);
+        assert!(segments.emphasize_target);
     }
 
     fn record_with_saved_at(path: &str, saved_at_unix_ms: u64) -> super::PresetRecord {

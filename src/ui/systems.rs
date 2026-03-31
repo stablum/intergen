@@ -491,20 +491,62 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
 }
 
 pub(crate) fn update_preset_overlay_system(
+    app_config: Res<AppConfig>,
     control_page: Res<ControlPageState>,
     preset_browser: Res<PresetBrowserState>,
     mut strip_visibility: Query<
         &mut Visibility,
         (With<PresetStripOverlay>, Without<PresetChooserOverlay>),
     >,
-    mut strip_text: Query<&mut Text, (With<PresetStripText>, Without<PresetChooserText>)>,
+    mut strip_command_text: Query<
+        (&mut Text, &mut TextColor),
+        (
+            With<PresetStripCommandText>,
+            Without<PresetStripTargetText>,
+            Without<PresetStripBanksText>,
+            Without<PresetStripStatusText>,
+            Without<PresetChooserText>,
+        ),
+    >,
+    mut strip_target_text: Query<
+        (&mut Text, &mut TextColor),
+        (
+            With<PresetStripTargetText>,
+            Without<PresetStripCommandText>,
+            Without<PresetStripBanksText>,
+            Without<PresetStripStatusText>,
+            Without<PresetChooserText>,
+        ),
+    >,
+    mut strip_banks_text: Query<
+        &mut Text,
+        (
+            With<PresetStripBanksText>,
+            Without<PresetStripCommandText>,
+            Without<PresetStripTargetText>,
+            Without<PresetStripStatusText>,
+            Without<PresetChooserText>,
+        ),
+    >,
+    mut strip_status_text: Query<
+        &mut Text,
+        (
+            With<PresetStripStatusText>,
+            Without<PresetStripCommandText>,
+            Without<PresetStripTargetText>,
+            Without<PresetStripBanksText>,
+            Without<PresetChooserText>,
+        ),
+    >,
     mut chooser_visibility: Query<
         &mut Visibility,
         (With<PresetChooserOverlay>, Without<PresetStripOverlay>),
     >,
     mut chooser_text: Query<&mut Text, (With<PresetChooserText>, Without<PresetStripText>)>,
 ) {
+    let ui_config = &app_config.ui;
     let preset_page_visible = control_page.is_active(ControlPage::ScenePresets);
+    let strip_segments = preset_browser.strip_segments();
 
     let Ok(mut strip_visibility) = strip_visibility.single_mut() else {
         return;
@@ -515,10 +557,37 @@ pub(crate) fn update_preset_overlay_system(
         Visibility::Hidden
     };
 
-    let Ok(mut strip_text) = strip_text.single_mut() else {
+    let Ok((mut strip_command_text, mut strip_command_color)) = strip_command_text.single_mut()
+    else {
         return;
     };
-    *strip_text = Text::new(preset_browser.strip_text());
+    *strip_command_text = Text::new(strip_segments.command);
+    *strip_command_color = if strip_segments.emphasize_command {
+        TextColor(lfo_enabled_text_color())
+    } else {
+        TextColor(srgb(ui_config.body_text))
+    };
+
+    let Ok((mut strip_target_text, mut strip_target_color)) = strip_target_text.single_mut()
+    else {
+        return;
+    };
+    *strip_target_text = Text::new(strip_segments.target);
+    *strip_target_color = if strip_segments.emphasize_target {
+        TextColor(lfo_enabled_text_color())
+    } else {
+        TextColor(srgb(ui_config.body_text))
+    };
+
+    let Ok(mut strip_banks_text) = strip_banks_text.single_mut() else {
+        return;
+    };
+    *strip_banks_text = Text::new(strip_segments.banks);
+
+    let Ok(mut strip_status_text) = strip_status_text.single_mut() else {
+        return;
+    };
+    *strip_status_text = Text::new(strip_segments.status);
 
     let Ok(mut chooser_visibility) = chooser_visibility.single_mut() else {
         return;

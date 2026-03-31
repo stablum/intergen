@@ -254,6 +254,18 @@ pub(crate) struct PresetStripOverlay;
 pub(crate) struct PresetStripText;
 
 #[derive(Component)]
+pub(crate) struct PresetStripCommandText;
+
+#[derive(Component)]
+pub(crate) struct PresetStripTargetText;
+
+#[derive(Component)]
+pub(crate) struct PresetStripBanksText;
+
+#[derive(Component)]
+pub(crate) struct PresetStripStatusText;
+
+#[derive(Component)]
 pub(crate) struct PresetChooserOverlay;
 
 #[derive(Component)]
