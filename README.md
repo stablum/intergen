@@ -4,6 +4,10 @@ Interactive 3D shape generation tool built with Rust and Bevy.
 
 Runtime tuning lives in `config.toml` at the repository root.
 
+## Documentation
+
+- [`DATA_MODEL.md`](DATA_MODEL.md): scene/config/preset data model, including shared vs per-shape parameters
+
 ## Gallery
 
 ![Recent Intergen screenshot](screenshots/intergen-1773391201-479-0000.png)

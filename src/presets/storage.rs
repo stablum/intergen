@@ -217,7 +217,7 @@ mod tests {
     use std::path::Path;
     use std::time::Duration;
 
-    use crate::config::EffectsConfig;
+    use crate::config::{EffectNumericParameter, EffectsConfig};
     use crate::effect_tuner::EffectTunerState;
     use crate::timestamp::format_utc_timestamp;
 
@@ -246,6 +246,12 @@ mod tests {
             preset_dir.exists(),
             "expected checked-in scene-presets directory to exist"
         );
+        let current_lfo_layout_len = EffectTunerState::from_config(&EffectsConfig::default())
+            .runtime_snapshot()
+            .lfos
+            .len();
+        let effect_only_layout_len = EffectNumericParameter::all().len();
+        let legacy_scene_layout_len = effect_only_layout_len + 19;
 
         let mut preset_paths = fs::read_dir(preset_dir)
             .expect("should read checked-in presets")
@@ -262,7 +268,12 @@ mod tests {
             let file = read_preset_file(&path)
                 .unwrap_or_else(|error| panic!("{} should parse: {error}", path.display()));
             assert!(
-                matches!(file.scene.effects.lfos.len(), 24 | 43),
+                matches!(
+                    file.scene.effects.lfos.len(),
+                    len if len == effect_only_layout_len
+                        || len == legacy_scene_layout_len
+                        || len == current_lfo_layout_len
+                ),
                 "{} should use one of the currently stored LFO layouts",
                 path.display()
             );
