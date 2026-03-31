@@ -46,10 +46,116 @@ pub(crate) struct EffectTunerListOverlaySnapshot {
     pub(crate) detail: EffectTunerOverlaySnapshot,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug)]
 pub(crate) struct EffectRuntimeSnapshot {
     pub(crate) current: EffectsConfig,
     pub(crate) lfos: Vec<ParameterLfo>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct StoredEffectRuntimeSnapshot {
+    current: EffectsConfig,
+    lfos: Vec<StoredParameterLfo>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct StoredParameterLfo {
+    parameter: String,
+    enabled: bool,
+    shape: LfoShape,
+    amplitude: f32,
+    frequency_hz: f32,
+}
+
+impl StoredParameterLfo {
+    fn from_runtime(parameter: EffectTunerParameter, lfo: ParameterLfo) -> Self {
+        Self {
+            parameter: parameter.stable_id().to_string(),
+            enabled: lfo.enabled,
+            shape: lfo.shape,
+            amplitude: lfo.amplitude,
+            frequency_hz: lfo.frequency_hz,
+        }
+    }
+
+    fn into_runtime(self) -> Result<(EffectTunerParameter, ParameterLfo), String> {
+        let parameter = EffectTunerParameter::from_stable_id(&self.parameter)
+            .ok_or_else(|| format!("Unknown effect tuner parameter id '{}'.", self.parameter))?;
+        let lfo = ParameterLfo {
+            enabled: self.enabled,
+            shape: self.shape,
+            amplitude: self.amplitude,
+            frequency_hz: self.frequency_hz,
+        };
+        Ok((parameter, lfo))
+    }
+}
+
+impl EffectRuntimeSnapshot {
+    fn stored_snapshot(&self) -> StoredEffectRuntimeSnapshot {
+        StoredEffectRuntimeSnapshot {
+            current: self.current.clone(),
+            lfos: lfo_parameters()
+                .zip(self.lfos.iter().copied())
+                .map(|(parameter, lfo)| StoredParameterLfo::from_runtime(parameter, lfo))
+                .collect(),
+        }
+    }
+
+    fn from_stored_snapshot(snapshot: StoredEffectRuntimeSnapshot) -> Result<Self, String> {
+        let mut lfos = default_lfos();
+        let mut seen_slots = vec![false; lfos.len()];
+
+        for stored_lfo in snapshot.lfos {
+            let (parameter, lfo) = stored_lfo.into_runtime()?;
+            let index = lfo_index_for_parameter(parameter)
+                .ok_or_else(|| format!("Parameter '{}' does not support LFOs.", parameter.stable_id()))?;
+            if seen_slots[index] {
+                return Err(format!(
+                    "Duplicate LFO entry for parameter '{}'.",
+                    parameter.stable_id()
+                ));
+            }
+            lfos[index] = lfo;
+            seen_slots[index] = true;
+        }
+
+        Ok(Self {
+            current: snapshot.current,
+            lfos,
+        })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn from_positional_lfos(
+        current: EffectsConfig,
+        positional_lfos: Vec<ParameterLfo>,
+    ) -> Self {
+        let mut lfos = default_lfos();
+        for (target, source) in lfos.iter_mut().zip(positional_lfos.into_iter()) {
+            *target = source;
+        }
+        Self { current, lfos }
+    }
+}
+
+impl Serialize for EffectRuntimeSnapshot {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        self.stored_snapshot().serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for EffectRuntimeSnapshot {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let snapshot = StoredEffectRuntimeSnapshot::deserialize(deserializer)?;
+        Self::from_stored_snapshot(snapshot).map_err(serde::de::Error::custom)
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -108,118 +214,26 @@ fn mark_scene_lfo_change(
     result: &mut SceneLfoApplicationResult,
     parameter: EffectTunerSceneParameter,
 ) {
-    match parameter {
-        EffectTunerSceneParameter::ChildTwistPerVertexRadians
-        | EffectTunerSceneParameter::ChildOutwardOffsetRatio => {
+    match parameter.change_target() {
+        SceneChangeTarget::Generation => {
             result.generation_changed = true;
         }
-        EffectTunerSceneParameter::GlobalOpacity
-        | EffectTunerSceneParameter::MaterialHueStepPerLevel
-        | EffectTunerSceneParameter::MaterialSaturation
-        | EffectTunerSceneParameter::MaterialLightness
-        | EffectTunerSceneParameter::MaterialMetallic
-        | EffectTunerSceneParameter::MaterialPerceptualRoughness
-        | EffectTunerSceneParameter::MaterialReflectance
-        | EffectTunerSceneParameter::MaterialCubeHueBias
-        | EffectTunerSceneParameter::MaterialTetrahedronHueBias
-        | EffectTunerSceneParameter::MaterialOctahedronHueBias
-        | EffectTunerSceneParameter::MaterialDodecahedronHueBias
-        | EffectTunerSceneParameter::MaterialAccentEveryNLevels
-        | EffectTunerSceneParameter::MaterialLevelLightnessShift
-        | EffectTunerSceneParameter::MaterialLevelSaturationShift
-        | EffectTunerSceneParameter::MaterialLevelMetallicShift
-        | EffectTunerSceneParameter::MaterialLevelRoughnessShift
-        | EffectTunerSceneParameter::MaterialLevelReflectanceShift => {
+        SceneChangeTarget::Materials => {
             result.materials_changed = true;
         }
-        EffectTunerSceneParameter::CameraDistance
-        | EffectTunerSceneParameter::CameraAngularVelocityX
-        | EffectTunerSceneParameter::CameraAngularVelocityY
-        | EffectTunerSceneParameter::CameraAngularVelocityZ
-        | EffectTunerSceneParameter::CameraZoomVelocity => {
+        SceneChangeTarget::Camera => {
             result.camera_changed = true;
         }
-        EffectTunerSceneParameter::RenderingClearColorR
-        | EffectTunerSceneParameter::RenderingClearColorG
-        | EffectTunerSceneParameter::RenderingClearColorB
-        | EffectTunerSceneParameter::RenderingAmbientColorR
-        | EffectTunerSceneParameter::RenderingAmbientColorG
-        | EffectTunerSceneParameter::RenderingAmbientColorB
-        | EffectTunerSceneParameter::RenderingAmbientBrightness => {
+        SceneChangeTarget::Rendering => {
             result.rendering_changed = true;
         }
-        EffectTunerSceneParameter::StageFloorColorR
-        | EffectTunerSceneParameter::StageFloorColorG
-        | EffectTunerSceneParameter::StageFloorColorB
-        | EffectTunerSceneParameter::StageFloorTranslationX
-        | EffectTunerSceneParameter::StageFloorTranslationY
-        | EffectTunerSceneParameter::StageFloorTranslationZ
-        | EffectTunerSceneParameter::StageFloorRotationX
-        | EffectTunerSceneParameter::StageFloorRotationY
-        | EffectTunerSceneParameter::StageFloorRotationZ
-        | EffectTunerSceneParameter::StageFloorSizeX
-        | EffectTunerSceneParameter::StageFloorSizeY
-        | EffectTunerSceneParameter::StageFloorThickness
-        | EffectTunerSceneParameter::StageFloorMetallic
-        | EffectTunerSceneParameter::StageFloorPerceptualRoughness
-        | EffectTunerSceneParameter::StageFloorReflectance
-        | EffectTunerSceneParameter::StageBackdropColorR
-        | EffectTunerSceneParameter::StageBackdropColorG
-        | EffectTunerSceneParameter::StageBackdropColorB
-        | EffectTunerSceneParameter::StageBackdropTranslationX
-        | EffectTunerSceneParameter::StageBackdropTranslationY
-        | EffectTunerSceneParameter::StageBackdropTranslationZ
-        | EffectTunerSceneParameter::StageBackdropRotationX
-        | EffectTunerSceneParameter::StageBackdropRotationY
-        | EffectTunerSceneParameter::StageBackdropRotationZ
-        | EffectTunerSceneParameter::StageBackdropSizeX
-        | EffectTunerSceneParameter::StageBackdropSizeY
-        | EffectTunerSceneParameter::StageBackdropThickness
-        | EffectTunerSceneParameter::StageBackdropMetallic
-        | EffectTunerSceneParameter::StageBackdropPerceptualRoughness
-        | EffectTunerSceneParameter::StageBackdropReflectance => {
+        SceneChangeTarget::Stage => {
             result.stage_changed = true;
         }
-        EffectTunerSceneParameter::LightingDirectionalColorR
-        | EffectTunerSceneParameter::LightingDirectionalColorG
-        | EffectTunerSceneParameter::LightingDirectionalColorB
-        | EffectTunerSceneParameter::LightingDirectionalIlluminance
-        | EffectTunerSceneParameter::LightingDirectionalTranslationX
-        | EffectTunerSceneParameter::LightingDirectionalTranslationY
-        | EffectTunerSceneParameter::LightingDirectionalTranslationZ
-        | EffectTunerSceneParameter::LightingDirectionalLookAtX
-        | EffectTunerSceneParameter::LightingDirectionalLookAtY
-        | EffectTunerSceneParameter::LightingDirectionalLookAtZ
-        | EffectTunerSceneParameter::LightingPointColorR
-        | EffectTunerSceneParameter::LightingPointColorG
-        | EffectTunerSceneParameter::LightingPointColorB
-        | EffectTunerSceneParameter::LightingPointIntensity
-        | EffectTunerSceneParameter::LightingPointRange
-        | EffectTunerSceneParameter::LightingPointTranslationX
-        | EffectTunerSceneParameter::LightingPointTranslationY
-        | EffectTunerSceneParameter::LightingPointTranslationZ
-        | EffectTunerSceneParameter::LightingAccentColorR
-        | EffectTunerSceneParameter::LightingAccentColorG
-        | EffectTunerSceneParameter::LightingAccentColorB
-        | EffectTunerSceneParameter::LightingAccentIntensity
-        | EffectTunerSceneParameter::LightingAccentRange
-        | EffectTunerSceneParameter::LightingAccentTranslationX
-        | EffectTunerSceneParameter::LightingAccentTranslationY
-        | EffectTunerSceneParameter::LightingAccentTranslationZ => {
+        SceneChangeTarget::Lighting => {
             result.lighting_changed = true;
         }
-        EffectTunerSceneParameter::ChildKind
-        | EffectTunerSceneParameter::SpawnPlacementMode
-        | EffectTunerSceneParameter::SpawnAddMode
-        | EffectTunerSceneParameter::ChildScaleRatio
-        | EffectTunerSceneParameter::ChildSpawnExclusionProbability
-        | EffectTunerSceneParameter::StageEnabled
-        | EffectTunerSceneParameter::StageFloorEnabled
-        | EffectTunerSceneParameter::StageBackdropEnabled
-        | EffectTunerSceneParameter::MaterialSurfaceMode
-        | EffectTunerSceneParameter::MaterialBaseSurface
-        | EffectTunerSceneParameter::MaterialRootSurface
-        | EffectTunerSceneParameter::MaterialAccentSurface => {}
+        SceneChangeTarget::None => {}
     }
 }
 

@@ -101,6 +101,17 @@ pub(crate) enum EffectTunerSceneParameter {
     LightingAccentTranslationZ,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum SceneChangeTarget {
+    None,
+    Generation,
+    Materials,
+    Stage,
+    Rendering,
+    Lighting,
+    Camera,
+}
+
 impl EffectTunerSceneParameter {
     const ALL: [Self; 99] = [
         Self::ChildKind,
@@ -330,7 +341,7 @@ impl EffectTunerSceneParameter {
         Self::lfo_capable().contains(&self)
     }
 
-    fn label(self) -> &'static str {
+    fn stable_id(self) -> &'static str {
         match self {
             Self::ChildKind => "generation.child_kind",
             Self::SpawnPlacementMode => "generation.spawn_placement_mode",
@@ -432,6 +443,17 @@ impl EffectTunerSceneParameter {
             Self::LightingAccentTranslationY => "lighting.accent.translation.y",
             Self::LightingAccentTranslationZ => "lighting.accent.translation.z",
         }
+    }
+
+    fn from_stable_id(stable_id: &str) -> Option<Self> {
+        Self::all()
+            .iter()
+            .copied()
+            .find(|parameter| parameter.stable_id() == stable_id)
+    }
+
+    fn label(self) -> &'static str {
+        self.stable_id()
     }
 
     fn short_label(self) -> &'static str {
@@ -628,6 +650,111 @@ impl EffectTunerSceneParameter {
             | Self::LightingAccentTranslationX
             | Self::LightingAccentTranslationY
             | Self::LightingAccentTranslationZ => "accent",
+        }
+    }
+
+    pub(crate) fn change_target(self) -> SceneChangeTarget {
+        match self {
+            Self::ChildTwistPerVertexRadians | Self::ChildOutwardOffsetRatio => {
+                SceneChangeTarget::Generation
+            }
+            Self::GlobalOpacity
+            | Self::MaterialHueStepPerLevel
+            | Self::MaterialSaturation
+            | Self::MaterialLightness
+            | Self::MaterialMetallic
+            | Self::MaterialPerceptualRoughness
+            | Self::MaterialReflectance
+            | Self::MaterialCubeHueBias
+            | Self::MaterialTetrahedronHueBias
+            | Self::MaterialOctahedronHueBias
+            | Self::MaterialDodecahedronHueBias
+            | Self::MaterialSurfaceMode
+            | Self::MaterialBaseSurface
+            | Self::MaterialRootSurface
+            | Self::MaterialAccentSurface
+            | Self::MaterialAccentEveryNLevels
+            | Self::MaterialLevelLightnessShift
+            | Self::MaterialLevelSaturationShift
+            | Self::MaterialLevelMetallicShift
+            | Self::MaterialLevelRoughnessShift
+            | Self::MaterialLevelReflectanceShift => SceneChangeTarget::Materials,
+            Self::StageEnabled
+            | Self::StageFloorEnabled
+            | Self::StageBackdropEnabled
+            | Self::StageFloorColorR
+            | Self::StageFloorColorG
+            | Self::StageFloorColorB
+            | Self::StageFloorTranslationX
+            | Self::StageFloorTranslationY
+            | Self::StageFloorTranslationZ
+            | Self::StageFloorRotationX
+            | Self::StageFloorRotationY
+            | Self::StageFloorRotationZ
+            | Self::StageFloorSizeX
+            | Self::StageFloorSizeY
+            | Self::StageFloorThickness
+            | Self::StageFloorMetallic
+            | Self::StageFloorPerceptualRoughness
+            | Self::StageFloorReflectance
+            | Self::StageBackdropColorR
+            | Self::StageBackdropColorG
+            | Self::StageBackdropColorB
+            | Self::StageBackdropTranslationX
+            | Self::StageBackdropTranslationY
+            | Self::StageBackdropTranslationZ
+            | Self::StageBackdropRotationX
+            | Self::StageBackdropRotationY
+            | Self::StageBackdropRotationZ
+            | Self::StageBackdropSizeX
+            | Self::StageBackdropSizeY
+            | Self::StageBackdropThickness
+            | Self::StageBackdropMetallic
+            | Self::StageBackdropPerceptualRoughness
+            | Self::StageBackdropReflectance => SceneChangeTarget::Stage,
+            Self::RenderingClearColorR
+            | Self::RenderingClearColorG
+            | Self::RenderingClearColorB
+            | Self::RenderingAmbientColorR
+            | Self::RenderingAmbientColorG
+            | Self::RenderingAmbientColorB
+            | Self::RenderingAmbientBrightness => SceneChangeTarget::Rendering,
+            Self::LightingDirectionalColorR
+            | Self::LightingDirectionalColorG
+            | Self::LightingDirectionalColorB
+            | Self::LightingDirectionalIlluminance
+            | Self::LightingDirectionalTranslationX
+            | Self::LightingDirectionalTranslationY
+            | Self::LightingDirectionalTranslationZ
+            | Self::LightingDirectionalLookAtX
+            | Self::LightingDirectionalLookAtY
+            | Self::LightingDirectionalLookAtZ
+            | Self::LightingPointColorR
+            | Self::LightingPointColorG
+            | Self::LightingPointColorB
+            | Self::LightingPointIntensity
+            | Self::LightingPointRange
+            | Self::LightingPointTranslationX
+            | Self::LightingPointTranslationY
+            | Self::LightingPointTranslationZ
+            | Self::LightingAccentColorR
+            | Self::LightingAccentColorG
+            | Self::LightingAccentColorB
+            | Self::LightingAccentIntensity
+            | Self::LightingAccentRange
+            | Self::LightingAccentTranslationX
+            | Self::LightingAccentTranslationY
+            | Self::LightingAccentTranslationZ => SceneChangeTarget::Lighting,
+            Self::CameraDistance
+            | Self::CameraAngularVelocityX
+            | Self::CameraAngularVelocityY
+            | Self::CameraAngularVelocityZ
+            | Self::CameraZoomVelocity => SceneChangeTarget::Camera,
+            Self::ChildKind
+            | Self::SpawnPlacementMode
+            | Self::SpawnAddMode
+            | Self::ChildScaleRatio
+            | Self::ChildSpawnExclusionProbability => SceneChangeTarget::None,
         }
     }
 

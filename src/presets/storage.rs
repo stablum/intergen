@@ -217,11 +217,93 @@ mod tests {
     use std::path::Path;
     use std::time::Duration;
 
-    use crate::config::{EffectNumericParameter, EffectsConfig};
-    use crate::effect_tuner::EffectTunerState;
+    use crate::config::{EffectsConfig, LightingConfig, MaterialConfig, RenderingConfig};
+    use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState, ParameterLfo};
+    use crate::scene_snapshot::{
+        CameraRigSnapshot, GenerationSnapshot, MaterialRuntimeSnapshot, SceneStateSnapshot,
+    };
     use crate::timestamp::format_utc_timestamp;
 
-    use super::read_preset_file;
+    use super::{ScenePresetFile, read_preset_file, write_preset_file};
+    use crate::presets::browser::PresetIndex;
+
+    #[derive(Clone, Debug, serde::Deserialize)]
+    struct LegacyEffectRuntimeSnapshot {
+        current: EffectsConfig,
+        lfos: Vec<ParameterLfo>,
+    }
+
+    #[derive(Clone, Debug, serde::Deserialize)]
+    struct LegacySceneStateSnapshot {
+        rendering: RenderingConfig,
+        lighting: LightingConfig,
+        materials: MaterialConfig,
+        camera: CameraRigSnapshot,
+        generation: GenerationSnapshot,
+        material_state: MaterialRuntimeSnapshot,
+        effects: LegacyEffectRuntimeSnapshot,
+    }
+
+    impl LegacySceneStateSnapshot {
+        fn into_current(self) -> SceneStateSnapshot {
+            SceneStateSnapshot {
+                rendering: self.rendering,
+                lighting: self.lighting,
+                materials: self.materials,
+                camera: self.camera,
+                generation: self.generation,
+                material_state: self.material_state,
+                effects: EffectRuntimeSnapshot::from_positional_lfos(
+                    self.effects.current,
+                    self.effects.lfos,
+                ),
+            }
+        }
+    }
+
+    #[derive(Clone, Debug, serde::Deserialize)]
+    struct LegacyScenePresetFile {
+        format_version: u32,
+        id: String,
+        saved_at_unix_ms: u64,
+        summary: String,
+        assignment: Option<PresetIndex>,
+        scene: LegacySceneStateSnapshot,
+    }
+
+    impl LegacyScenePresetFile {
+        fn into_current(self) -> ScenePresetFile {
+            ScenePresetFile {
+                format_version: self.format_version,
+                id: self.id,
+                saved_at_unix_ms: self.saved_at_unix_ms,
+                summary: self.summary,
+                assignment: self.assignment,
+                scene: self.scene.into_current(),
+            }
+        }
+    }
+
+    fn checked_in_preset_paths() -> Vec<std::path::PathBuf> {
+        let mut preset_paths = super::preset_paths().expect("should read checked-in presets");
+        preset_paths.sort();
+        assert!(
+            !preset_paths.is_empty(),
+            "expected at least one checked-in scene preset"
+        );
+        preset_paths
+    }
+
+    fn raw_effect_lfo_entries(contents: &str) -> Vec<toml::Value> {
+        let value: toml::Value = toml::from_str(contents).expect("preset should parse as raw toml");
+        value
+            .get("scene")
+            .and_then(|value| value.get("effects"))
+            .and_then(|value| value.get("lfos"))
+            .and_then(toml::Value::as_array)
+            .cloned()
+            .expect("preset should store effect LFO entries in an array")
+    }
 
     #[test]
     fn preset_filename_timestamp_matches_screenshot_style() {
@@ -250,33 +332,30 @@ mod tests {
             .runtime_snapshot()
             .lfos
             .len();
-        let effect_only_layout_len = EffectNumericParameter::all().len();
-        let legacy_scene_layout_len = effect_only_layout_len + 19;
 
-        let mut preset_paths = fs::read_dir(preset_dir)
-            .expect("should read checked-in presets")
-            .filter_map(|entry| entry.ok().map(|entry| entry.path()))
-            .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("toml"))
-            .collect::<Vec<_>>();
-        preset_paths.sort();
-        assert!(
-            !preset_paths.is_empty(),
-            "expected at least one checked-in scene preset"
-        );
-
-        for path in preset_paths {
-            let file = read_preset_file(&path)
-                .unwrap_or_else(|error| panic!("{} should parse: {error}", path.display()));
-            assert!(
-                matches!(
-                    file.scene.effects.lfos.len(),
-                    len if len == effect_only_layout_len
-                        || len == legacy_scene_layout_len
-                        || len == current_lfo_layout_len
-                ),
-                "{} should use one of the currently stored LFO layouts",
+        for path in checked_in_preset_paths() {
+            let contents = fs::read_to_string(&path)
+                .unwrap_or_else(|error| panic!("{} should read: {error}", path.display()));
+            let stored_lfos = raw_effect_lfo_entries(&contents);
+            assert_eq!(
+                stored_lfos.len(),
+                current_lfo_layout_len,
+                "{} should store the full keyed LFO layout",
                 path.display()
             );
+            for stored_lfo in stored_lfos {
+                assert!(
+                    stored_lfo
+                        .get("parameter")
+                        .and_then(toml::Value::as_str)
+                        .is_some(),
+                    "{} should store a stable parameter id for each LFO entry",
+                    path.display()
+                );
+            }
+
+            let file = read_preset_file(&path)
+                .unwrap_or_else(|error| panic!("{} should parse: {error}", path.display()));
             file.scene
                 .prepare_runtime()
                 .unwrap_or_else(|error| panic!("{} should prepare: {error}", path.display()));
@@ -285,9 +364,10 @@ mod tests {
             effect_tuner.apply_runtime_snapshot(&file.scene.effects);
             let restored = effect_tuner.runtime_snapshot();
 
-            assert!(
-                restored.lfos.len() >= file.scene.effects.lfos.len(),
-                "{} should fit into the current runtime LFO layout",
+            assert_eq!(
+                restored.lfos.len(),
+                file.scene.effects.lfos.len(),
+                "{} should restore the full keyed LFO layout",
                 path.display()
             );
 
@@ -300,5 +380,81 @@ mod tests {
                 assert_eq!(restored_lfo.frequency_hz, expected_lfo.frequency_hz);
             }
         }
+    }
+
+    fn rewrite_checked_in_scene_presets_to_current_effect_format_impl() {
+        for path in checked_in_preset_paths() {
+            let legacy_contents = fs::read_to_string(&path)
+                .unwrap_or_else(|error| panic!("{} should read: {error}", path.display()));
+            let legacy_file: LegacyScenePresetFile = toml::from_str(&legacy_contents)
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} should parse as a legacy preset: {error}",
+                        path.display()
+                    )
+                });
+            let expected_file = legacy_file.into_current();
+            let expected_contents = toml::to_string_pretty(&expected_file)
+                .unwrap_or_else(|error| panic!("{} should serialize: {error}", path.display()));
+            let expected_value: toml::Value =
+                toml::from_str(&expected_contents).unwrap_or_else(|error| {
+                    panic!("{} expected output should parse: {error}", path.display())
+                });
+
+            write_preset_file(&path, &expected_file)
+                .unwrap_or_else(|error| panic!("{} should rewrite: {error}", path.display()));
+
+            let rewritten_contents = fs::read_to_string(&path)
+                .unwrap_or_else(|error| panic!("{} should reread: {error}", path.display()));
+            let rewritten_value: toml::Value =
+                toml::from_str(&rewritten_contents).unwrap_or_else(|error| {
+                    panic!("{} rewritten output should parse: {error}", path.display())
+                });
+            assert_eq!(
+                rewritten_value,
+                expected_value,
+                "{} should rewrite to the expected keyed format",
+                path.display()
+            );
+
+            let rewritten_file = read_preset_file(&path).unwrap_or_else(|error| {
+                panic!("{} should parse after rewrite: {error}", path.display())
+            });
+            rewritten_file
+                .scene
+                .prepare_runtime()
+                .unwrap_or_else(|error| {
+                    panic!(
+                        "{} should still prepare after rewrite: {error}",
+                        path.display()
+                    )
+                });
+
+            let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+            effect_tuner.apply_runtime_snapshot(&rewritten_file.scene.effects);
+            let restored = effect_tuner.runtime_snapshot();
+            assert_eq!(
+                restored.lfos.len(),
+                rewritten_file.scene.effects.lfos.len(),
+                "{} should preserve the full runtime LFO layout after rewrite",
+                path.display()
+            );
+            for (restored_lfo, expected_lfo) in restored
+                .lfos
+                .iter()
+                .zip(rewritten_file.scene.effects.lfos.iter())
+            {
+                assert_eq!(restored_lfo.enabled, expected_lfo.enabled);
+                assert_eq!(restored_lfo.shape, expected_lfo.shape);
+                assert_eq!(restored_lfo.amplitude, expected_lfo.amplitude);
+                assert_eq!(restored_lfo.frequency_hz, expected_lfo.frequency_hz);
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "rewrites checked-in scene presets to the current keyed effect snapshot format"]
+    fn rewrite_checked_in_scene_presets_to_current_effect_format() {
+        rewrite_checked_in_scene_presets_to_current_effect_format_impl();
     }
 }

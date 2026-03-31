@@ -14,8 +14,8 @@ use crate::runtime_scene::GenerationSceneAccess;
 use crate::scene::{apply_live_lighting_state, apply_live_rendering_state, sync_stage_entities};
 
 use super::state::{
-    AdjustmentModifiers, EffectTunerEditContext, EffectTunerParameter, EffectTunerSceneParameter,
-    EffectTunerState, EffectTunerViewContext, SceneLfoApplicationResult,
+    AdjustmentModifiers, EffectTunerEditContext, EffectTunerParameter, EffectTunerState,
+    EffectTunerViewContext, SceneChangeTarget, SceneLfoApplicationResult,
 };
 use crate::parameters::HoldInput;
 
@@ -521,32 +521,15 @@ fn apply_selected_parameter_side_effects(
     parameter: EffectTunerParameter,
     scene: &mut GenerationSceneAccess<'_, '_>,
 ) {
-    match parameter {
-        EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildTwistPerVertexRadians)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildOutwardOffsetRatio) => {
+    let EffectTunerParameter::Scene(parameter) = parameter else {
+        return;
+    };
+
+    match parameter.change_target() {
+        SceneChangeTarget::Generation => {
             recompute_generation_tree(scene);
         }
-        EffectTunerParameter::Scene(EffectTunerSceneParameter::GlobalOpacity)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialHueStepPerLevel)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialSaturation)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialLightness)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialMetallic)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialPerceptualRoughness)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialReflectance)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialCubeHueBias)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialTetrahedronHueBias)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialOctahedronHueBias)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialDodecahedronHueBias)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialSurfaceMode)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialBaseSurface)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialRootSurface)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialAccentSurface)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialAccentEveryNLevels)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialLevelLightnessShift)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialLevelSaturationShift)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialLevelMetallicShift)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialLevelRoughnessShift)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::MaterialLevelReflectanceShift) => {
+        SceneChangeTarget::Materials => {
             apply_live_material_state(
                 &scene.generation_state,
                 &scene.app_config.materials,
@@ -555,41 +538,7 @@ fn apply_selected_parameter_side_effects(
                 &scene.shape_materials,
             );
         }
-        EffectTunerParameter::Scene(EffectTunerSceneParameter::StageEnabled)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorEnabled)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropEnabled)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorColorR)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorColorG)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorColorB)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorTranslationX)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorTranslationY)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorTranslationZ)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorRotationX)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorRotationY)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorRotationZ)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorSizeX)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorSizeY)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorThickness)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorMetallic)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorPerceptualRoughness)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageFloorReflectance)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropColorR)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropColorG)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropColorB)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropTranslationX)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropTranslationY)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropTranslationZ)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropRotationX)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropRotationY)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropRotationZ)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropSizeX)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropSizeY)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropThickness)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropMetallic)
-        | EffectTunerParameter::Scene(
-            EffectTunerSceneParameter::StageBackdropPerceptualRoughness,
-        )
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::StageBackdropReflectance) => {
+        SceneChangeTarget::Stage => {
             let runtime_rendering = scene
                 .rendering_state
                 .runtime_rendering_config(&scene.app_config.rendering, &scene.stage_state);
@@ -601,13 +550,7 @@ fn apply_selected_parameter_side_effects(
                 &scene.stage_entities,
             );
         }
-        EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingClearColorR)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingClearColorG)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingClearColorB)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingAmbientColorR)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingAmbientColorG)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingAmbientColorB)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::RenderingAmbientBrightness) => {
+        SceneChangeTarget::Rendering => {
             let runtime_rendering = scene
                 .rendering_state
                 .runtime_rendering_config(&scene.app_config.rendering, &scene.stage_state);
@@ -617,39 +560,10 @@ fn apply_selected_parameter_side_effects(
                 &mut scene.ambient_light,
             );
         }
-        EffectTunerParameter::Scene(EffectTunerSceneParameter::CameraDistance)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::CameraAngularVelocityX)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::CameraAngularVelocityY)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::CameraAngularVelocityZ)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::CameraZoomVelocity) => {
+        SceneChangeTarget::Camera => {
             sync_scene_camera_transform(&scene.camera_rig, &mut scene.camera_transforms);
         }
-        EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalColorR)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalColorG)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalColorB)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalIlluminance)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalTranslationX)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalTranslationY)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalTranslationZ)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalLookAtX)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalLookAtY)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingDirectionalLookAtZ)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointColorR)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointColorG)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointColorB)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointIntensity)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointRange)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointTranslationX)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointTranslationY)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingPointTranslationZ)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentColorR)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentColorG)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentColorB)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentIntensity)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentRange)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentTranslationX)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentTranslationY)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::LightingAccentTranslationZ) => {
+        SceneChangeTarget::Lighting => {
             let runtime_lighting = scene
                 .lighting_state
                 .runtime_lighting_config(&scene.app_config.lighting);
@@ -660,13 +574,7 @@ fn apply_selected_parameter_side_effects(
                 &mut scene.accent_lights,
             );
         }
-        EffectTunerParameter::Effect(_)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildKind)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::SpawnPlacementMode)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::SpawnAddMode)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildScaleRatio)
-        | EffectTunerParameter::Scene(EffectTunerSceneParameter::ChildSpawnExclusionProbability) => {
-        }
+        SceneChangeTarget::None => {}
     }
 }
 

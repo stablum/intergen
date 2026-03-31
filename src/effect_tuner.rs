@@ -3,6 +3,8 @@ mod metadata;
 mod state;
 mod systems;
 
+#[cfg(test)]
+pub(crate) use lfo::ParameterLfo;
 pub(crate) use metadata::EffectOverlayField;
 pub(crate) use state::{
     EffectRuntimeSnapshot, EffectTunerEditContext, EffectTunerPageMode, EffectTunerParameter,

@@ -93,18 +93,26 @@ fn material_surface_family_value_text(family: MaterialSurfaceFamily) -> &'static
     }
 }
 
-fn default_lfos() -> Vec<ParameterLfo> {
-    let mut lfos: Vec<_> = EffectNumericParameter::all()
+fn lfo_parameters() -> impl Iterator<Item = EffectTunerParameter> {
+    EffectNumericParameter::all()
         .iter()
         .copied()
-        .map(ParameterLfo::default_for)
-        .collect();
-    lfos.extend(
-        EffectTunerSceneParameter::lfo_capable()
-            .iter()
-            .map(|_| ParameterLfo::new(0.0)),
-    );
-    lfos
+        .map(EffectTunerParameter::Effect)
+        .chain(
+            EffectTunerSceneParameter::lfo_capable()
+                .iter()
+                .copied()
+                .map(EffectTunerParameter::Scene),
+        )
+}
+
+fn default_lfos() -> Vec<ParameterLfo> {
+    lfo_parameters()
+        .map(|parameter| match parameter {
+            EffectTunerParameter::Effect(parameter) => ParameterLfo::default_for(parameter),
+            EffectTunerParameter::Scene(_) => ParameterLfo::new(0.0),
+        })
+        .collect()
 }
 
 fn default_scene_lfo_bases() -> Vec<f32> {

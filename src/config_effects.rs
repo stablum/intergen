@@ -317,7 +317,7 @@ impl EffectNumericParameter {
         &Self::ALL
     }
 
-    pub(crate) fn label(self) -> &'static str {
+    pub(crate) fn stable_id(self) -> &'static str {
         match self {
             Self::WavefolderGain => "color_wavefolder.gain",
             Self::WavefolderModulus => "color_wavefolder.modulus",
@@ -344,6 +344,17 @@ impl EffectNumericParameter {
             Self::EdgeColorG => "edge_detection.color.g",
             Self::EdgeColorB => "edge_detection.color.b",
         }
+    }
+
+    pub(crate) fn from_stable_id(stable_id: &str) -> Option<Self> {
+        Self::all()
+            .iter()
+            .copied()
+            .find(|parameter| parameter.stable_id() == stable_id)
+    }
+
+    pub(crate) fn label(self) -> &'static str {
+        self.stable_id()
     }
 
     pub(crate) fn short_label(self) -> &'static str {

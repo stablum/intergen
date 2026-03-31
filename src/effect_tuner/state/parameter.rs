@@ -135,6 +135,19 @@ impl EffectTunerParameter {
         &Self::ALL
     }
 
+    pub(crate) fn stable_id(self) -> &'static str {
+        match self {
+            Self::Effect(parameter) => parameter.stable_id(),
+            Self::Scene(parameter) => parameter.stable_id(),
+        }
+    }
+
+    pub(crate) fn from_stable_id(stable_id: &str) -> Option<Self> {
+        EffectNumericParameter::from_stable_id(stable_id)
+            .map(Self::Effect)
+            .or_else(|| EffectTunerSceneParameter::from_stable_id(stable_id).map(Self::Scene))
+    }
+
     pub(crate) fn label(self) -> &'static str {
         match self {
             Self::Effect(parameter) => parameter.label(),

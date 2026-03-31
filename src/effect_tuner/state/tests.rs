@@ -7,8 +7,9 @@ use crate::effect_tuner::metadata::{EffectEditMode, EffectOverlayField};
 use crate::{camera::CameraRig, scene::{GenerationState, LightingState, MaterialState, RenderingState, StageState}};
 
 use super::{
-    EffectNumericParameter, EffectTunerEditContext, EffectTunerPageMode, EffectTunerParameter,
-    EffectTunerSceneParameter, EffectTunerState, EffectTunerViewContext, HoldInput,
+    EffectNumericParameter, EffectRuntimeSnapshot, EffectTunerEditContext, EffectTunerPageMode,
+    EffectTunerParameter, EffectTunerSceneParameter, EffectTunerState, EffectTunerViewContext,
+    HoldInput,
     lfo_index_for_parameter,
 };
 
@@ -334,10 +335,10 @@ fn runtime_snapshot_round_trips_lfo_state() {
     effect_tuner.selected_lfo_mut().frequency_hz = 0.75;
 
     let snapshot = effect_tuner.runtime_snapshot();
-    let mut restored = EffectTunerState::from_config(&EffectsConfig::default());
-    restored.apply_runtime_snapshot(&snapshot);
+    let encoded = toml::to_string(&snapshot).expect("snapshot should serialize");
+    let restored_snapshot: EffectRuntimeSnapshot =
+        toml::from_str(&encoded).expect("snapshot should deserialize");
 
-    let restored_snapshot = restored.runtime_snapshot();
     assert_eq!(restored_snapshot.lfos.len(), snapshot.lfos.len());
     assert_eq!(
         restored_snapshot.current.color_wavefolder.gain,
@@ -348,7 +349,7 @@ fn runtime_snapshot_round_trips_lfo_state() {
 }
 
 #[test]
-fn runtime_snapshot_accepts_older_effect_only_lfo_arrays() {
+fn runtime_snapshot_restores_keyed_lfos_independent_of_order() {
     let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
     let effect_index = lfo_index_for_parameter(EffectTunerParameter::Effect(
         EffectNumericParameter::LensStrength,
@@ -358,57 +359,64 @@ fn runtime_snapshot_accepts_older_effect_only_lfo_arrays() {
     effect_tuner.lfos[effect_index].shape = LfoShape::Square;
     effect_tuner.lfos[effect_index].amplitude = 0.42;
 
-    let mut snapshot = effect_tuner.runtime_snapshot();
-    snapshot.lfos.truncate(EffectNumericParameter::all().len());
+    let scene_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
+        EffectTunerSceneParameter::GlobalOpacity,
+    ))
+    .expect("scene parameter should have an LFO slot");
+    effect_tuner.lfos[scene_index].enabled = true;
+    effect_tuner.lfos[scene_index].shape = LfoShape::BrownianMotion;
+    effect_tuner.lfos[scene_index].amplitude = 0.31;
+    effect_tuner.lfos[scene_index].frequency_hz = 1.7;
 
-    let mut restored = EffectTunerState::from_config(&EffectsConfig::default());
-    restored.apply_runtime_snapshot(&snapshot);
+    let snapshot = effect_tuner.runtime_snapshot();
+    let encoded = toml::to_string(&snapshot).expect("snapshot should serialize");
+    let mut value: toml::Value = toml::from_str(&encoded).expect("snapshot should parse as toml");
+    let lfos = value
+        .get_mut("lfos")
+        .and_then(toml::Value::as_array_mut)
+        .expect("snapshot should contain a keyed LFO array");
+    lfos.retain(|entry| {
+        let parameter = entry
+            .get("parameter")
+            .and_then(toml::Value::as_str)
+            .expect("stored LFOs should include a parameter id");
+        matches!(parameter, "lens_distortion.strength" | "materials.opacity")
+    });
+    lfos.reverse();
+    let sparse_encoded = toml::to_string(&value).expect("sparse snapshot should serialize");
+    let restored: EffectRuntimeSnapshot =
+        toml::from_str(&sparse_encoded).expect("sparse snapshot should deserialize");
 
     assert!(restored.lfos[effect_index].enabled);
     assert_eq!(restored.lfos[effect_index].shape, LfoShape::Square);
     assert_eq!(restored.lfos[effect_index].amplitude, 0.42);
 
-    let scene_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
-        EffectTunerSceneParameter::GlobalOpacity,
+    assert!(restored.lfos[scene_index].enabled);
+    assert_eq!(restored.lfos[scene_index].shape, LfoShape::BrownianMotion);
+    assert_eq!(restored.lfos[scene_index].amplitude, 0.31);
+    assert_eq!(restored.lfos[scene_index].frequency_hz, 1.7);
+
+    let default_snapshot = EffectTunerState::from_config(&EffectsConfig::default()).runtime_snapshot();
+    let missing_index = lfo_index_for_parameter(EffectTunerParameter::Effect(
+        EffectNumericParameter::BloomRadius,
     ))
-    .expect("scene parameter should have an appended LFO slot");
-    assert!(!restored.lfos[scene_index].enabled);
-    assert_eq!(restored.lfos[scene_index].amplitude, 0.0);
-}
-
-#[test]
-fn runtime_snapshot_accepts_current_stored_scene_lfo_arrays() {
-    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-    let legacy_scene_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
-        EffectTunerSceneParameter::MaterialLevelReflectanceShift,
-    ))
-    .expect("legacy scene parameter should have an LFO slot");
-    effect_tuner.lfos[legacy_scene_index].enabled = true;
-    effect_tuner.lfos[legacy_scene_index].shape = LfoShape::BrownianMotion;
-    effect_tuner.lfos[legacy_scene_index].amplitude = 0.31;
-    effect_tuner.lfos[legacy_scene_index].frequency_hz = 1.7;
-
-    let mut snapshot = effect_tuner.runtime_snapshot();
-    snapshot
-        .lfos
-        .truncate(EffectNumericParameter::all().len() + 19);
-
-    let mut restored = EffectTunerState::from_config(&EffectsConfig::default());
-    restored.apply_runtime_snapshot(&snapshot);
-
-    assert!(restored.lfos[legacy_scene_index].enabled);
+    .expect("missing effect parameter should still have a default LFO slot");
     assert_eq!(
-        restored.lfos[legacy_scene_index].shape,
-        LfoShape::BrownianMotion
+        restored.lfos[missing_index].enabled,
+        default_snapshot.lfos[missing_index].enabled
     );
-    assert_eq!(restored.lfos[legacy_scene_index].amplitude, 0.31);
-    assert_eq!(restored.lfos[legacy_scene_index].frequency_hz, 1.7);
-
-    let first_runtime_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
-        EffectTunerSceneParameter::CameraDistance,
-    ))
-    .expect("camera distance should have an appended LFO slot");
-    assert!(!restored.lfos[first_runtime_index].enabled);
+    assert_eq!(
+        restored.lfos[missing_index].shape,
+        default_snapshot.lfos[missing_index].shape
+    );
+    assert_eq!(
+        restored.lfos[missing_index].amplitude,
+        default_snapshot.lfos[missing_index].amplitude
+    );
+    assert_eq!(
+        restored.lfos[missing_index].frequency_hz,
+        default_snapshot.lfos[missing_index].frequency_hz
+    );
 }
 
 #[test]

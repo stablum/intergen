@@ -167,7 +167,7 @@ distance = 14.0
 zoom_velocity = 0.0
 
 [scene.generation]
-selected_kind = "cube"
+selected_shape_kind = "cube"
 spawn_placement_mode = "vertex"
 spawn_add_mode = "single"
 scale_ratio = 0.5799999833106995
@@ -176,7 +176,7 @@ vertex_offset_ratio = 0.0
 vertex_spawn_exclusion_probability = 0.0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 0
 center = [
     0.0,
@@ -226,7 +226,7 @@ occupied_faces = [
 origin = "Root"
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 1
 center = [
     -1.8999998569488525,
@@ -280,7 +280,7 @@ attachment_mode = "vertex"
 attachment_index = 0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 1
 center = [
     1.8999998569488525,
@@ -334,7 +334,7 @@ attachment_mode = "vertex"
 attachment_index = 1
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 1
 center = [
     -1.8999998569488525,
@@ -388,7 +388,7 @@ attachment_mode = "vertex"
 attachment_index = 2
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 1
 center = [
     1.8999998569488525,
@@ -442,7 +442,7 @@ attachment_mode = "vertex"
 attachment_index = 3
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 1
 center = [
     -1.8999998569488525,
@@ -496,7 +496,7 @@ attachment_mode = "vertex"
 attachment_index = 4
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 1
 center = [
     1.8999998569488525,
@@ -550,7 +550,7 @@ attachment_mode = "vertex"
 attachment_index = 5
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 1
 center = [
     -1.8999998569488525,
@@ -604,7 +604,7 @@ attachment_mode = "vertex"
 attachment_index = 6
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 1
 center = [
     1.8999998569488525,
@@ -658,7 +658,7 @@ attachment_mode = "vertex"
 attachment_index = 7
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -712,7 +712,7 @@ attachment_mode = "vertex"
 attachment_index = 0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -0.7979999780654907,
@@ -766,7 +766,7 @@ attachment_mode = "vertex"
 attachment_index = 1
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -820,7 +820,7 @@ attachment_mode = "vertex"
 attachment_index = 2
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -0.7979999780654907,
@@ -874,7 +874,7 @@ attachment_mode = "vertex"
 attachment_index = 3
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -928,7 +928,7 @@ attachment_mode = "vertex"
 attachment_index = 4
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -0.7979999780654907,
@@ -982,7 +982,7 @@ attachment_mode = "vertex"
 attachment_index = 5
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -1036,7 +1036,7 @@ attachment_mode = "vertex"
 attachment_index = 6
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     0.7979999780654907,
@@ -1090,7 +1090,7 @@ attachment_mode = "vertex"
 attachment_index = 0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -1144,7 +1144,7 @@ attachment_mode = "vertex"
 attachment_index = 1
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     0.7979999780654907,
@@ -1198,7 +1198,7 @@ attachment_mode = "vertex"
 attachment_index = 2
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -1252,7 +1252,7 @@ attachment_mode = "vertex"
 attachment_index = 3
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     0.7979999780654907,
@@ -1306,7 +1306,7 @@ attachment_mode = "vertex"
 attachment_index = 4
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -1360,7 +1360,7 @@ attachment_mode = "vertex"
 attachment_index = 5
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -1414,7 +1414,7 @@ attachment_mode = "vertex"
 attachment_index = 7
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -1468,7 +1468,7 @@ attachment_mode = "vertex"
 attachment_index = 0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -0.7979999780654907,
@@ -1522,7 +1522,7 @@ attachment_mode = "vertex"
 attachment_index = 1
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -1576,7 +1576,7 @@ attachment_mode = "vertex"
 attachment_index = 2
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -0.7979999780654907,
@@ -1630,7 +1630,7 @@ attachment_mode = "vertex"
 attachment_index = 3
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -1684,7 +1684,7 @@ attachment_mode = "vertex"
 attachment_index = 4
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -1738,7 +1738,7 @@ attachment_mode = "vertex"
 attachment_index = 6
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -0.7979999780654907,
@@ -1792,7 +1792,7 @@ attachment_mode = "vertex"
 attachment_index = 7
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     0.7979999780654907,
@@ -1846,7 +1846,7 @@ attachment_mode = "vertex"
 attachment_index = 0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -1900,7 +1900,7 @@ attachment_mode = "vertex"
 attachment_index = 1
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     0.7979999780654907,
@@ -1954,7 +1954,7 @@ attachment_mode = "vertex"
 attachment_index = 2
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -2008,7 +2008,7 @@ attachment_mode = "vertex"
 attachment_index = 3
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -2062,7 +2062,7 @@ attachment_mode = "vertex"
 attachment_index = 5
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     0.7979999780654907,
@@ -2116,7 +2116,7 @@ attachment_mode = "vertex"
 attachment_index = 6
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -2170,7 +2170,7 @@ attachment_mode = "vertex"
 attachment_index = 7
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -2224,7 +2224,7 @@ attachment_mode = "vertex"
 attachment_index = 0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -0.7979999780654907,
@@ -2278,7 +2278,7 @@ attachment_mode = "vertex"
 attachment_index = 1
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -2332,7 +2332,7 @@ attachment_mode = "vertex"
 attachment_index = 2
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -2386,7 +2386,7 @@ attachment_mode = "vertex"
 attachment_index = 4
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -0.7979999780654907,
@@ -2440,7 +2440,7 @@ attachment_mode = "vertex"
 attachment_index = 5
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -2494,7 +2494,7 @@ attachment_mode = "vertex"
 attachment_index = 6
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -0.7979999780654907,
@@ -2548,7 +2548,7 @@ attachment_mode = "vertex"
 attachment_index = 7
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     0.7979999780654907,
@@ -2602,7 +2602,7 @@ attachment_mode = "vertex"
 attachment_index = 0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -2656,7 +2656,7 @@ attachment_mode = "vertex"
 attachment_index = 1
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -2710,7 +2710,7 @@ attachment_mode = "vertex"
 attachment_index = 3
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     0.7979999780654907,
@@ -2764,7 +2764,7 @@ attachment_mode = "vertex"
 attachment_index = 4
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -2818,7 +2818,7 @@ attachment_mode = "vertex"
 attachment_index = 5
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     0.7979999780654907,
@@ -2872,7 +2872,7 @@ attachment_mode = "vertex"
 attachment_index = 6
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -2926,7 +2926,7 @@ attachment_mode = "vertex"
 attachment_index = 7
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -2980,7 +2980,7 @@ attachment_mode = "vertex"
 attachment_index = 0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -3034,7 +3034,7 @@ attachment_mode = "vertex"
 attachment_index = 2
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -0.7979999780654907,
@@ -3088,7 +3088,7 @@ attachment_mode = "vertex"
 attachment_index = 3
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -3142,7 +3142,7 @@ attachment_mode = "vertex"
 attachment_index = 4
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -0.7979999780654907,
@@ -3196,7 +3196,7 @@ attachment_mode = "vertex"
 attachment_index = 5
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -3.001999855041504,
@@ -3250,7 +3250,7 @@ attachment_mode = "vertex"
 attachment_index = 6
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     -0.7979999780654907,
@@ -3304,7 +3304,7 @@ attachment_mode = "vertex"
 attachment_index = 7
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -3358,7 +3358,7 @@ attachment_mode = "vertex"
 attachment_index = 1
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     0.7979999780654907,
@@ -3412,7 +3412,7 @@ attachment_mode = "vertex"
 attachment_index = 2
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -3466,7 +3466,7 @@ attachment_mode = "vertex"
 attachment_index = 3
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     0.7979999780654907,
@@ -3520,7 +3520,7 @@ attachment_mode = "vertex"
 attachment_index = 4
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -3574,7 +3574,7 @@ attachment_mode = "vertex"
 attachment_index = 5
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     0.7979999780654907,
@@ -3628,7 +3628,7 @@ attachment_mode = "vertex"
 attachment_index = 6
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 2
 center = [
     3.001999855041504,
@@ -3682,7 +3682,7 @@ attachment_mode = "vertex"
 attachment_index = 7
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -3.641159772872925,
@@ -3736,7 +3736,7 @@ attachment_mode = "vertex"
 attachment_index = 0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -2.362839937210083,
@@ -3790,7 +3790,7 @@ attachment_mode = "vertex"
 attachment_index = 1
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -3.641159772872925,
@@ -3844,7 +3844,7 @@ attachment_mode = "vertex"
 attachment_index = 2
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -2.362839937210083,
@@ -3898,7 +3898,7 @@ attachment_mode = "vertex"
 attachment_index = 3
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -3.641159772872925,
@@ -3952,7 +3952,7 @@ attachment_mode = "vertex"
 attachment_index = 4
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -2.362839937210083,
@@ -4006,7 +4006,7 @@ attachment_mode = "vertex"
 attachment_index = 5
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -3.641159772872925,
@@ -4060,7 +4060,7 @@ attachment_mode = "vertex"
 attachment_index = 6
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -1.4371600151062012,
@@ -4114,7 +4114,7 @@ attachment_mode = "vertex"
 attachment_index = 0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -0.15884000062942505,
@@ -4168,7 +4168,7 @@ attachment_mode = "vertex"
 attachment_index = 1
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -1.4371600151062012,
@@ -4222,7 +4222,7 @@ attachment_mode = "vertex"
 attachment_index = 2
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -0.15884000062942505,
@@ -4276,7 +4276,7 @@ attachment_mode = "vertex"
 attachment_index = 3
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -1.4371600151062012,
@@ -4330,7 +4330,7 @@ attachment_mode = "vertex"
 attachment_index = 4
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -0.15884000062942505,
@@ -4384,7 +4384,7 @@ attachment_mode = "vertex"
 attachment_index = 5
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -0.15884000062942505,
@@ -4438,7 +4438,7 @@ attachment_mode = "vertex"
 attachment_index = 7
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -3.641159772872925,
@@ -4492,7 +4492,7 @@ attachment_mode = "vertex"
 attachment_index = 0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -2.362839937210083,
@@ -4546,7 +4546,7 @@ attachment_mode = "vertex"
 attachment_index = 1
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -3.641159772872925,
@@ -4600,7 +4600,7 @@ attachment_mode = "vertex"
 attachment_index = 2
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -2.362839937210083,
@@ -4654,7 +4654,7 @@ attachment_mode = "vertex"
 attachment_index = 3
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -3.641159772872925,
@@ -4708,7 +4708,7 @@ attachment_mode = "vertex"
 attachment_index = 4
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -3.641159772872925,
@@ -4762,7 +4762,7 @@ attachment_mode = "vertex"
 attachment_index = 6
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -2.362839937210083,
@@ -4816,7 +4816,7 @@ attachment_mode = "vertex"
 attachment_index = 7
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -1.4371600151062012,
@@ -4870,7 +4870,7 @@ attachment_mode = "vertex"
 attachment_index = 0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -0.15884000062942505,
@@ -4924,7 +4924,7 @@ attachment_mode = "vertex"
 attachment_index = 1
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -0.15884000062942505,
@@ -4978,7 +4978,7 @@ attachment_mode = "vertex"
 attachment_index = 3
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -0.15884000062942505,
@@ -5032,7 +5032,7 @@ attachment_mode = "vertex"
 attachment_index = 5
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -0.15884000062942505,
@@ -5086,7 +5086,7 @@ attachment_mode = "vertex"
 attachment_index = 7
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -3.641159772872925,
@@ -5140,7 +5140,7 @@ attachment_mode = "vertex"
 attachment_index = 0
 
 [[scene.generation.nodes]]
-kind = "cube"
+shape_kind = "cube"
 level = 3
 center = [
     -2.362839937210083,
@@ -5244,145 +5244,778 @@ color = [
 ]
 
 [[scene.effects.lfos]]
+parameter = "color_wavefolder.gain"
 enabled = false
 shape = "sine"
 amplitude = 0.5
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "color_wavefolder.modulus"
 enabled = false
 shape = "sine"
 amplitude = 0.25
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "lens_distortion.strength"
 enabled = false
 shape = "sine"
 amplitude = 0.25
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "lens_distortion.radial_k2"
 enabled = false
 shape = "sine"
 amplitude = 0.25
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "lens_distortion.radial_k3"
 enabled = false
 shape = "sine"
 amplitude = 0.25
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "lens_distortion.center.x"
 enabled = false
 shape = "sine"
 amplitude = 0.04999999701976776
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "lens_distortion.center.y"
 enabled = false
 shape = "sine"
 amplitude = 0.04999999701976776
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "lens_distortion.scale.x"
 enabled = false
 shape = "sine"
 amplitude = 0.25
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "lens_distortion.scale.y"
 enabled = false
 shape = "sine"
 amplitude = 0.25
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "lens_distortion.tangential.x"
 enabled = false
 shape = "sine"
 amplitude = 0.04999999701976776
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "lens_distortion.tangential.y"
 enabled = false
 shape = "sine"
 amplitude = 0.04999999701976776
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "lens_distortion.zoom"
 enabled = false
 shape = "sine"
 amplitude = 0.09999999403953552
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "lens_distortion.chromatic_aberration"
 enabled = false
 shape = "sine"
 amplitude = 0.02499999850988388
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "gaussian_blur.sigma"
 enabled = false
 shape = "sine"
 amplitude = 0.25
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "gaussian_blur.radius_pixels"
 enabled = false
 shape = "sine"
 amplitude = 5.0
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "bloom.threshold"
 enabled = false
 shape = "sine"
 amplitude = 0.25
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "bloom.intensity"
 enabled = false
 shape = "sine"
 amplitude = 0.25
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "bloom.radius_pixels"
 enabled = false
 shape = "sine"
 amplitude = 5.0
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "edge_detection.strength"
 enabled = false
 shape = "sine"
 amplitude = 0.25
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "edge_detection.threshold"
 enabled = false
 shape = "sine"
 amplitude = 0.25
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "edge_detection.mix"
 enabled = false
 shape = "sine"
 amplitude = 0.09999999403953552
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "edge_detection.color.r"
 enabled = false
 shape = "sine"
 amplitude = 0.09999999403953552
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "edge_detection.color.g"
 enabled = false
 shape = "sine"
 amplitude = 0.09999999403953552
 frequency_hz = 0.25
 
 [[scene.effects.lfos]]
+parameter = "edge_detection.color.b"
 enabled = false
 shape = "sine"
 amplitude = 0.09999999403953552
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "generation.child_twist_per_vertex_radians"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "generation.child_outward_offset_ratio"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.opacity"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.hue_step_per_level"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.saturation"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.lightness"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.metallic"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.perceptual_roughness"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.reflectance"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.cube_hue_bias"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.tetrahedron_hue_bias"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.octahedron_hue_bias"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.dodecahedron_hue_bias"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.accent_every_n_levels"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.level_lightness_shift"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.level_saturation_shift"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.level_metallic_shift"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.level_roughness_shift"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "materials.level_reflectance_shift"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "camera.distance"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "camera.angular_velocity.x"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "camera.angular_velocity.y"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "camera.angular_velocity.z"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "camera.zoom_velocity"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "rendering.clear_color.r"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "rendering.clear_color.g"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "rendering.clear_color.b"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "rendering.ambient_light_color.r"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "rendering.ambient_light_color.g"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "rendering.ambient_light_color.b"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "rendering.ambient_light_brightness"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.color.r"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.color.g"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.color.b"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.translation.x"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.translation.y"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.translation.z"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.rotation_degrees.x"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.rotation_degrees.y"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.rotation_degrees.z"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.size.x"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.size.y"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.thickness"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.metallic"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.perceptual_roughness"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.floor.reflectance"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.color.r"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.color.g"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.color.b"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.translation.x"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.translation.y"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.translation.z"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.rotation_degrees.x"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.rotation_degrees.y"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.rotation_degrees.z"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.size.x"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.size.y"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.thickness"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.metallic"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.perceptual_roughness"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "stage.backdrop.reflectance"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.directional.color.r"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.directional.color.g"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.directional.color.b"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.directional.illuminance"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.directional.translation.x"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.directional.translation.y"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.directional.translation.z"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.directional.look_at.x"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.directional.look_at.y"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.directional.look_at.z"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.point.color.r"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.point.color.g"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.point.color.b"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.point.intensity"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.point.range"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.point.translation.x"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.point.translation.y"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.point.translation.z"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.accent.color.r"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.accent.color.g"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.accent.color.b"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.accent.intensity"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.accent.range"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.accent.translation.x"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.accent.translation.y"
+enabled = false
+shape = "sine"
+amplitude = 0.0
+frequency_hz = 0.25
+
+[[scene.effects.lfos]]
+parameter = "lighting.accent.translation.z"
+enabled = false
+shape = "sine"
+amplitude = 0.0
 frequency_hz = 0.25
