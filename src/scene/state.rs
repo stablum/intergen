@@ -45,6 +45,9 @@ impl ShapeRuntime {
 #[derive(Clone, Debug)]
 pub(crate) struct GenerationParameters {
     scale_ratio: ScalarParameterState,
+    child_axis_scale_x: ScalarParameterState,
+    child_axis_scale_y: ScalarParameterState,
+    child_axis_scale_z: ScalarParameterState,
     child_twist: ScalarParameterState,
     child_offset: ScalarParameterState,
     child_spawn_exclusion_probability: ScalarParameterState,
@@ -55,6 +58,15 @@ impl GenerationParameters {
         Self {
             scale_ratio: ScalarParameterState::new(
                 generation_config.parameter_spec(GenerationParameter::ChildScaleRatio),
+            ),
+            child_axis_scale_x: ScalarParameterState::new(
+                generation_config.parameter_spec(GenerationParameter::ChildAxisScaleX),
+            ),
+            child_axis_scale_y: ScalarParameterState::new(
+                generation_config.parameter_spec(GenerationParameter::ChildAxisScaleY),
+            ),
+            child_axis_scale_z: ScalarParameterState::new(
+                generation_config.parameter_spec(GenerationParameter::ChildAxisScaleZ),
             ),
             child_twist: ScalarParameterState::new(
                 generation_config.parameter_spec(GenerationParameter::ChildTwistPerVertexRadians),
@@ -69,14 +81,18 @@ impl GenerationParameters {
         }
     }
 
-    pub(crate) fn from_base_values(
+    pub(crate) fn from_base_values_with_axis_scale(
         scale_ratio: f32,
+        child_axis_scale: Vec3,
         child_twist: f32,
         child_offset: f32,
         child_spawn_exclusion_probability: f32,
     ) -> Self {
         Self {
             scale_ratio: ScalarParameterState::from_base(scale_ratio),
+            child_axis_scale_x: ScalarParameterState::from_base(child_axis_scale.x),
+            child_axis_scale_y: ScalarParameterState::from_base(child_axis_scale.y),
+            child_axis_scale_z: ScalarParameterState::from_base(child_axis_scale.z),
             child_twist: ScalarParameterState::from_base(child_twist),
             child_offset: ScalarParameterState::from_base(child_offset),
             child_spawn_exclusion_probability: ScalarParameterState::from_base(
@@ -88,6 +104,9 @@ impl GenerationParameters {
     fn parameter(&self, parameter: GenerationParameter) -> &ScalarParameterState {
         match parameter {
             GenerationParameter::ChildScaleRatio => &self.scale_ratio,
+            GenerationParameter::ChildAxisScaleX => &self.child_axis_scale_x,
+            GenerationParameter::ChildAxisScaleY => &self.child_axis_scale_y,
+            GenerationParameter::ChildAxisScaleZ => &self.child_axis_scale_z,
             GenerationParameter::ChildTwistPerVertexRadians => &self.child_twist,
             GenerationParameter::ChildOutwardOffsetRatio => &self.child_offset,
             GenerationParameter::ChildSpawnExclusionProbability => {
@@ -99,6 +118,9 @@ impl GenerationParameters {
     fn parameter_mut(&mut self, parameter: GenerationParameter) -> &mut ScalarParameterState {
         match parameter {
             GenerationParameter::ChildScaleRatio => &mut self.scale_ratio,
+            GenerationParameter::ChildAxisScaleX => &mut self.child_axis_scale_x,
+            GenerationParameter::ChildAxisScaleY => &mut self.child_axis_scale_y,
+            GenerationParameter::ChildAxisScaleZ => &mut self.child_axis_scale_z,
             GenerationParameter::ChildTwistPerVertexRadians => &mut self.child_twist,
             GenerationParameter::ChildOutwardOffsetRatio => &mut self.child_offset,
             GenerationParameter::ChildSpawnExclusionProbability => {
@@ -126,6 +148,7 @@ impl GenerationParameters {
         spawn_placement_mode: SpawnPlacementMode,
     ) -> SpawnTuning {
         generation_config.spawn_tuning(
+            self.evaluated_axis_scale(generation_config),
             self.evaluated(
                 GenerationParameter::ChildTwistPerVertexRadians,
                 generation_config,
@@ -139,6 +162,22 @@ impl GenerationParameters {
                 generation_config,
             ),
             spawn_placement_mode,
+        )
+    }
+
+    fn evaluated_axis_scale(&self, generation_config: &GenerationConfig) -> Vec3 {
+        Vec3::new(
+            self.evaluated(GenerationParameter::ChildAxisScaleX, generation_config),
+            self.evaluated(GenerationParameter::ChildAxisScaleY, generation_config),
+            self.evaluated(GenerationParameter::ChildAxisScaleZ, generation_config),
+        )
+    }
+
+    fn base_axis_scale(&self) -> Vec3 {
+        Vec3::new(
+            self.base_value(GenerationParameter::ChildAxisScaleX),
+            self.base_value(GenerationParameter::ChildAxisScaleY),
+            self.base_value(GenerationParameter::ChildAxisScaleZ),
         )
     }
 
@@ -233,6 +272,14 @@ impl GenerationState {
     pub(crate) fn vertex_spawn_exclusion_probability_base(&self) -> f32 {
         self.parameters
             .base_value(GenerationParameter::ChildSpawnExclusionProbability)
+    }
+
+    pub(crate) fn child_axis_scale(&self, generation_config: &GenerationConfig) -> Vec3 {
+        self.parameters.evaluated_axis_scale(generation_config)
+    }
+
+    pub(crate) fn child_axis_scale_base(&self) -> Vec3 {
+        self.parameters.base_axis_scale()
     }
 
     pub(crate) fn spawn_tuning(&self, generation_config: &GenerationConfig) -> SpawnTuning {
@@ -554,9 +601,10 @@ pub(crate) fn root_generation_node(
     shape_catalog: &ShapeCatalog,
     generation_config: &GenerationConfig,
 ) -> ShapeNode {
-    root_node(
+    root_node_with_axis_scale(
         generation_config.root_shape_kind,
         generation_config.root_scale,
+        generation_config.default_child_axis_scale_clamped(),
         shape_catalog,
     )
 }
@@ -566,9 +614,10 @@ pub(crate) fn reset_generation_state(
     shape_catalog: &ShapeCatalog,
     generation_config: &GenerationConfig,
 ) -> ShapeNode {
-    let root = root_node(
+    let root = root_node_with_axis_scale(
         generation_state.selected_shape_kind,
         generation_config.root_scale,
+        generation_state.child_axis_scale(generation_config),
         shape_catalog,
     );
     generation_state.nodes = vec![root.clone()];

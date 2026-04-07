@@ -1,14 +1,20 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash)]
 pub(crate) enum GenerationParameter {
     ChildScaleRatio,
+    ChildAxisScaleX,
+    ChildAxisScaleY,
+    ChildAxisScaleZ,
     ChildTwistPerVertexRadians,
     ChildOutwardOffsetRatio,
     ChildSpawnExclusionProbability,
 }
 
 impl GenerationParameter {
-    pub(crate) const ALL: [Self; 4] = [
+    pub(crate) const ALL: [Self; 7] = [
         Self::ChildScaleRatio,
+        Self::ChildAxisScaleX,
+        Self::ChildAxisScaleY,
+        Self::ChildAxisScaleZ,
         Self::ChildTwistPerVertexRadians,
         Self::ChildOutwardOffsetRatio,
         Self::ChildSpawnExclusionProbability,

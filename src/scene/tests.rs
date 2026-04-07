@@ -42,7 +42,13 @@ fn reset_generation_state_restores_root_only() {
         selected_shape_kind: ShapeKind::Octahedron,
         spawn_placement_mode: SpawnPlacementMode::Face,
         spawn_add_mode: SpawnAddMode::FillLevel,
-        parameters: GenerationParameters::from_base_values(0.42, 0.3, 0.6, 0.2),
+        parameters: GenerationParameters::from_base_values_with_axis_scale(
+            0.42,
+            Vec3::new(1.25, 0.75, 1.5),
+            0.3,
+            0.6,
+            0.2,
+        ),
         spawn_hold: HoldRepeatState {
             elapsed_secs: 1.0,
             repeating: true,
@@ -124,6 +130,10 @@ fn reset_generation_state_restores_root_only() {
     assert_eq!(generation_state.nodes[0].center, Vec3::ZERO);
     assert_eq!(generation_state.selected_shape_kind, ShapeKind::Octahedron);
     assert_eq!(generation_state.scale_ratio_base(), 0.42);
+    assert_eq!(
+        generation_state.child_axis_scale_base(),
+        Vec3::new(1.25, 0.75, 1.5)
+    );
     assert_eq!(generation_state.twist_per_vertex_radians_base(), 0.3);
     assert_eq!(generation_state.vertex_offset_ratio_base(), 0.6);
     assert_eq!(
@@ -158,6 +168,11 @@ fn reset_generation_state_restores_root_only() {
     );
     assert_eq!(reset_root.center, Vec3::ZERO);
     assert_eq!(reset_root.kind, ShapeKind::Octahedron);
+    assert_eq!(reset_root.axis_scale, Vec3::new(1.25, 0.75, 1.5));
+    assert_eq!(
+        generation_state.nodes[0].axis_scale,
+        Vec3::new(1.25, 0.75, 1.5)
+    );
     assert_eq!(generation_state.spawn_hold.elapsed_secs, 0.0);
     assert!(!generation_state.spawn_hold.repeating);
     let twist_input = generation_state

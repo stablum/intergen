@@ -50,6 +50,8 @@ pub(crate) struct GenerationSnapshot {
     #[serde(default)]
     pub(crate) spawn_add_mode: SpawnAddMode,
     pub(crate) scale_ratio: f32,
+    #[serde(default = "unit_axis_scale_array")]
+    pub(crate) child_axis_scale: [f32; 3],
     pub(crate) twist_per_vertex_radians: f32,
     pub(crate) vertex_offset_ratio: f32,
     #[serde(default)]
@@ -216,6 +218,7 @@ impl GenerationSnapshot {
             spawn_placement_mode: generation_state.spawn_placement_mode,
             spawn_add_mode: generation_state.spawn_add_mode,
             scale_ratio: generation_state.scale_ratio_base(),
+            child_axis_scale: vec3_to_array(generation_state.child_axis_scale_base()),
             twist_per_vertex_radians: generation_state.twist_per_vertex_radians_base(),
             vertex_offset_ratio: generation_state.vertex_offset_ratio_base(),
             vertex_spawn_exclusion_probability: generation_state
@@ -243,8 +246,9 @@ impl GenerationSnapshot {
             selected_shape_kind: self.selected_shape_kind,
             spawn_placement_mode: self.spawn_placement_mode,
             spawn_add_mode: self.spawn_add_mode,
-            parameters: GenerationParameters::from_base_values(
+            parameters: GenerationParameters::from_base_values_with_axis_scale(
                 self.scale_ratio,
+                vec3_from_array(self.child_axis_scale),
                 self.twist_per_vertex_radians,
                 self.vertex_offset_ratio,
                 self.vertex_spawn_exclusion_probability,
@@ -369,7 +373,7 @@ fn resize_occupancy(values: &[bool], len: usize) -> Vec<bool> {
 mod tests {
     use bevy::prelude::Vec3;
 
-    use super::{NodeOriginSnapshot, SceneStateSnapshot, ShapeNodeSnapshot};
+    use super::{GenerationSnapshot, NodeOriginSnapshot, SceneStateSnapshot, ShapeNodeSnapshot};
     use crate::camera::CameraRig;
     use crate::config::AppConfig;
     use crate::effect_tuner::EffectTunerState;
@@ -434,6 +438,22 @@ origin = "Root"
         assert!(
             (node.radius - shape_catalog.geometry(ShapeKind::Cube).radius * 2.0).abs() <= 1.0e-6
         );
+    }
+
+    #[test]
+    fn generation_snapshot_defaults_child_axis_scale_to_unit() {
+        let snapshot: GenerationSnapshot = toml::from_str(
+            r#"
+selected_shape_kind = "cube"
+scale_ratio = 0.58
+twist_per_vertex_radians = 0.0
+vertex_offset_ratio = 0.0
+nodes = []
+"#,
+        )
+        .expect("generation snapshot should parse");
+
+        assert_eq!(snapshot.child_axis_scale, [1.0, 1.0, 1.0]);
     }
 
     #[test]

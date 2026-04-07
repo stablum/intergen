@@ -83,6 +83,9 @@ Each generation parameter is stored as a `ScalarParameterState`, which means:
 | Parameter | Stored Domain | Effective Domain / Notes |
 | --- | --- | --- |
 | `scale_ratio` | `ScalarParameterState` over finite `f32` | Effective value is clamped to `GenerationConfig.min_scale_ratio..max_scale_ratio`; default config is `0.15..1.0`. Affects future spawns only. Existing per-node `ShapeNode.scale` and `ShapeNode.axis_scale` values are not rewritten. |
+| `child_axis_scale_x` | `ScalarParameterState` over finite `f32` | Effective value is clamped to the positive `GenerationConfig.min_child_axis_scale..max_child_axis_scale` range; default config is `0.05..4.0`. Affects future spawns only, plus the root node created by scene reset. Existing per-node `ShapeNode.axis_scale` values are not rewritten. |
+| `child_axis_scale_y` | `ScalarParameterState` over finite `f32` | Same semantics as `child_axis_scale_x`, applied to the Y axis. |
+| `child_axis_scale_z` | `ScalarParameterState` over finite `f32` | Same semantics as `child_axis_scale_x`, applied to the Z axis. |
 | `child_twist` | `ScalarParameterState` over finite `f32` | Effective value is clamped to the nonnegative twist bounds in `GenerationConfig`; default config is `0.0..PI`. Affects child orientation and can recompute existing child node rotations. |
 | `child_offset` | `ScalarParameterState` over finite `f32` | Effective value is clamped to the nonnegative offset bounds in `GenerationConfig`; default config is `0.0..6.0`. Measured in child-radius units. Can recompute existing child node centers. |
 | `child_spawn_exclusion_probability` | `ScalarParameterState` over finite `f32` | Effective value is clamped to `[0.0, 1.0]`. Affects future spawn candidate filtering only. No persistent per-attachment exclusion flag is stored. |
@@ -90,7 +93,7 @@ Each generation parameter is stored as a `ScalarParameterState`, which means:
 Important distinction:
 
 - `selected_shape_kind`, `spawn_placement_mode`, and `spawn_add_mode` are editor/spawn-mode state for future spawning.
-- `scale_ratio` and `child_spawn_exclusion_probability` are latent spawn-time parameters: they affect future spawn decisions but do not reflow the existing tree.
+- `scale_ratio`, `child_axis_scale_x/y/z`, and `child_spawn_exclusion_probability` are latent spawn-time parameters: they affect future spawn decisions but do not reflow the existing tree.
 - `child_twist` and `child_offset` are shared scene parameters that can recompute existing child transforms from their stored parent/attachment relationship.
 
 ### `MaterialState`
@@ -225,15 +228,15 @@ The current per-node scale model has two stored parameters and two important der
 | Quantity | Domain | Notes |
 | --- | --- | --- |
 | `ShapeNode.scale` | finite `f32`, normally `> 0.0` in valid generated scenes | Uniform scalar portion of the node scale. Spawned children compute this from `parent.scale * scale_ratio`. |
-| `ShapeNode.axis_scale` | `Vec3` of finite `f32` | Per-axis multiplier. The root node and newly spawned children currently default to `Vec3::ONE`, so non-uniform scaling currently comes from snapshot/imported per-node data or later direct node edits, not from the shared generation parameters. |
+| `ShapeNode.axis_scale` | `Vec3` of finite `f32` | Per-axis multiplier. New roots and spawned children copy the current shared generation axis-scale values at creation time. After that, the value is stored per node and preserved across recomputes and snapshots. |
 | `ShapeNode.combined_scale()` | `Vec3` of finite `f32` | Defined as `axis_scale * scale` component-wise. This is the scale actually sent into Bevy transforms and mesh export. |
 | `ShapeNode.bounding_radius(geometry)` | finite `f32`, normally `> 0.0` | Defined from `geometry.radius * max(abs(combined_scale.x), abs(combined_scale.y), abs(combined_scale.z))`. This is what the node caches in `radius`. |
 
 Current runtime behavior:
 
-- root nodes start with `axis_scale = Vec3::ONE`
-- newly spawned child nodes also start with `axis_scale = Vec3::ONE`
-- spawn-time shared `scale_ratio` only changes the uniform `scale` term for future children
+- root nodes start with the clamped shared generation axis scale
+- newly spawned child nodes copy the current clamped shared generation axis scale
+- spawn-time shared `scale_ratio` changes the uniform `scale` term for future children
 - recomputing the tree preserves each node's stored `axis_scale` and recomputes `radius` from it
 
 ### `ShapeKind`
@@ -403,6 +406,7 @@ The main serialized snapshot contains:
 | `spawn_placement_mode` | `SpawnPlacementMode` | Future-spawn placement mode. |
 | `spawn_add_mode` | `SpawnAddMode` | Future-spawn add mode. |
 | `scale_ratio` | finite `f32` | Serialized base scale ratio. In runtime evaluation it is clamped by `GenerationConfig`. |
+| `child_axis_scale` | `[f32; 3]` of finite values | Serialized base shared child/root axis scale. Missing serialized values default to `[1.0, 1.0, 1.0]` for backward compatibility. Runtime evaluation clamps each component to the positive axis-scale bounds. |
 | `twist_per_vertex_radians` | finite `f32` | Serialized base twist. In runtime evaluation it is clamped by `GenerationConfig`. |
 | `vertex_offset_ratio` | finite `f32` | Serialized base outward offset. In runtime evaluation it is clamped by `GenerationConfig`. |
 | `vertex_spawn_exclusion_probability` | finite `f32` | Serialized base spawn exclusion probability. Runtime evaluation clamps it to `[0.0, 1.0]`. |

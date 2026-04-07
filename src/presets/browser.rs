@@ -443,6 +443,7 @@ mod tests {
                 spawn_placement_mode: SpawnPlacementMode::Vertex,
                 spawn_add_mode: SpawnAddMode::Single,
                 scale_ratio: 0.5,
+                child_axis_scale: [1.0, 1.0, 1.0],
                 twist_per_vertex_radians: 0.0,
                 vertex_offset_ratio: 0.0,
                 vertex_spawn_exclusion_probability: 0.0,

@@ -9,6 +9,7 @@ use super::catalog::{ShapeCatalog, ShapeGeometry};
 pub(crate) struct SpawnTuning {
     pub(crate) min_scale_ratio: f32,
     pub(crate) max_scale_ratio: f32,
+    pub(crate) child_axis_scale: Vec3,
     pub(crate) containment_epsilon: f32,
     pub(crate) twist_per_vertex_radians: f32,
     pub(crate) vertex_offset_ratio: f32,
@@ -188,7 +189,17 @@ struct SpawnCandidateInput<'a> {
     tuning: SpawnTuning,
 }
 
-pub(crate) fn root_node(kind: ShapeKind, scale: f32, shapes: &ShapeCatalog) -> ShapeNode {
+#[cfg_attr(not(test), allow(dead_code))]
+fn root_node(kind: ShapeKind, scale: f32, shapes: &ShapeCatalog) -> ShapeNode {
+    root_node_with_axis_scale(kind, scale, Vec3::ONE, shapes)
+}
+
+pub(crate) fn root_node_with_axis_scale(
+    kind: ShapeKind,
+    scale: f32,
+    axis_scale: Vec3,
+    shapes: &ShapeCatalog,
+) -> ShapeNode {
     let geometry = shapes.geometry(kind);
     let mut node = ShapeNode {
         kind,
@@ -196,7 +207,7 @@ pub(crate) fn root_node(kind: ShapeKind, scale: f32, shapes: &ShapeCatalog) -> S
         center: Vec3::ZERO,
         rotation: Quat::IDENTITY,
         scale,
-        axis_scale: Vec3::ONE,
+        axis_scale,
         radius: 0.0,
         occupied_attachments: AttachmentOccupancy::new(geometry),
         origin: NodeOrigin::Root,
@@ -417,7 +428,7 @@ fn spawn_candidate(input: SpawnCandidateInput<'_>) -> ShapeNode {
         center: Vec3::ZERO,
         rotation: Quat::IDENTITY,
         scale,
-        axis_scale: Vec3::ONE,
+        axis_scale: input.tuning.child_axis_scale,
         radius: 0.0,
         occupied_attachments: AttachmentOccupancy::new(input.child_geometry),
         origin: NodeOrigin::Child {
@@ -531,6 +542,7 @@ mod tests {
         SpawnTuning {
             min_scale_ratio: 0.15,
             max_scale_ratio: 1.0,
+            child_axis_scale: Vec3::ONE,
             containment_epsilon: 0.02,
             twist_per_vertex_radians: PI / 5.0,
             vertex_offset_ratio: 0.0,
@@ -775,6 +787,26 @@ mod tests {
         let expected_center = world_anchor + outward * child_radius * vertex_offset_ratio;
 
         assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
+    }
+
+    #[test]
+    fn spawned_children_copy_the_shared_axis_scale() {
+        let shapes = ShapeCatalog::new();
+        let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
+
+        let spawn = next_spawn(
+            &mut nodes,
+            &shapes,
+            ShapeKind::Tetrahedron,
+            0.35,
+            SpawnTuning {
+                child_axis_scale: Vec3::new(1.4, 0.8, 1.2),
+                ..test_tuning()
+            },
+        )
+        .expect("spawn should succeed");
+
+        assert_eq!(spawn.node.axis_scale, Vec3::new(1.4, 0.8, 1.2));
     }
 
     #[test]

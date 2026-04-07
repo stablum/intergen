@@ -351,7 +351,7 @@ mod tests {
             .runtime_snapshot()
             .lfos
             .len();
-        let checked_in_pre_scale_and_exclusion_len = current_lfo_layout_len - 2;
+        let checked_in_scene_presets_raw_lfo_len = current_lfo_layout_len - 5;
         let default_encoded =
             toml::to_string(&default_snapshot).expect("default runtime snapshot should serialize");
         let default_lfos = raw_runtime_snapshot_lfo_entries(&default_encoded);
@@ -361,9 +361,9 @@ mod tests {
                 .unwrap_or_else(|error| panic!("{} should read: {error}", path.display()));
             let stored_lfos = raw_effect_lfo_entries(&contents);
             assert!(
-                stored_lfos.len() == checked_in_pre_scale_and_exclusion_len
+                stored_lfos.len() == checked_in_scene_presets_raw_lfo_len
                     || stored_lfos.len() == current_lfo_layout_len,
-                "{} should store either the checked-in pre-scale/exclusion layout or the current keyed LFO layout",
+                "{} should store either the checked-in raw layout or the current keyed LFO layout",
                 path.display()
             );
             for stored_lfo in stored_lfos {
@@ -408,12 +408,15 @@ mod tests {
 
             for parameter in [
                 "generation.child_scale_ratio",
+                "generation.child_axis_scale.x",
+                "generation.child_axis_scale.y",
+                "generation.child_axis_scale.z",
                 "generation.child_spawn_exclusion_probability",
             ] {
                 assert_eq!(
                     lfo_entry_by_parameter(&restored_lfos, parameter),
                     lfo_entry_by_parameter(&default_lfos, parameter),
-                    "{} should default the newly added generation LFO slot '{}'",
+                    "{} should default the checked-in missing generation LFO slot '{}'",
                     path.display(),
                     parameter
                 );

@@ -16,7 +16,7 @@ use crate::help_text::{startup_controls_message, startup_fx_message};
 use crate::parameters::{GenerationParameter, HoldRepeatState, ScalarParameterState};
 use crate::shapes::{
     ShapeCatalog, ShapeGeometry, ShapeKind, ShapeNode, SpawnAddMode, SpawnPlacementMode,
-    SpawnTuning, build_mesh, root_node,
+    SpawnTuning, build_mesh, root_node_with_axis_scale,
 };
 use crate::ui::{UiFontSource, load_ui_theme, spawn_help_ui};
 

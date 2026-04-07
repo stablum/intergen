@@ -4,6 +4,9 @@ pub(crate) enum EffectTunerSceneParameter {
     SpawnPlacementMode,
     SpawnAddMode,
     ChildScaleRatio,
+    ChildAxisScaleX,
+    ChildAxisScaleY,
+    ChildAxisScaleZ,
     ChildTwistPerVertexRadians,
     ChildOutwardOffsetRatio,
     ChildSpawnExclusionProbability,
@@ -113,11 +116,14 @@ pub(crate) enum SceneChangeTarget {
 }
 
 impl EffectTunerSceneParameter {
-    const ALL: [Self; 99] = [
+    const ALL: [Self; 102] = [
         Self::ChildKind,
         Self::SpawnPlacementMode,
         Self::SpawnAddMode,
         Self::ChildScaleRatio,
+        Self::ChildAxisScaleX,
+        Self::ChildAxisScaleY,
+        Self::ChildAxisScaleZ,
         Self::ChildTwistPerVertexRadians,
         Self::ChildOutwardOffsetRatio,
         Self::ChildSpawnExclusionProbability,
@@ -215,7 +221,7 @@ impl EffectTunerSceneParameter {
         Self::LightingAccentTranslationZ,
     ];
 
-    const LFO_CAPABLE: [Self; 89] = [
+    const LFO_CAPABLE: [Self; 92] = [
         Self::ChildTwistPerVertexRadians,
         Self::ChildOutwardOffsetRatio,
         Self::GlobalOpacity,
@@ -304,11 +310,17 @@ impl EffectTunerSceneParameter {
         Self::LightingAccentTranslationY,
         Self::LightingAccentTranslationZ,
         Self::ChildScaleRatio,
+        Self::ChildAxisScaleX,
+        Self::ChildAxisScaleY,
+        Self::ChildAxisScaleZ,
         Self::ChildSpawnExclusionProbability,
     ];
 
-    const GENERATION_LFO_CAPABLE: [Self; 4] = [
+    const GENERATION_LFO_CAPABLE: [Self; 7] = [
         Self::ChildScaleRatio,
+        Self::ChildAxisScaleX,
+        Self::ChildAxisScaleY,
+        Self::ChildAxisScaleZ,
         Self::ChildTwistPerVertexRadians,
         Self::ChildOutwardOffsetRatio,
         Self::ChildSpawnExclusionProbability,
@@ -360,6 +372,9 @@ impl EffectTunerSceneParameter {
             Self::SpawnPlacementMode => "generation.spawn_placement_mode",
             Self::SpawnAddMode => "generation.spawn_add_mode",
             Self::ChildScaleRatio => "generation.child_scale_ratio",
+            Self::ChildAxisScaleX => "generation.child_axis_scale.x",
+            Self::ChildAxisScaleY => "generation.child_axis_scale.y",
+            Self::ChildAxisScaleZ => "generation.child_axis_scale.z",
             Self::ChildTwistPerVertexRadians => "generation.child_twist_per_vertex_radians",
             Self::ChildOutwardOffsetRatio => "generation.child_outward_offset_ratio",
             Self::ChildSpawnExclusionProbability => "generation.child_spawn_exclusion_probability",
@@ -475,6 +490,9 @@ impl EffectTunerSceneParameter {
             Self::SpawnPlacementMode => "placement",
             Self::SpawnAddMode => "add mode",
             Self::ChildScaleRatio => "scale",
+            Self::ChildAxisScaleX => "axis x",
+            Self::ChildAxisScaleY => "axis y",
+            Self::ChildAxisScaleZ => "axis z",
             Self::ChildTwistPerVertexRadians => "twist",
             Self::ChildOutwardOffsetRatio => "offset",
             Self::ChildSpawnExclusionProbability => "spawn%",
@@ -592,6 +610,9 @@ impl EffectTunerSceneParameter {
             | Self::SpawnPlacementMode
             | Self::SpawnAddMode
             | Self::ChildScaleRatio
+            | Self::ChildAxisScaleX
+            | Self::ChildAxisScaleY
+            | Self::ChildAxisScaleZ
             | Self::ChildTwistPerVertexRadians
             | Self::ChildOutwardOffsetRatio
             | Self::ChildSpawnExclusionProbability => "scene",
@@ -767,6 +788,9 @@ impl EffectTunerSceneParameter {
             | Self::SpawnPlacementMode
             | Self::SpawnAddMode
             | Self::ChildScaleRatio
+            | Self::ChildAxisScaleX
+            | Self::ChildAxisScaleY
+            | Self::ChildAxisScaleZ
             | Self::ChildSpawnExclusionProbability => SceneChangeTarget::None,
         }
     }
@@ -804,6 +828,9 @@ impl EffectTunerSceneParameter {
     fn generation_parameter(self) -> Option<GenerationParameter> {
         match self {
             Self::ChildScaleRatio => Some(GenerationParameter::ChildScaleRatio),
+            Self::ChildAxisScaleX => Some(GenerationParameter::ChildAxisScaleX),
+            Self::ChildAxisScaleY => Some(GenerationParameter::ChildAxisScaleY),
+            Self::ChildAxisScaleZ => Some(GenerationParameter::ChildAxisScaleZ),
             Self::ChildTwistPerVertexRadians => {
                 Some(GenerationParameter::ChildTwistPerVertexRadians)
             }
@@ -912,6 +939,9 @@ impl EffectTunerSceneParameter {
                 | Self::MaterialRootSurface
                 | Self::MaterialAccentSurface
                 | Self::ChildScaleRatio
+                | Self::ChildAxisScaleX
+                | Self::ChildAxisScaleY
+                | Self::ChildAxisScaleZ
                 | Self::ChildTwistPerVertexRadians
                 | Self::ChildOutwardOffsetRatio
                 | Self::ChildSpawnExclusionProbability => 1.0,
@@ -945,6 +975,9 @@ impl EffectTunerSceneParameter {
             | Self::MaterialRootSurface
             | Self::MaterialAccentSurface => 0.0,
             Self::ChildScaleRatio => context.generation_state.scale_ratio_base(),
+            Self::ChildAxisScaleX => context.generation_state.child_axis_scale_base().x,
+            Self::ChildAxisScaleY => context.generation_state.child_axis_scale_base().y,
+            Self::ChildAxisScaleZ => context.generation_state.child_axis_scale_base().z,
             Self::ChildTwistPerVertexRadians => {
                 context.generation_state.twist_per_vertex_radians_base()
             }
@@ -1577,6 +1610,9 @@ impl EffectTunerSceneParameter {
             Self::ChildScaleRatio => {
                 Some(context.generation_state.scale_ratio(context.generation_config))
             }
+            Self::ChildAxisScaleX => Some(context.generation_state.child_axis_scale(context.generation_config).x),
+            Self::ChildAxisScaleY => Some(context.generation_state.child_axis_scale(context.generation_config).y),
+            Self::ChildAxisScaleZ => Some(context.generation_state.child_axis_scale(context.generation_config).z),
             Self::ChildTwistPerVertexRadians => Some(
                 context
                     .generation_state

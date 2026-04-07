@@ -1,3 +1,5 @@
+use bevy::prelude::Vec3;
+
 use crate::config::{
     CameraConfig, EffectGroup, EffectsConfig, GenerationConfig, LightingConfig, MaterialConfig,
     MaterialSurfaceMode, RenderingConfig, StageConfig,
@@ -507,6 +509,7 @@ fn latent_generation_lfos_modulate_spawn_inputs_without_recompute_side_effects()
     ));
 
     let scale_base = generation_state.scale_ratio(&generation_config);
+    let axis_scale_base = generation_state.child_axis_scale(&generation_config);
     let exclusion_base = generation_state.vertex_spawn_exclusion_probability(&generation_config);
 
     let scale_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
@@ -517,6 +520,19 @@ fn latent_generation_lfos_modulate_spawn_inputs_without_recompute_side_effects()
     effect_tuner.lfos[scale_index].shape = LfoShape::Sine;
     effect_tuner.lfos[scale_index].amplitude = 0.2;
     effect_tuner.lfos[scale_index].frequency_hz = 1.0;
+
+    for (parameter, amplitude) in [
+        (EffectTunerSceneParameter::ChildAxisScaleX, 0.15),
+        (EffectTunerSceneParameter::ChildAxisScaleY, -0.2),
+        (EffectTunerSceneParameter::ChildAxisScaleZ, 0.1),
+    ] {
+        let axis_index = lfo_index_for_parameter(EffectTunerParameter::Scene(parameter))
+            .expect("axis scale parameter should have an LFO slot");
+        effect_tuner.lfos[axis_index].enabled = true;
+        effect_tuner.lfos[axis_index].shape = LfoShape::Sine;
+        effect_tuner.lfos[axis_index].amplitude = amplitude;
+        effect_tuner.lfos[axis_index].frequency_hz = 1.0;
+    }
 
     let exclusion_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
         EffectTunerSceneParameter::ChildSpawnExclusionProbability,
@@ -541,10 +557,18 @@ fn latent_generation_lfos_modulate_spawn_inputs_without_recompute_side_effects()
 
     assert!(!result.generation_changed);
     assert!(generation_state.scale_ratio(&generation_config) > scale_base);
+    assert_ne!(
+        generation_state.child_axis_scale(&generation_config),
+        axis_scale_base
+    );
     assert!(generation_state.vertex_spawn_exclusion_probability(&generation_config) > exclusion_base);
 
     let base_generation = effect_tuner.base_generation_state(&generation_config, &generation_state);
     assert!((base_generation.scale_ratio(&generation_config) - scale_base).abs() < 1.0e-6);
+    assert_eq!(
+        base_generation.child_axis_scale(&generation_config),
+        Vec3::ONE
+    );
     assert!(
         (base_generation.vertex_spawn_exclusion_probability(&generation_config) - exclusion_base)
             .abs()

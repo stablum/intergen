@@ -287,6 +287,10 @@ pub(crate) struct GenerationConfig {
     pub(crate) scale_adjust_step: f32,
     pub(crate) min_scale_ratio: f32,
     pub(crate) max_scale_ratio: f32,
+    pub(crate) default_child_axis_scale: [f32; 3],
+    pub(crate) child_axis_scale_adjust_step: f32,
+    pub(crate) min_child_axis_scale: f32,
+    pub(crate) max_child_axis_scale: f32,
     pub(crate) spawn_hold_delay_secs: f32,
     pub(crate) spawn_repeat_interval_secs: f32,
     pub(crate) containment_epsilon: f32,
@@ -322,6 +326,15 @@ impl GenerationConfig {
                 0.0,
                 0.0,
             ),
+            GenerationParameter::ChildAxisScaleX => {
+                self.child_axis_scale_spec(self.default_child_axis_scale[0])
+            }
+            GenerationParameter::ChildAxisScaleY => {
+                self.child_axis_scale_spec(self.default_child_axis_scale[1])
+            }
+            GenerationParameter::ChildAxisScaleZ => {
+                self.child_axis_scale_spec(self.default_child_axis_scale[2])
+            }
             GenerationParameter::ChildTwistPerVertexRadians => {
                 ScalarParameterSpec::new_nonnegative(
                     self.twist_per_vertex_radians,
@@ -353,9 +366,38 @@ impl GenerationConfig {
         }
     }
 
+    fn child_axis_scale_spec(&self, default_value: f32) -> ScalarParameterSpec {
+        let min_value = self.min_child_axis_scale.max(0.01);
+        let max_value = self.max_child_axis_scale.max(min_value);
+        ScalarParameterSpec::new(
+            default_value,
+            min_value,
+            max_value,
+            self.child_axis_scale_adjust_step,
+            0.0,
+            0.0,
+        )
+    }
+
     pub(crate) fn twist_bounds(&self) -> (f32, f32) {
         self.parameter_spec(GenerationParameter::ChildTwistPerVertexRadians)
             .bounds()
+    }
+
+    pub(crate) fn child_axis_scale_bounds(&self) -> (f32, f32) {
+        self.parameter_spec(GenerationParameter::ChildAxisScaleX)
+            .bounds()
+    }
+
+    pub(crate) fn default_child_axis_scale_clamped(&self) -> Vec3 {
+        Vec3::new(
+            self.parameter_spec(GenerationParameter::ChildAxisScaleX)
+                .default_value(),
+            self.parameter_spec(GenerationParameter::ChildAxisScaleY)
+                .default_value(),
+            self.parameter_spec(GenerationParameter::ChildAxisScaleZ)
+                .default_value(),
+        )
     }
 
     pub(crate) fn default_twist_per_vertex_radians_clamped(&self) -> f32 {
@@ -385,12 +427,16 @@ impl GenerationConfig {
 
     pub(crate) fn spawn_tuning(
         &self,
+        child_axis_scale: Vec3,
         twist_per_vertex_radians: f32,
         vertex_offset_ratio: f32,
         vertex_spawn_exclusion_probability: f32,
         spawn_placement_mode: SpawnPlacementMode,
     ) -> SpawnTuning {
         let scale_spec = self.parameter_spec(GenerationParameter::ChildScaleRatio);
+        let axis_scale_x_spec = self.parameter_spec(GenerationParameter::ChildAxisScaleX);
+        let axis_scale_y_spec = self.parameter_spec(GenerationParameter::ChildAxisScaleY);
+        let axis_scale_z_spec = self.parameter_spec(GenerationParameter::ChildAxisScaleZ);
         let twist_spec = self.parameter_spec(GenerationParameter::ChildTwistPerVertexRadians);
         let offset_spec = self.parameter_spec(GenerationParameter::ChildOutwardOffsetRatio);
         let exclusion_spec =
@@ -399,6 +445,11 @@ impl GenerationConfig {
         SpawnTuning {
             min_scale_ratio,
             max_scale_ratio,
+            child_axis_scale: Vec3::new(
+                axis_scale_x_spec.clamp(child_axis_scale.x),
+                axis_scale_y_spec.clamp(child_axis_scale.y),
+                axis_scale_z_spec.clamp(child_axis_scale.z),
+            ),
             containment_epsilon: self.containment_epsilon,
             twist_per_vertex_radians: twist_spec.clamp(twist_per_vertex_radians),
             vertex_offset_ratio: offset_spec.clamp(vertex_offset_ratio),
@@ -419,6 +470,10 @@ impl Default for GenerationConfig {
             scale_adjust_step: 0.05,
             min_scale_ratio: 0.15,
             max_scale_ratio: 1.0,
+            default_child_axis_scale: [1.0, 1.0, 1.0],
+            child_axis_scale_adjust_step: 0.05,
+            min_child_axis_scale: 0.05,
+            max_child_axis_scale: 4.0,
             spawn_hold_delay_secs: 0.24,
             spawn_repeat_interval_secs: 0.07,
             containment_epsilon: 0.02,
@@ -777,6 +832,8 @@ fn ordered_pair(left: f32, right: f32) -> (f32, f32) {
 
 #[cfg(test)]
 mod tests {
+    use bevy::prelude::Vec3;
+
     use super::{AppConfig, PresentModeSetting, parse_config};
 
     #[test]
@@ -1068,6 +1125,26 @@ mod tests {
 
         assert_eq!(config.generation.vertex_offset_bounds(), (0.0, 0.75));
     }
+
+    #[test]
+    fn child_axis_scale_defaults_are_clamped_to_positive_bounds() {
+        let config = parse_config(
+            r#"
+            [generation]
+            default_child_axis_scale = [-1.0, 4.0, 0.5]
+            min_child_axis_scale = -2.0
+            max_child_axis_scale = 2.0
+            "#,
+        )
+        .expect("child axis scale config should parse");
+
+        assert_eq!(config.generation.child_axis_scale_bounds(), (0.01, 2.0));
+        assert_eq!(
+            config.generation.default_child_axis_scale_clamped(),
+            Vec3::new(0.01, 2.0, 0.5)
+        );
+    }
+
     #[test]
     fn ui_focus_colors_default_when_not_overridden() {
         let config = parse_config(
