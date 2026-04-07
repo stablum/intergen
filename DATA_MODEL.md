@@ -1,6 +1,6 @@
 # intergen Data Model
 
-This document describes the current scene data model in the codebase: what is stored per shape, what is shared across the whole scene, and how that data is serialized into presets and exports.
+This document describes the current scene data model in the codebase: what is stored per shape, what is shared across the whole scene, how values are derived, and what domain each named field lives in.
 
 ## Overview
 
@@ -18,32 +18,37 @@ The main rule is:
 - If something belongs to one generated object in the tree, it lives on `ShapeNode`.
 - If something can be recomputed from shared state and node metadata, it is usually derived at render time instead of stored per node.
 
-## Aggregation Levels
+## Domain Conventions
 
-### 1. App-wide startup defaults
+This document uses "domain" in the mathematical sense: the set of values a field is allowed or expected to hold.
+
+- "Stored domain" means the type and value shape the struct field carries.
+- "Effective domain" means the value range that actually reaches rendering/spawn logic after the code clamps or normalizes it.
+- `finite f32` means a normal floating-point value, not `NaN` or infinity.
+- `Vec<T>` means variable length, with extra rules called out in the notes column when they matter.
+- Rust range notation like `0..8` means `0` through `7`.
+
+For several fields, the code stores a broad `f32` but clamps later when it is consumed. In those cases, both the stored domain and the effective domain are listed.
+
+## AppConfig
 
 `AppConfig` is the root configuration object loaded from `config.toml`.
 
-Top-level sections:
+| Field | Domain | Notes |
+| --- | --- | --- |
+| `window` | `WindowConfig` | Window title, size, and present mode defaults. |
+| `rendering` | `RenderingConfig` | Clear color, ambient light, and stage defaults. |
+| `camera` | `CameraConfig` | Camera startup pose and motion tuning. |
+| `generation` | `GenerationConfig` | Root shape, spawn defaults, and generation parameter specs. |
+| `lighting` | `LightingConfig` | Directional, point, and accent light defaults. |
+| `effects` | `EffectsConfig` | Post-process effect defaults. |
+| `materials` | `MaterialConfig` | Shared material palette and procedural surface defaults. |
+| `capture` | `CaptureConfig` | Screenshot/output settings. |
+| `ui` | `UiConfig` | Overlay layout, colors, and font candidates. |
 
-- `window`
-- `rendering`
-- `camera`
-- `generation`
-- `lighting`
-- `effects`
-- `materials`
-- `capture`
-- `ui`
+The top-level config fields above are not the live scene themselves. They are the defaults and specs from which runtime state is built.
 
-This layer is mostly defaults and parameter specs, not the current live scene. For example:
-
-- `GenerationConfig` stores default values and bounds for scale, twist, outward offset, and spawn exclusion.
-- `MaterialConfig` stores the default palette/PBR values and procedural surface-family rules.
-- `RenderingConfig` stores clear color, ambient light, and stage defaults.
-- `LightingConfig` stores directional, point, and accent light defaults.
-
-### 2. Scene-wide runtime state
+## Scene-Wide Runtime State
 
 The current scene is spread across shared resources:
 
@@ -57,139 +62,202 @@ The current scene is spread across shared resources:
 
 These are scene-wide, not per object.
 
-#### `GenerationState`
+### `GenerationState`
 
-`GenerationState` owns:
+| Field | Stored Domain | Effective Domain / Notes |
+| --- | --- | --- |
+| `nodes` | `Vec<ShapeNode>` | Ordered node tree. In valid runtime scenes and prepared snapshots, length is at least `1` and node `0` is the root. Child `parent_index` values refer into this vector. |
+| `selected_shape_kind` | `ShapeKind` | One of `Cube`, `Tetrahedron`, `Octahedron`, `Dodecahedron`. This is the shape kind for future spawns, not a property of all existing nodes. |
+| `spawn_placement_mode` | `SpawnPlacementMode` | One of `Vertex`, `Edge`, `Face`. Controls where future children attach. |
+| `spawn_add_mode` | `SpawnAddMode` | One of `Single`, `FillLevel`. Controls how many objects one spawn action adds. |
+| `parameters` | `GenerationParameters` | Shared scalar generation state. See the next table. |
+| `spawn_hold` | `HoldRepeatState` | Internal input state. `elapsed_secs` is expected to stay `>= 0.0`; `repeating` is boolean. |
 
-- `nodes: Vec<ShapeNode>`: the actual recursive shape tree
-- `selected_shape_kind`: which shape kind the next spawn should use
-- `spawn_placement_mode`: whether new children attach to vertices, edges, or faces
-- `spawn_add_mode`: single spawn vs fill-current-level behavior
-- `parameters`: shared generation parameter states
-- `spawn_hold`: key-repeat state for spawning input
+### `GenerationParameters`
 
-`GenerationParameters` currently contains four shared scalar parameters:
+Each generation parameter is stored as a `ScalarParameterState`, which means:
 
-- `scale_ratio`
-- `child_twist`
-- `child_offset`
-- `child_spawn_exclusion_probability`
+- stored base domain: one finite `f32` base value plus one finite `f32` additive offset
+- effective domain: the base value plus offset, clamped by the matching `GenerationConfig` spec
+
+| Parameter | Stored Domain | Effective Domain / Notes |
+| --- | --- | --- |
+| `scale_ratio` | `ScalarParameterState` over finite `f32` | Effective value is clamped to `GenerationConfig.min_scale_ratio..max_scale_ratio`; default config is `0.15..1.0`. Affects future spawns only. Existing `ShapeNode.scale` values are not rewritten. |
+| `child_twist` | `ScalarParameterState` over finite `f32` | Effective value is clamped to the nonnegative twist bounds in `GenerationConfig`; default config is `0.0..PI`. Affects child orientation and can recompute existing child node rotations. |
+| `child_offset` | `ScalarParameterState` over finite `f32` | Effective value is clamped to the nonnegative offset bounds in `GenerationConfig`; default config is `0.0..6.0`. Measured in child-radius units. Can recompute existing child node centers. |
+| `child_spawn_exclusion_probability` | `ScalarParameterState` over finite `f32` | Effective value is clamped to `[0.0, 1.0]`. Affects future spawn candidate filtering only. No persistent per-attachment exclusion flag is stored. |
 
 Important distinction:
 
 - `selected_shape_kind`, `spawn_placement_mode`, and `spawn_add_mode` are editor/spawn-mode state for future spawning.
-- `scale_ratio` is also a future-spawn input; existing nodes keep their own already-materialized `scale`.
+- `scale_ratio` and `child_spawn_exclusion_probability` are latent spawn-time parameters: they affect future spawn decisions but do not reflow the existing tree.
 - `child_twist` and `child_offset` are shared scene parameters that can recompute existing child transforms from their stored parent/attachment relationship.
-- `child_spawn_exclusion_probability` affects future spawn candidate selection only; it does not rewrite existing nodes.
 
-#### `MaterialState`
+### `MaterialState`
 
-`MaterialState` is shared by the whole generated shape set. It stores:
+`MaterialState` is shared by the whole generated shape set. There is no per-node material state struct for generated shapes.
 
-- global opacity
-- hue progression and base HSL/PBR values
-- per-shape-kind hue biases
-- surface-mode and surface-family selectors
-- accent cadence by level
-- per-level shifts for lightness, saturation, metallic, roughness, and reflectance
+| Field | Stored Domain | Effective Domain / Notes |
+| --- | --- | --- |
+| `opacity` | finite `f32` | Effective value is clamped to `[0.0, 1.0]` when applied to materials. Reset/input paths usually respect `MaterialConfig.min_opacity..max_opacity`. |
+| `hue_step_per_level` | finite `f32` in degrees per level | No hard storage clamp. Effective hue is wrapped with `rem_euclid(360.0)` when computing color. |
+| `saturation` | finite `f32` | Intended as an HSL saturation base. Effective per-node saturation is clamped to `[0.0, 1.0]` after surface bias and level shifts. |
+| `lightness` | finite `f32` | Intended as an HSL lightness base. Effective per-node lightness is clamped to `[0.0, 1.0]` after surface bias and level shifts. |
+| `metallic` | finite `f32` | Intended base metallic value. Effective per-node value is clamped to `[0.0, 1.0]`. |
+| `perceptual_roughness` | finite `f32` | Intended base roughness value. Effective per-node value is clamped to `[0.02, 1.0]` for generated shape materials. |
+| `reflectance` | finite `f32` | Effective per-node value is clamped to `[0.0, 1.0]`. |
+| `cube_hue_bias` | finite `f32` in degrees | Added to hue for cube nodes, then wrapped mod `360`. |
+| `tetrahedron_hue_bias` | finite `f32` in degrees | Added to hue for tetrahedron nodes, then wrapped mod `360`. |
+| `octahedron_hue_bias` | finite `f32` in degrees | Added to hue for octahedron nodes, then wrapped mod `360`. |
+| `dodecahedron_hue_bias` | finite `f32` in degrees | Added to hue for dodecahedron nodes, then wrapped mod `360`. |
+| `surface_mode` | `MaterialSurfaceMode` | One of `Legacy`, `Procedural`. |
+| `base_surface` | `MaterialSurfaceFamily` | One of `Legacy`, `Matte`, `Satin`, `Glossy`, `Metal`, `Frosted`. Used for non-root, non-accent levels in procedural mode. |
+| `root_surface` | `MaterialSurfaceFamily` | Same enum domain as above. Used for level `0` in procedural mode when not `Legacy`. |
+| `accent_surface` | `MaterialSurfaceFamily` | Same enum domain as above. Used for accent levels in procedural mode when not `Legacy`. |
+| `accent_every_n_levels` | `usize` | `0` disables accent cadence. Positive values mean "every N levels." |
+| `level_lightness_shift` | finite `f32` per level | Added before final `[0.0, 1.0]` clamping. |
+| `level_saturation_shift` | finite `f32` per level | Added before final `[0.0, 1.0]` clamping. |
+| `level_metallic_shift` | finite `f32` per level | Added before final `[0.0, 1.0]` clamping. |
+| `level_roughness_shift` | finite `f32` per level | Added before final `[0.02, 1.0]` clamping. |
+| `level_reflectance_shift` | finite `f32` per level | Added before final `[0.0, 1.0]` clamping. |
 
-There is no per-node material state struct for generated shapes.
+### `StageState`
 
-#### `StageState`
+| Field | Stored Domain | Effective Domain / Notes |
+| --- | --- | --- |
+| `enabled` | `bool` | `true` or `false`. Master stage toggle. |
+| `floor_enabled` | `bool` | `true` or `false`. Floor surface toggle. |
+| `backdrop_enabled` | `bool` | `true` or `false`. Backdrop surface toggle. |
+| `floor` | `StageSurfaceState` | Floor surface settings. |
+| `backdrop` | `StageSurfaceState` | Backdrop surface settings. |
 
-`StageState` is scene-wide and contains:
+### `StageSurfaceState`
 
-- `enabled`
-- `floor_enabled`
-- `backdrop_enabled`
-- `floor: StageSurfaceState`
-- `backdrop: StageSurfaceState`
+| Field | Stored Domain | Effective Domain / Notes |
+| --- | --- | --- |
+| `color` | `[f32; 3]` | RGB triple. No hard clamp in state conversion; intended as display color components. |
+| `translation` | `[f32; 3]` | Position vector in scene units. |
+| `rotation_degrees` | `[f32; 3]` | Euler rotation in degrees. |
+| `size` | `[f32; 2]` | Width and height. Runtime export/config conversion clamps each component to `>= 0.01`. |
+| `thickness` | finite `f32` | Runtime export/config conversion clamps to `>= 0.01`. |
+| `metallic` | finite `f32` | Runtime export/config conversion clamps to `[0.0, 1.0]`. |
+| `perceptual_roughness` | finite `f32` | Runtime export/config conversion clamps to `[0.0, 1.0]`. |
+| `reflectance` | finite `f32` | Runtime export/config conversion clamps to `[0.0, 1.0]`. |
 
-Each `StageSurfaceState` contains:
+### `RenderingState`
 
-- `color`
-- `translation`
-- `rotation_degrees`
-- `size`
-- `thickness`
-- `metallic`
-- `perceptual_roughness`
-- `reflectance`
+| Field | Stored Domain | Effective Domain / Notes |
+| --- | --- | --- |
+| `clear_color` | `[f32; 3]` | RGB triple. No hard clamp in `RenderingState`; passed through to Bevy as sRGB color. |
+| `ambient_light_color` | `[f32; 3]` | RGB triple. No hard clamp in `RenderingState`; passed through to Bevy as sRGB color. |
+| `ambient_light_brightness` | finite `f32` | Runtime export/config conversion clamps to `>= 0.0`. |
 
-#### `RenderingState`
+### `LightingState`
 
-`RenderingState` is shared and contains:
+| Field | Stored Domain | Effective Domain / Notes |
+| --- | --- | --- |
+| `directional` | `DirectionalLightState` | Shared directional light state. |
+| `point` | `PointLightState` | Shared point light state. |
+| `accent` | `PointLightState` | Shared accent light state. |
 
-- `clear_color`
-- `ambient_light_color`
-- `ambient_light_brightness`
+### `DirectionalLightState`
 
-#### `LightingState`
+| Field | Stored Domain | Effective Domain / Notes |
+| --- | --- | --- |
+| `color` | `[f32; 3]` | RGB triple. No hard clamp in state conversion. |
+| `illuminance` | finite `f32` | Runtime export/config conversion clamps to `>= 0.0`. |
+| `translation` | `[f32; 3]` | Position vector in scene units. |
+| `look_at` | `[f32; 3]` | Look target in scene units. |
 
-`LightingState` is shared and contains:
+### `PointLightState`
 
-- `directional: DirectionalLightState`
-- `point: PointLightState`
-- `accent: PointLightState`
+The same struct type is used for both the point light and the accent light.
 
-Those light structs store shared light color/intensity/range/position data for each light type.
+| Field | Stored Domain | Effective Domain / Notes |
+| --- | --- | --- |
+| `color` | `[f32; 3]` | RGB triple. No hard clamp in state conversion. |
+| `intensity` | finite `f32` | Runtime export/config conversion clamps to `>= 0.0`. |
+| `range` | finite `f32` | Runtime export/config conversion clamps to `>= 0.0`. |
+| `translation` | `[f32; 3]` | Position vector in scene units. |
 
-#### `EffectTunerState`
+### `CameraRig`
 
-`EffectTunerState` is also scene-wide. It stores:
+| Field | Stored Domain | Effective Domain / Notes |
+| --- | --- | --- |
+| `orientation` | `Quat` | Expected to be a normalized quaternion. Camera motion renormalizes after integration; snapshot load normalizes too. |
+| `angular_velocity` | `Vec3` | Angular velocity vector in radians per second. Components are finite `f32`. No hard clamp in runtime state. |
+| `distance` | finite `f32` | Camera distance from origin. Camera motion clamps it to `CameraConfig.min_distance..max_distance` on each update. |
+| `zoom_velocity` | finite `f32` | Zoom speed scalar. No hard storage clamp; damped each frame. |
 
-- current effect values (`EffectsConfig`)
-- one `ParameterLfo` slot per LFO-capable effect or scene parameter
-- internal base values for scene-parameter LFO application
-- control-page selection/edit UI state
+### `EffectTunerState`
 
-This is where runtime modulation lives. The effect tuner does not create per-node effect state.
+`EffectTunerState` is scene-wide runtime modulation state.
 
-### 3. Per-shape node level
+| Field / Concept | Domain | Notes |
+| --- | --- | --- |
+| `current` | `EffectsConfig` | Current effect values. Same schema as `config.effects`, but live and mutable. |
+| `lfos` | `Vec<ParameterLfo>` | Ordered LFO slot array. Length equals the current number of LFO-capable effect and scene parameters in this build. Serialized snapshots may be shorter for backward compatibility. |
+| scene-parameter base values | `Vec<f32>` | One base numeric value per LFO-capable numeric scene parameter. Used to preserve base values while LFOs are active. |
+| selection/edit UI state | indices, enums, booleans, hold states | Internal overlay state only. Domains include bounded selection indices, page/edit enums, booleans, and hold-repeat timers. |
+
+## Per-Shape Node Level
 
 Each generated object in the recursive tree is a `ShapeNode`.
 
-`ShapeNode` stores:
+### `ShapeNode`
 
-- `kind`
-- `level`
-- `center`
-- `rotation`
-- `scale`
-- `radius`
-- `occupied_attachments`
-- `origin`
+| Field | Stored Domain | Effective Domain / Notes |
+| --- | --- | --- |
+| `kind` | `ShapeKind` | One of `Cube`, `Tetrahedron`, `Octahedron`, `Dodecahedron`. |
+| `level` | `usize` | Tree depth. Root is level `0`. |
+| `center` | `Vec3` | Position in scene space. Valid generated scenes use finite components. |
+| `rotation` | `Quat` | Expected to be a normalized quaternion. This is stored per node, but for non-root nodes it is usually derived from the parent transform, the attachment, and the shared twist parameter. |
+| `scale` | finite `f32` | Valid generated scenes use `scale > 0.0`. It is materialized at spawn time from the parent's scale and the shared scale ratio. Later scale-ratio changes do not retroactively rewrite existing node scales. |
+| `radius` | finite `f32` | Valid generated scenes use `radius > 0.0`. Cached scaled bounding radius for containment and placement math. |
+| `occupied_attachments` | `AttachmentOccupancy` | Per-node occupancy flags for vertices, edges, and faces. |
+| `origin` | `NodeOrigin` | Either `Root` or `Child { parent_index, attachment }`. |
 
-What those mean:
+### `ShapeKind`
 
-- `kind`: cube, tetrahedron, octahedron, or dodecahedron
-- `level`: tree depth, with the root at level `0`
-- `center`, `rotation`, `scale`: the node's current transform data
-- `radius`: cached scaled bounding radius for spawn checks and placement math
-- `occupied_attachments`: which of this node's vertices/edges/faces are already used for children
-- `origin`: how this node was created
+| Value | Meaning |
+| --- | --- |
+| `Cube` | 8 vertices, 12 edges, 6 faces |
+| `Tetrahedron` | 4 vertices, 6 edges, 4 faces |
+| `Octahedron` | 6 vertices, 12 edges, 8 faces |
+| `Dodecahedron` | 20 vertices, 30 edges, 12 faces |
 
-`NodeOrigin` is:
+### `NodeOrigin`
 
-- `Root`
-- `Child { parent_index, attachment }`
+| Variant | Domain | Notes |
+| --- | --- | --- |
+| `Root` | no payload | Used only for the root node. |
+| `Child { parent_index, attachment }` | `parent_index: usize`, `attachment: SpawnAttachment` | In valid trees, `parent_index` points to an earlier node in `GenerationState.nodes`. |
 
-`attachment` is a `SpawnAttachment`:
+### `SpawnAttachment`
 
-- `mode`: vertex, edge, or face
-- `index`: which specific vertex/edge/face on the parent
+| Field | Domain | Notes |
+| --- | --- | --- |
+| `mode` | `SpawnPlacementMode` | One of `Vertex`, `Edge`, `Face`. |
+| `index` | `usize` | Must be in `0..attachment_count(parent.kind, mode)`. See the next table for concrete counts. |
 
-This parent-plus-attachment link is what allows the app to recompute child positions and rotations when shared twist or offset settings change.
+### `SpawnAttachment.index` by parent shape
 
-### 4. Per-attachment occupancy level
+| Parent `ShapeKind` | Vertex indices | Edge indices | Face indices |
+| --- | --- | --- | --- |
+| `Cube` | `0..8` | `0..12` | `0..6` |
+| `Tetrahedron` | `0..4` | `0..6` | `0..4` |
+| `Octahedron` | `0..6` | `0..12` | `0..8` |
+| `Dodecahedron` | `0..20` | `0..30` | `0..12` |
 
-`AttachmentOccupancy` lives inside each `ShapeNode` and contains three boolean arrays:
+### `AttachmentOccupancy`
 
-- `vertices`
-- `edges`
-- `faces`
+`AttachmentOccupancy` lives inside each `ShapeNode`.
 
-These arrays track which parent attachment points are already occupied by spawned children.
+| Field | Domain | Notes |
+| --- | --- | --- |
+| `vertices` | `Vec<bool>` | Length equals the current geometry vertex count for the node's `kind`. |
+| `edges` | `Vec<bool>` | Length equals the current geometry edge count for the node's `kind`. |
+| `faces` | `Vec<bool>` | Length equals the current geometry face count for the node's `kind`. |
 
 Important distinction:
 
@@ -244,8 +312,20 @@ In [`src/scene/materials.rs`](src/scene/materials.rs), the current material appe
 
 - hue comes from `level * hue_step_per_level + hue_bias(kind)`
 - surface family comes from the shared surface-mode rules and the node level
-- saturation/lightness/metallic/roughness/reflectance can also shift by level
+- saturation, lightness, metallic, roughness, and reflectance can all shift by level
 - opacity is one shared global object opacity value
+
+The derived-value domains are:
+
+| Derived Value | Domain | Notes |
+| --- | --- | --- |
+| hue | finite `f32`, wrapped to `[0.0, 360.0)` | `rem_euclid(360.0)` is applied. |
+| saturation | `[0.0, 1.0]` | After surface bias and level shift. |
+| lightness | `[0.0, 1.0]` | After surface bias and level shift. |
+| metallic | `[0.0, 1.0]` | After level shift. |
+| perceptual roughness | `[0.02, 1.0]` | After level shift. |
+| reflectance | `[0.0, 1.0]` | After level shift. |
+| opacity | `[0.0, 1.0]` | Global object opacity after clamping. |
 
 So if you are asking "does this value belong to one shape or to the whole scene?", a good test is:
 
@@ -256,11 +336,9 @@ So if you are asking "does this value belong to one shape or to the whole scene?
 
 The Bevy entity layer is intentionally thin.
 
-`ShapeEntity` only stores:
-
-- `node_index`
-
-That means the ECS entity is just a render-side handle pointing back into `GenerationState.nodes`.
+| Field | Domain | Notes |
+| --- | --- | --- |
+| `ShapeEntity.node_index` | `usize` | Index into `GenerationState.nodes`. The ECS entity is just a render-side handle pointing back into the authoritative node vector. |
 
 The authoritative recursive scene model is the node vector, not the spawned Bevy entities.
 
@@ -278,36 +356,65 @@ The main serialized snapshot contains:
 - `material_state`
 - `effects`
 
-Notable detail:
+| Field | Domain | Notes |
+| --- | --- | --- |
+| `rendering` | `RenderingConfig` | Runtime-rendered rendering config, including stage data. |
+| `lighting` | `LightingConfig` | Runtime-rendered lighting config. |
+| `materials` | `MaterialConfig` | Runtime material config for generated objects. Most shared material settings serialize here. |
+| `camera` | `CameraRigSnapshot` | Serializable camera state. |
+| `generation` | `GenerationSnapshot` | Serializable generation tree and generation parameters. |
+| `material_state` | `MaterialRuntimeSnapshot` | Currently just runtime opacity. |
+| `effects` | `EffectRuntimeSnapshot` | Current effect values plus serialized LFO slots. |
 
-- most material settings serialize through `materials: MaterialConfig`
-- `material_state` currently only stores runtime `opacity`
+### `CameraRigSnapshot`
+
+| Field | Domain | Notes |
+| --- | --- | --- |
+| `orientation` | `[f32; 4]` | Quaternion components `[x, y, z, w]`. Normalized on load. |
+| `angular_velocity` | `[f32; 3]` | Angular velocity vector components. |
+| `distance` | finite `f32` | Stored as-is in the snapshot; runtime camera motion later respects distance bounds. |
+| `zoom_velocity` | finite `f32` | Stored zoom velocity scalar. |
 
 ### `GenerationSnapshot`
 
-`GenerationSnapshot` stores:
+| Field | Domain | Notes |
+| --- | --- | --- |
+| `selected_shape_kind` | `ShapeKind` | Future-spawn selected child kind. |
+| `spawn_placement_mode` | `SpawnPlacementMode` | Future-spawn placement mode. |
+| `spawn_add_mode` | `SpawnAddMode` | Future-spawn add mode. |
+| `scale_ratio` | finite `f32` | Serialized base scale ratio. In runtime evaluation it is clamped by `GenerationConfig`. |
+| `twist_per_vertex_radians` | finite `f32` | Serialized base twist. In runtime evaluation it is clamped by `GenerationConfig`. |
+| `vertex_offset_ratio` | finite `f32` | Serialized base outward offset. In runtime evaluation it is clamped by `GenerationConfig`. |
+| `vertex_spawn_exclusion_probability` | finite `f32` | Serialized base spawn exclusion probability. Runtime evaluation clamps it to `[0.0, 1.0]`. |
+| `nodes` | `Vec<ShapeNodeSnapshot>` | Prepared runtime rejects empty node arrays, so valid prepared snapshots have `len >= 1`. |
 
-- `selected_shape_kind`
-- `spawn_placement_mode`
-- `spawn_add_mode`
-- `scale_ratio`
-- `twist_per_vertex_radians`
-- `vertex_offset_ratio`
-- `vertex_spawn_exclusion_probability`
-- `nodes`
+### `MaterialRuntimeSnapshot`
 
-Each serialized node stores:
+| Field | Domain | Notes |
+| --- | --- | --- |
+| `opacity` | finite `f32` | Clamped to `[0.0, 1.0]` during `prepare_runtime`. |
 
-- `shape_kind`
-- `level`
-- `center`
-- `rotation`
-- `scale`
-- `radius`
-- `occupied_vertices`
-- `occupied_edges`
-- `occupied_faces`
-- `origin`
+### `ShapeNodeSnapshot`
+
+| Field | Domain | Notes |
+| --- | --- | --- |
+| `shape_kind` | `ShapeKind` | Serialized node shape kind. |
+| `level` | `usize` | Serialized node depth. |
+| `center` | `[f32; 3]` | Serialized world-space center. |
+| `rotation` | `[f32; 4]` | Serialized quaternion components. Normalized on load. |
+| `scale` | finite `f32` | Valid generated scenes use positive values. Snapshot loading trusts the stored value. |
+| `radius` | finite `f32` | Valid generated scenes use positive values. Snapshot loading trusts the stored value. |
+| `occupied_vertices` | `Vec<bool>` | Resized to current geometry length on load. |
+| `occupied_edges` | `Vec<bool>` | Resized to current geometry length on load. |
+| `occupied_faces` | `Vec<bool>` | Resized to current geometry length on load. |
+| `origin` | `NodeOriginSnapshot` | Serialized root/child origin data. |
+
+### `NodeOriginSnapshot`
+
+| Variant | Domain | Notes |
+| --- | --- | --- |
+| `Root` | no payload | Root node marker. |
+| `Child { parent_index, attachment_mode, attachment_index }` | `parent_index: usize`, `attachment_mode: SpawnPlacementMode`, `attachment_index: usize` | Same attachment index domain rules as runtime `SpawnAttachment`. |
 
 ### Preset wrapper
 
@@ -320,15 +427,54 @@ Scene preset files add an outer wrapper with metadata:
 - `assignment`
 - `scene`
 
-The actual scene data still lives inside `scene: SceneStateSnapshot`.
+| Field | Domain | Notes |
+| --- | --- | --- |
+| `format_version` | `u32` | Currently written as `1`. Loader currently expects the current preset format version. |
+| `id` | `String` | Current writer uses the pattern `preset-<saved_at_unix_ms>`. |
+| `saved_at_unix_ms` | `u64` | Unix timestamp in milliseconds. |
+| `summary` | `String` | Human-readable summary like `"Cube root, 12637 nodes"`. |
+| `assignment` | `Option<PresetIndex>` | `Some` means a bank/slot assignment exists; `None` means the file is unassigned. |
+| `scene` | `SceneStateSnapshot` | The actual serialized scene. |
+
+### `PresetIndex`
+
+| Field | Domain | Notes |
+| --- | --- | --- |
+| `bank` | `u8` | Current UI convention uses digit banks `0..=9`, meaning values `0` through `9`. |
+| `slot` | `u8` | Current UI convention uses digit slots `0..=9`, meaning values `0` through `9`. |
 
 ## Base Values vs Live Modulation
 
 One of the most important implementation details is the split between base values and live LFO-modulated values.
 
-- `ScalarParameterState` stores a `base_value` plus runtime modulation.
-- `EffectTunerState` keeps the current effect config and LFO definitions separately.
-- Scene preset capture uses base scene/material/camera/light/stage values plus the effect/LFO runtime snapshot.
+### `ScalarParameterState`
+
+| Field / Concept | Domain | Notes |
+| --- | --- | --- |
+| base value | finite `f32` | Stored independently from modulation. Presets save base generation values rather than one arbitrary sampled frame. |
+| additive offset | finite `f32` | Runtime-only modulation offset. |
+| effective value | finite `f32` | Computed as `base_value + additive_offset`, then clamped by the matching parameter spec. |
+| input state | `ScalarParameterInputState` | Internal hold-repeat state for keyboard editing. |
+
+### `ParameterLfo`
+
+| Field | Domain | Notes |
+| --- | --- | --- |
+| `enabled` | `bool` | `true` or `false`. |
+| `shape` | `LfoShape` | One of `Sine`, `Triangle`, `Saw`, `Square`, `SteppedRandom`, `BrownianMotion`. |
+| `amplitude` | finite `f32` | UI/edit paths keep it `>= 0.0`. An LFO is only active when amplitude is `> 0.0`. |
+| `frequency_hz` | finite `f32` | UI/edit paths keep it `>= 0.0`. An LFO is only active when frequency is `> 0.0`. |
+
+### `LfoShape.sample(...)`
+
+| Shape | Output Domain | Notes |
+| --- | --- | --- |
+| `Sine` | `[-1.0, 1.0]` | Continuous sinusoid. |
+| `Triangle` | `[-1.0, 1.0]` | Continuous triangle wave. |
+| `Saw` | `[-1.0, 1.0)` | Sawtooth wave over one cycle. |
+| `Square` | `{-1.0, 1.0}` | Binary square wave. |
+| `SteppedRandom` | `[-1.0, 1.0]` | Piecewise-constant random values. |
+| `BrownianMotion` | `[-1.0, 1.0]` | Smooth bounded random walk. |
 
 That means presets do not freeze one arbitrary sampled frame when LFOs are active. Instead they preserve:
 
@@ -338,14 +484,15 @@ That means presets do not freeze one arbitrary sampled frame when LFOs are activ
 
 For generation specifically:
 
-- `scale_ratio` is stored as a base value for future spawning
-- `twist_per_vertex_radians` and `vertex_offset_ratio` are stored as base values and can be reapplied to recompute the existing tree
+- `scale_ratio` and `vertex_spawn_exclusion_probability` can carry live LFO offsets as latent spawn-time parameters for future spawn decisions
+- `twist_per_vertex_radians` and `vertex_offset_ratio` can carry live LFO offsets and can be reapplied to recompute the existing tree
 - existing nodes still serialize their concrete transform values and origins
 
 ## Practical Rules Of Thumb
 
-- Put transform/history/topology data on `ShapeNode`.
+- Put transform, history, and topology data on `ShapeNode`.
 - Put scene-wide controls and palettes in shared runtime resources.
-- Treat `GenerationState.selected_shape_kind` and the spawn modes as "what the next spawn should do", not as properties of existing nodes.
+- Treat `GenerationState.selected_shape_kind` and the spawn modes as "what the next spawn should do," not as properties of existing nodes.
+- Treat `ShapeNode.rotation` as per-node stored state, but remember that child rotations are normally derived from per-node origin data plus shared twist.
 - Treat material settings as shared rules that derive per-node appearance from `kind` and `level`.
 - Treat preset files as serialized scene-wide state plus the concrete shape tree, not as a second independent data model.
