@@ -305,6 +305,23 @@ mod tests {
             .expect("preset should store effect LFO entries in an array")
     }
 
+    fn raw_runtime_snapshot_lfo_entries(contents: &str) -> Vec<toml::Value> {
+        let value: toml::Value =
+            toml::from_str(contents).expect("runtime snapshot should parse as raw toml");
+        value
+            .get("lfos")
+            .and_then(toml::Value::as_array)
+            .cloned()
+            .expect("runtime snapshot should store LFO entries in an array")
+    }
+
+    fn lfo_entry_by_parameter<'a>(entries: &'a [toml::Value], parameter: &str) -> &'a toml::Value {
+        entries
+            .iter()
+            .find(|entry| entry.get("parameter").and_then(toml::Value::as_str) == Some(parameter))
+            .unwrap_or_else(|| panic!("missing LFO entry for parameter '{parameter}'"))
+    }
+
     #[test]
     fn preset_filename_timestamp_matches_screenshot_style() {
         let timestamp = Duration::new(1_741_018_296, 45_000_000);
@@ -328,19 +345,25 @@ mod tests {
             preset_dir.exists(),
             "expected checked-in scene-presets directory to exist"
         );
+        let default_snapshot =
+            EffectTunerState::from_config(&EffectsConfig::default()).runtime_snapshot();
         let current_lfo_layout_len = EffectTunerState::from_config(&EffectsConfig::default())
             .runtime_snapshot()
             .lfos
             .len();
+        let checked_in_pre_scale_and_exclusion_len = current_lfo_layout_len - 2;
+        let default_encoded =
+            toml::to_string(&default_snapshot).expect("default runtime snapshot should serialize");
+        let default_lfos = raw_runtime_snapshot_lfo_entries(&default_encoded);
 
         for path in checked_in_preset_paths() {
             let contents = fs::read_to_string(&path)
                 .unwrap_or_else(|error| panic!("{} should read: {error}", path.display()));
             let stored_lfos = raw_effect_lfo_entries(&contents);
-            assert_eq!(
-                stored_lfos.len(),
-                current_lfo_layout_len,
-                "{} should store the full keyed LFO layout",
+            assert!(
+                stored_lfos.len() == checked_in_pre_scale_and_exclusion_len
+                    || stored_lfos.len() == current_lfo_layout_len,
+                "{} should store either the checked-in pre-scale/exclusion layout or the current keyed LFO layout",
                 path.display()
             );
             for stored_lfo in stored_lfos {
@@ -363,6 +386,9 @@ mod tests {
             let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
             effect_tuner.apply_runtime_snapshot(&file.scene.effects);
             let restored = effect_tuner.runtime_snapshot();
+            let restored_encoded =
+                toml::to_string(&restored).expect("restored runtime snapshot should serialize");
+            let restored_lfos = raw_runtime_snapshot_lfo_entries(&restored_encoded);
 
             assert_eq!(
                 restored.lfos.len(),
@@ -378,6 +404,19 @@ mod tests {
                 assert_eq!(restored_lfo.shape, expected_lfo.shape);
                 assert_eq!(restored_lfo.amplitude, expected_lfo.amplitude);
                 assert_eq!(restored_lfo.frequency_hz, expected_lfo.frequency_hz);
+            }
+
+            for parameter in [
+                "generation.child_scale_ratio",
+                "generation.child_spawn_exclusion_probability",
+            ] {
+                assert_eq!(
+                    lfo_entry_by_parameter(&restored_lfos, parameter),
+                    lfo_entry_by_parameter(&default_lfos, parameter),
+                    "{} should default the newly added generation LFO slot '{}'",
+                    path.display(),
+                    parameter
+                );
             }
         }
     }

@@ -220,6 +220,16 @@ impl GenerationState {
             .base_value(GenerationParameter::ChildOutwardOffsetRatio)
     }
 
+    pub(crate) fn vertex_spawn_exclusion_probability(
+        &self,
+        generation_config: &GenerationConfig,
+    ) -> f32 {
+        self.parameters.evaluated(
+            GenerationParameter::ChildSpawnExclusionProbability,
+            generation_config,
+        )
+    }
+
     pub(crate) fn vertex_spawn_exclusion_probability_base(&self) -> f32 {
         self.parameters
             .base_value(GenerationParameter::ChildSpawnExclusionProbability)

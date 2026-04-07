@@ -487,6 +487,72 @@ fn base_states_strip_active_scene_lfo_modulation() {
 }
 
 #[test]
+fn latent_generation_lfos_modulate_spawn_inputs_without_recompute_side_effects() {
+    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+    let (
+        generation_config,
+        mut generation_state,
+        material_config,
+        mut material_state,
+        stage_config,
+        mut stage_state,
+    ) = default_scene_state();
+    effect_tuner.sync_scene_lfo_bases(&view_context(
+        &generation_config,
+        &generation_state,
+        &material_config,
+        &material_state,
+        &stage_config,
+        &stage_state,
+    ));
+
+    let scale_base = generation_state.scale_ratio(&generation_config);
+    let exclusion_base = generation_state.vertex_spawn_exclusion_probability(&generation_config);
+
+    let scale_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
+        EffectTunerSceneParameter::ChildScaleRatio,
+    ))
+    .expect("scale parameter should have an LFO slot");
+    effect_tuner.lfos[scale_index].enabled = true;
+    effect_tuner.lfos[scale_index].shape = LfoShape::Sine;
+    effect_tuner.lfos[scale_index].amplitude = 0.2;
+    effect_tuner.lfos[scale_index].frequency_hz = 1.0;
+
+    let exclusion_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
+        EffectTunerSceneParameter::ChildSpawnExclusionProbability,
+    ))
+    .expect("spawn exclusion parameter should have an LFO slot");
+    effect_tuner.lfos[exclusion_index].enabled = true;
+    effect_tuner.lfos[exclusion_index].shape = LfoShape::Sine;
+    effect_tuner.lfos[exclusion_index].amplitude = 0.3;
+    effect_tuner.lfos[exclusion_index].frequency_hz = 1.0;
+
+    let result = effect_tuner.apply_scene_lfos(
+        0.25,
+        &mut edit_context(
+            &generation_config,
+            &mut generation_state,
+            &material_config,
+            &mut material_state,
+            &stage_config,
+            &mut stage_state,
+        ),
+    );
+
+    assert!(!result.generation_changed);
+    assert!(generation_state.scale_ratio(&generation_config) > scale_base);
+    assert!(generation_state.vertex_spawn_exclusion_probability(&generation_config) > exclusion_base);
+
+    let base_generation = effect_tuner.base_generation_state(&generation_config, &generation_state);
+    assert!((base_generation.scale_ratio(&generation_config) - scale_base).abs() < 1.0e-6);
+    assert!(
+        (base_generation.vertex_spawn_exclusion_probability(&generation_config) - exclusion_base)
+            .abs()
+            < 1.0e-6
+    );
+}
+
+#[test]
 fn numeric_entry_updates_selected_value() {
     let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
     let (

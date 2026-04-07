@@ -215,7 +215,7 @@ impl EffectTunerSceneParameter {
         Self::LightingAccentTranslationZ,
     ];
 
-    const LFO_CAPABLE: [Self; 87] = [
+    const LFO_CAPABLE: [Self; 89] = [
         Self::ChildTwistPerVertexRadians,
         Self::ChildOutwardOffsetRatio,
         Self::GlobalOpacity,
@@ -303,6 +303,15 @@ impl EffectTunerSceneParameter {
         Self::LightingAccentTranslationX,
         Self::LightingAccentTranslationY,
         Self::LightingAccentTranslationZ,
+        Self::ChildScaleRatio,
+        Self::ChildSpawnExclusionProbability,
+    ];
+
+    const GENERATION_LFO_CAPABLE: [Self; 4] = [
+        Self::ChildScaleRatio,
+        Self::ChildTwistPerVertexRadians,
+        Self::ChildOutwardOffsetRatio,
+        Self::ChildSpawnExclusionProbability,
     ];
 
     const MATERIAL_LFO_CAPABLE: [Self; 17] = [
@@ -331,6 +340,10 @@ impl EffectTunerSceneParameter {
 
     fn lfo_capable() -> &'static [Self] {
         &Self::LFO_CAPABLE
+    }
+
+    fn generation_lfo_capable() -> &'static [Self] {
+        &Self::GENERATION_LFO_CAPABLE
     }
 
     fn material_lfo_capable() -> &'static [Self] {
@@ -775,10 +788,7 @@ impl EffectTunerSceneParameter {
     }
 
     fn is_generation_lfo_parameter(self) -> bool {
-        matches!(
-            self,
-            Self::ChildTwistPerVertexRadians | Self::ChildOutwardOffsetRatio
-        )
+        Self::generation_lfo_capable().contains(&self)
     }
 
     fn lfo_scene_index(self) -> Option<usize> {
@@ -1564,6 +1574,9 @@ impl EffectTunerSceneParameter {
 
     fn live_value(self, context: &EffectTunerViewContext<'_>) -> Option<f32> {
         match self {
+            Self::ChildScaleRatio => {
+                Some(context.generation_state.scale_ratio(context.generation_config))
+            }
             Self::ChildTwistPerVertexRadians => Some(
                 context
                     .generation_state
@@ -1573,6 +1586,11 @@ impl EffectTunerSceneParameter {
                 context
                     .generation_state
                     .vertex_offset_ratio(context.generation_config),
+            ),
+            Self::ChildSpawnExclusionProbability => Some(
+                context
+                    .generation_state
+                    .vertex_spawn_exclusion_probability(context.generation_config),
             ),
             _ if self.is_numeric() => Some(self.value(context)),
             _ => None,

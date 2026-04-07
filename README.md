@@ -154,7 +154,7 @@ The in-app F2 control page starts from the values loaded from `config.toml` at l
 - LFO shapes currently available are `sine`, `triangle`, `saw`, `square`, `stepped random`, and `brownian motion`.
 - `Enter` confirms typed numeric F2 input, or resets the selected F2 field when no numeric input is active.
 - `Shift + Enter` resets all F2 controls to their startup defaults.
-- Shader-effect parameters expose LFO fields, and so do the supported numeric scene/material parameters that update the current scene immediately. Other scene, stage, and material controls remain value-only.
+- Shader-effect parameters expose LFO fields, and so do the supported numeric scene/runtime parameters, including live scene updates and generation values that only take effect during future spawning. Other scene, stage, and material controls remain value-only.
 - `Esc` closes the current F-page, including help, F2, or F3.
 - The tuner does not write changes back to `config.toml` automatically.
 

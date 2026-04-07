@@ -253,7 +253,8 @@ pub(crate) struct EffectTunerState {
     current: EffectsConfig,
     lfos: Vec<ParameterLfo>,
     scene_lfo_bases: Vec<f32>,
-    generation_scene_lfo_applied: bool,
+    generation_lfo_applied: bool,
+    generation_recompute_lfo_applied: bool,
     scene_numeric_lfo_applied: bool,
     selected_index: usize,
     page_mode: EffectTunerPageMode,
@@ -275,7 +276,8 @@ impl EffectTunerState {
             current: effects_config.clone(),
             lfos: default_lfos(),
             scene_lfo_bases: default_scene_lfo_bases(),
-            generation_scene_lfo_applied: false,
+            generation_lfo_applied: false,
+            generation_recompute_lfo_applied: false,
             scene_numeric_lfo_applied: false,
             selected_index: 0,
             page_mode: EffectTunerPageMode::Compact,
@@ -329,7 +331,7 @@ impl EffectTunerState {
 
     pub(crate) fn needs_scene_lfo_application(&self) -> bool {
         self.has_active_scene_lfos()
-            || self.generation_scene_lfo_applied
+            || self.generation_lfo_applied
             || self.scene_numeric_lfo_applied
     }
 
@@ -344,7 +346,8 @@ impl EffectTunerState {
         self.current = snapshot.current.clone();
         self.lfos = default_lfos();
         self.scene_lfo_bases = default_scene_lfo_bases();
-        self.generation_scene_lfo_applied = false;
+        self.generation_lfo_applied = false;
+        self.generation_recompute_lfo_applied = false;
         self.scene_numeric_lfo_applied = false;
         for (target, source) in self.lfos.iter_mut().zip(snapshot.lfos.iter().copied()) {
             *target = source;
@@ -483,11 +486,13 @@ impl EffectTunerState {
         generation_state: &GenerationState,
     ) -> GenerationState {
         let mut base_state = generation_state.clone();
-        for parameter in [
-            GenerationParameter::ChildTwistPerVertexRadians,
-            GenerationParameter::ChildOutwardOffsetRatio,
-        ] {
-            base_state.parameter_mut(parameter).set_additive_offset(0.0);
+        for parameter in EffectTunerSceneParameter::generation_lfo_capable() {
+            let generation_parameter = parameter
+                .generation_parameter()
+                .expect("generation LFO parameter should map to generation state");
+            base_state
+                .parameter_mut(generation_parameter)
+                .set_additive_offset(0.0);
         }
         let twist_per_vertex_radians = base_state.twist_per_vertex_radians(generation_config);
         let vertex_offset_ratio = base_state.vertex_offset_ratio(generation_config);
@@ -508,17 +513,18 @@ impl EffectTunerState {
         let mut result = SceneLfoApplicationResult::default();
 
         let mut generation_lfo_active = false;
-        for parameter in [
-            EffectTunerSceneParameter::ChildTwistPerVertexRadians,
-            EffectTunerSceneParameter::ChildOutwardOffsetRatio,
-        ] {
-            let Some(lfo_index) = lfo_index_for_parameter(EffectTunerParameter::Scene(parameter))
-            else {
+        let mut generation_recompute_lfo_active = false;
+        for parameter in EffectTunerSceneParameter::generation_lfo_capable() {
+            let parameter = *parameter;
+            let Some(lfo_index) = lfo_index_for_parameter(EffectTunerParameter::Scene(parameter)) else {
                 continue;
             };
             let lfo = self.lfos[lfo_index];
             let offset = if lfo.is_active() {
                 generation_lfo_active = true;
+                if parameter.change_target() == SceneChangeTarget::Generation {
+                    generation_recompute_lfo_active = true;
+                }
                 lfo.amplitude
                     * lfo
                         .shape
@@ -534,10 +540,11 @@ impl EffectTunerState {
                 .parameter_mut(generation_parameter)
                 .set_additive_offset(offset);
         }
-        if generation_lfo_active || self.generation_scene_lfo_applied {
+        if generation_recompute_lfo_active || self.generation_recompute_lfo_applied {
             result.generation_changed = true;
         }
-        self.generation_scene_lfo_applied = generation_lfo_active;
+        self.generation_lfo_applied = generation_lfo_active;
+        self.generation_recompute_lfo_applied = generation_recompute_lfo_active;
 
         let mut scene_numeric_lfo_active = false;
         for parameter in EffectTunerSceneParameter::lfo_capable() {
