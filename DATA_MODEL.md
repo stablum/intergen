@@ -83,7 +83,7 @@ Each generation parameter is stored as a `ScalarParameterState`, which means:
 | Parameter | Stored Domain | Effective Domain / Notes |
 | --- | --- | --- |
 | `scale_ratio` | `ScalarParameterState` over finite `f32` | Effective value is clamped to `GenerationConfig.min_scale_ratio..max_scale_ratio`; default config is `0.15..1.0`. Affects future spawns only. Existing per-node `ShapeNode.scale` and `ShapeNode.axis_scale` values are not rewritten. |
-| `child_axis_scale_x` | `ScalarParameterState` over finite `f32` | Effective value is clamped to the positive `GenerationConfig.min_child_axis_scale..max_child_axis_scale` range; default config is `0.05..4.0`. Affects future spawns only, plus the root node created by scene reset. Existing per-node `ShapeNode.axis_scale` values are not rewritten. |
+| `child_axis_scale_x` | `ScalarParameterState` over finite `f32` | Effective value is clamped to the positive `GenerationConfig.min_child_axis_scale..max_child_axis_scale` range; default config is `0.01..100.0`. Affects future spawns only, plus the root node created by scene reset. Existing per-node `ShapeNode.axis_scale` values are not rewritten. |
 | `child_axis_scale_y` | `ScalarParameterState` over finite `f32` | Same semantics as `child_axis_scale_x`, applied to the Y axis. |
 | `child_axis_scale_z` | `ScalarParameterState` over finite `f32` | Same semantics as `child_axis_scale_x`, applied to the Z axis. |
 | `child_twist` | `ScalarParameterState` over finite `f32` | Effective value is clamped to the nonnegative twist bounds in `GenerationConfig`; default config is `0.0..PI`. Affects child orientation and can recompute existing child node rotations. |
