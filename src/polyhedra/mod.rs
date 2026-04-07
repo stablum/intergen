@@ -9,6 +9,5 @@ pub(crate) use mesh::build_mesh;
 pub(crate) use spawn::NodeOrigin;
 pub(crate) use spawn::{
     AttachmentOccupancy, ShapeKind, ShapeNode, SpawnAddMode, SpawnAttachment, SpawnPlacementMode,
-    SpawnTuning, SpawnedShape, recompute_spawn_tree, root_node_with_axis_scale,
-    spawn_batch,
+    SpawnTuning, SpawnedShape, recompute_spawn_tree, root_node_with_axis_scale, spawn_batch,
 };

@@ -492,9 +492,8 @@ fn child_transform(
     twist_per_vertex_radians: f32,
     vertex_offset_ratio: f32,
 ) -> (Vec3, Quat) {
-    let outward_local = parent_geometry.attachment_direction(attachment.mode, attachment.index);
-    let outward = parent.rotation * outward_local;
-    let world_anchor = parent.center + outward * parent.radius;
+    let (world_anchor, outward) =
+        transformed_attachment_anchor(parent, parent_geometry, attachment);
 
     let twist_step = if twist_per_vertex_radians.is_finite() {
         twist_per_vertex_radians
@@ -508,6 +507,24 @@ fn child_transform(
         world_anchor + outward * vertex_offset,
         twist * parent.rotation,
     )
+}
+
+fn transformed_attachment_anchor(
+    parent: &ShapeNode,
+    parent_geometry: &ShapeGeometry,
+    attachment: SpawnAttachment,
+) -> (Vec3, Vec3) {
+    let anchor_local = parent_geometry.attachment_anchor(attachment.mode, attachment.index);
+    let scaled_anchor_local = anchor_local * parent.combined_scale();
+    let outward_local = if scaled_anchor_local.length_squared() > 1.0e-12 {
+        scaled_anchor_local.normalize()
+    } else {
+        parent_geometry.attachment_direction(attachment.mode, attachment.index)
+    };
+    let outward = parent.rotation * outward_local;
+    let world_anchor = parent.center + outward * parent.radius;
+
+    (world_anchor, outward)
 }
 
 fn is_fully_contained(
@@ -683,7 +700,7 @@ mod tests {
     }
 
     #[test]
-    fn spawned_child_center_matches_parent_edge_direction() {
+    fn spawned_child_center_matches_parent_edge_ray() {
         let shapes = ShapeCatalog::new();
         let parent_geometry = shapes.geometry(ShapeKind::Cube);
         let mut nodes = vec![ShapeNode {
@@ -710,13 +727,17 @@ mod tests {
         )
         .expect("spawn should succeed");
         let expected_center = nodes[0].center
-            + parent_geometry.attachment_direction(SpawnPlacementMode::Edge, 0) * nodes[0].radius;
+            + (nodes[0].rotation
+                * (parent_geometry.attachment_anchor(SpawnPlacementMode::Edge, 0)
+                    * nodes[0].combined_scale()))
+            .normalize()
+                * nodes[0].radius;
 
         assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
     }
 
     #[test]
-    fn spawned_child_center_matches_parent_face_direction() {
+    fn spawned_child_center_matches_parent_face_ray() {
         let shapes = ShapeCatalog::new();
         let parent_geometry = shapes.geometry(ShapeKind::Cube);
         let mut nodes = vec![ShapeNode {
@@ -743,7 +764,11 @@ mod tests {
         )
         .expect("spawn should succeed");
         let expected_center = nodes[0].center
-            + parent_geometry.attachment_direction(SpawnPlacementMode::Face, 0) * nodes[0].radius;
+            + (nodes[0].rotation
+                * (parent_geometry.attachment_anchor(SpawnPlacementMode::Face, 0)
+                    * nodes[0].combined_scale()))
+            .normalize()
+                * nodes[0].radius;
 
         assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
     }
@@ -781,7 +806,10 @@ mod tests {
             },
         )
         .expect("spawn should succeed");
-        let outward = parent_geometry.attachment_direction(SpawnPlacementMode::Vertex, 0);
+        let outward = (nodes[0].rotation
+            * (parent_geometry.attachment_anchor(SpawnPlacementMode::Vertex, 0)
+                * nodes[0].combined_scale()))
+        .normalize();
         let world_anchor = nodes[0].center + outward * nodes[0].radius;
         let child_radius = child_geometry.radius * parent_scale * scale_ratio;
         let expected_center = world_anchor + outward * child_radius * vertex_offset_ratio;
@@ -807,6 +835,40 @@ mod tests {
         .expect("spawn should succeed");
 
         assert_eq!(spawn.node.axis_scale, Vec3::new(1.4, 0.8, 1.2));
+    }
+
+    #[test]
+    fn spawned_child_center_uses_transformed_face_ray_for_non_uniform_parent_scale() {
+        let shapes = ShapeCatalog::new();
+        let parent_geometry = shapes.geometry(ShapeKind::Cube);
+        let parent_rotation = Quat::from_euler(EulerRot::YXZ, 0.25, -0.4, 0.1);
+        let parent_axis_scale = Vec3::new(1.8, 0.7, 0.5);
+        let mut parent = root_node(ShapeKind::Cube, 1.4, &shapes);
+        parent.center = Vec3::new(1.5, -0.75, 2.25);
+        parent.rotation = parent_rotation;
+        parent.axis_scale = parent_axis_scale;
+        parent.radius = parent.bounding_radius(parent_geometry);
+        let mut nodes = vec![parent];
+
+        let spawn = next_spawn(
+            &mut nodes,
+            &shapes,
+            ShapeKind::Tetrahedron,
+            0.35,
+            SpawnTuning {
+                spawn_placement_mode: SpawnPlacementMode::Face,
+                ..test_tuning()
+            },
+        )
+        .expect("spawn should succeed");
+        let expected_center = nodes[0].center
+            + (nodes[0].rotation
+                * (parent_geometry.attachment_anchor(SpawnPlacementMode::Face, 0)
+                    * nodes[0].combined_scale()))
+            .normalize()
+                * nodes[0].radius;
+
+        assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
     }
 
     #[test]
