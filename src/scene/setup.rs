@@ -326,7 +326,7 @@ pub(crate) fn spawn_shape_entity(
         Transform {
             translation: node.center,
             rotation: node.rotation,
-            scale: Vec3::splat(node.scale),
+            scale: node.combined_scale(),
         },
         Visibility::Visible,
     ));
@@ -343,6 +343,6 @@ pub(crate) fn sync_shape_transforms<F: bevy::ecs::query::QueryFilter>(
 
         transform.translation = node.center;
         transform.rotation = node.rotation;
-        transform.scale = Vec3::splat(node.scale);
+        transform.scale = node.combined_scale();
     }
 }

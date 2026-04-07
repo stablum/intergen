@@ -452,6 +452,7 @@ mod tests {
                     center: [0.0, 0.0, 0.0],
                     rotation: [0.0, 0.0, 0.0, 1.0],
                     scale: 1.0,
+                    axis_scale: [1.0, 1.0, 1.0],
                     radius: 1.0,
                     occupied_vertices: vec![],
                     occupied_edges: vec![],

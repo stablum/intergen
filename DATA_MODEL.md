@@ -212,8 +212,9 @@ Each generated object in the recursive tree is a `ShapeNode`.
 | `level` | `usize` | Tree depth. Root is level `0`. |
 | `center` | `Vec3` | Position in scene space. Valid generated scenes use finite components. |
 | `rotation` | `Quat` | Expected to be a normalized quaternion. This is stored per node, but for non-root nodes it is usually derived from the parent transform, the attachment, and the shared twist parameter. |
-| `scale` | finite `f32` | Valid generated scenes use `scale > 0.0`. It is materialized at spawn time from the parent's scale and the shared scale ratio. Later scale-ratio changes do not retroactively rewrite existing node scales. |
-| `radius` | finite `f32` | Valid generated scenes use `radius > 0.0`. Cached scaled bounding radius for containment and placement math. |
+| `scale` | finite `f32` | Valid generated scenes use `scale > 0.0`. It is the uniform scalar materialized at spawn time from the parent's scale and the shared scale ratio. Later scale-ratio changes do not retroactively rewrite existing node scales. |
+| `axis_scale` | `Vec3` of finite `f32` | Per-axis scale multiplier stored per node. `Vec3::ONE` means no non-uniform scaling. Runtime transforms use `scale * axis_scale` component-wise. |
+| `radius` | finite `f32` | Valid generated scenes use `radius > 0.0`. Cached scaled bounding radius for containment and placement math, derived from the largest absolute component of `scale * axis_scale`. |
 | `occupied_attachments` | `AttachmentOccupancy` | Per-node occupancy flags for vertices, edges, and faces. |
 | `origin` | `NodeOrigin` | Either `Root` or `Child { parent_index, attachment }`. |
 
@@ -294,7 +295,7 @@ These belong to individual generated objects:
 
 - shape kind
 - level
-- transform (`center`, `rotation`, `scale`)
+- transform (`center`, `rotation`, `scale`, `axis_scale`)
 - cached radius
 - parent/origin relationship
 - attachment occupancy for that node
@@ -402,8 +403,9 @@ The main serialized snapshot contains:
 | `level` | `usize` | Serialized node depth. |
 | `center` | `[f32; 3]` | Serialized world-space center. |
 | `rotation` | `[f32; 4]` | Serialized quaternion components. Normalized on load. |
-| `scale` | finite `f32` | Valid generated scenes use positive values. Snapshot loading trusts the stored value. |
-| `radius` | finite `f32` | Valid generated scenes use positive values. Snapshot loading trusts the stored value. |
+| `scale` | finite `f32` | Valid generated scenes use positive values. This is the stored uniform scalar. |
+| `axis_scale` | `[f32; 3]` of finite values | Per-axis scale multiplier. Missing serialized values default to `[1.0, 1.0, 1.0]` for backward compatibility. |
+| `radius` | finite `f32` | Valid generated scenes use positive values. Runtime loading recomputes it from geometry, `scale`, and `axis_scale` so cached values stay consistent. |
 | `occupied_vertices` | `Vec<bool>` | Resized to current geometry length on load. |
 | `occupied_edges` | `Vec<bool>` | Resized to current geometry length on load. |
 | `occupied_faces` | `Vec<bool>` | Resized to current geometry length on load. |

@@ -139,9 +139,21 @@ pub(crate) struct ShapeNode {
     pub(crate) center: Vec3,
     pub(crate) rotation: Quat,
     pub(crate) scale: f32,
+    pub(crate) axis_scale: Vec3,
     pub(crate) radius: f32,
     pub(crate) occupied_attachments: AttachmentOccupancy,
     pub(crate) origin: NodeOrigin,
+}
+
+impl ShapeNode {
+    pub(crate) fn combined_scale(&self) -> Vec3 {
+        self.axis_scale * self.scale
+    }
+
+    pub(crate) fn bounding_radius(&self, geometry: &ShapeGeometry) -> f32 {
+        let scaled = self.combined_scale().abs();
+        geometry.radius * scaled.x.max(scaled.y).max(scaled.z)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -178,16 +190,19 @@ struct SpawnCandidateInput<'a> {
 
 pub(crate) fn root_node(kind: ShapeKind, scale: f32, shapes: &ShapeCatalog) -> ShapeNode {
     let geometry = shapes.geometry(kind);
-    ShapeNode {
+    let mut node = ShapeNode {
         kind,
         level: 0,
         center: Vec3::ZERO,
         rotation: Quat::IDENTITY,
         scale,
-        radius: geometry.radius * scale,
+        axis_scale: Vec3::ONE,
+        radius: 0.0,
         occupied_attachments: AttachmentOccupancy::new(geometry),
         origin: NodeOrigin::Root,
-    }
+    };
+    node.radius = node.bounding_radius(geometry);
+    node
 }
 
 pub(crate) fn next_spawn(
@@ -378,7 +393,7 @@ pub(crate) fn recompute_spawn_tree(
         let parent = &parents[parent_index];
         let parent_geometry = shapes.geometry(parent.kind);
         let child_geometry = shapes.geometry(node.kind);
-        let child_radius = child_geometry.radius * node.scale;
+        let child_radius = node.bounding_radius(child_geometry);
         let (center, rotation) = child_transform(
             parent,
             parent_geometry,
@@ -396,29 +411,32 @@ pub(crate) fn recompute_spawn_tree(
 
 fn spawn_candidate(input: SpawnCandidateInput<'_>) -> ShapeNode {
     let scale = input.parent.scale * input.scale_ratio;
-    let radius = input.child_geometry.radius * scale;
-    let (center, rotation) = child_transform(
-        input.parent,
-        input.parent_geometry,
-        input.attachment,
-        radius,
-        input.tuning.twist_per_vertex_radians,
-        input.tuning.vertex_offset_ratio,
-    );
-
-    ShapeNode {
+    let mut node = ShapeNode {
         kind: input.child_kind,
         level: input.parent.level + 1,
-        center,
-        rotation,
+        center: Vec3::ZERO,
+        rotation: Quat::IDENTITY,
         scale,
-        radius,
+        axis_scale: Vec3::ONE,
+        radius: 0.0,
         occupied_attachments: AttachmentOccupancy::new(input.child_geometry),
         origin: NodeOrigin::Child {
             parent_index: input.parent_index,
             attachment: input.attachment,
         },
-    }
+    };
+    node.radius = node.bounding_radius(input.child_geometry);
+    let (center, rotation) = child_transform(
+        input.parent,
+        input.parent_geometry,
+        input.attachment,
+        node.radius,
+        input.tuning.twist_per_vertex_radians,
+        input.tuning.vertex_offset_ratio,
+    );
+    node.center = center;
+    node.rotation = rotation;
+    node
 }
 
 fn attachment_is_excluded(
@@ -595,6 +613,7 @@ mod tests {
             center: Vec3::ZERO,
             rotation: Quat::IDENTITY,
             scale: 1.0,
+            axis_scale: Vec3::ONE,
             radius: 5.0,
             occupied_attachments: AttachmentOccupancy::default(),
             origin: NodeOrigin::Root,
@@ -628,6 +647,7 @@ mod tests {
             center: parent_center,
             rotation: parent_rotation,
             scale: parent_scale,
+            axis_scale: Vec3::ONE,
             radius: parent_geometry.radius * parent_scale,
             occupied_attachments: AttachmentOccupancy::new(parent_geometry),
             origin: NodeOrigin::Root,
@@ -660,6 +680,7 @@ mod tests {
             center: Vec3::new(1.5, -0.75, 2.25),
             rotation: Quat::IDENTITY,
             scale: 1.4,
+            axis_scale: Vec3::ONE,
             radius: parent_geometry.radius * 1.4,
             occupied_attachments: AttachmentOccupancy::new(parent_geometry),
             origin: NodeOrigin::Root,
@@ -692,6 +713,7 @@ mod tests {
             center: Vec3::new(1.5, -0.75, 2.25),
             rotation: Quat::IDENTITY,
             scale: 1.4,
+            axis_scale: Vec3::ONE,
             radius: parent_geometry.radius * 1.4,
             occupied_attachments: AttachmentOccupancy::new(parent_geometry),
             origin: NodeOrigin::Root,
@@ -730,6 +752,7 @@ mod tests {
             center: Vec3::new(1.5, -0.75, 2.25),
             rotation: Quat::IDENTITY,
             scale: parent_scale,
+            axis_scale: Vec3::ONE,
             radius: parent_geometry.radius * parent_scale,
             occupied_attachments: AttachmentOccupancy::new(parent_geometry),
             origin: NodeOrigin::Root,
@@ -813,6 +836,7 @@ mod tests {
             center: Vec3::new(1.5, -0.75, 2.25),
             rotation: parent_rotation,
             scale: 1.4,
+            axis_scale: Vec3::ONE,
             radius: parent_geometry.radius * 1.4,
             occupied_attachments: AttachmentOccupancy::new(parent_geometry),
             origin: NodeOrigin::Root,

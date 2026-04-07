@@ -184,7 +184,7 @@ Current scene preset contents:
 - material palette/PBR settings, procedural surface-family settings, and the saved base global opacity
 - camera position, distance, and momentum
 - selected child shape, spawn placement mode, scale ratio, base twist/outward-offset values, and global spawn-exclusion probability
-- the shape tree rebuilt from those saved base values
+- the shape tree rebuilt from those saved base values, including each node's scalar and per-axis scale
 - effect-tuner values plus all per-parameter LFO settings
 
 When scene or material LFOs are active, preset files preserve the underlying base values and the LFO setup separately instead of freezing a single sampled frame.

@@ -70,6 +70,8 @@ pub(crate) struct ShapeNodeSnapshot {
     pub(crate) center: [f32; 3],
     pub(crate) rotation: [f32; 4],
     pub(crate) scale: f32,
+    #[serde(default = "unit_axis_scale_array")]
+    pub(crate) axis_scale: [f32; 3],
     pub(crate) radius: f32,
     pub(crate) occupied_vertices: Vec<bool>,
     #[serde(default)]
@@ -268,6 +270,7 @@ impl ShapeNodeSnapshot {
             center: vec3_to_array(node.center),
             rotation: quat_to_array(node.rotation),
             scale: node.scale,
+            axis_scale: vec3_to_array(node.axis_scale),
             radius: node.radius,
             occupied_vertices: node.occupied_attachments.vertices.clone(),
             occupied_edges: node.occupied_attachments.edges.clone(),
@@ -281,21 +284,24 @@ impl ShapeNodeSnapshot {
         shape_catalog: &crate::shapes::ShapeCatalog,
     ) -> Result<ShapeNode, String> {
         let geometry = shape_catalog.geometry(self.shape_kind);
-
-        Ok(ShapeNode {
+        let mut node = ShapeNode {
             kind: self.shape_kind,
             level: self.level,
             center: vec3_from_array(self.center),
             rotation: quat_from_array(self.rotation),
             scale: self.scale,
-            radius: self.radius,
+            axis_scale: vec3_from_array(self.axis_scale),
+            radius: 0.0,
             occupied_attachments: AttachmentOccupancy {
                 vertices: resize_occupancy(&self.occupied_vertices, geometry.vertices.len()),
                 edges: resize_occupancy(&self.occupied_edges, geometry.edges.len()),
                 faces: resize_occupancy(&self.occupied_faces, geometry.faces.len()),
             },
             origin: self.origin.to_runtime()?,
-        })
+        };
+        node.radius = node.bounding_radius(geometry);
+
+        Ok(node)
     }
 }
 
@@ -340,6 +346,10 @@ fn vec3_from_array(vector: [f32; 3]) -> Vec3 {
     Vec3::new(vector[0], vector[1], vector[2])
 }
 
+fn unit_axis_scale_array() -> [f32; 3] {
+    [1.0, 1.0, 1.0]
+}
+
 fn quat_to_array(quat: Quat) -> [f32; 4] {
     [quat.x, quat.y, quat.z, quat.w]
 }
@@ -357,11 +367,14 @@ fn resize_occupancy(values: &[bool], len: usize) -> Vec<bool> {
 
 #[cfg(test)]
 mod tests {
-    use super::SceneStateSnapshot;
+    use bevy::prelude::Vec3;
+
+    use super::{NodeOriginSnapshot, SceneStateSnapshot, ShapeNodeSnapshot};
     use crate::camera::CameraRig;
     use crate::config::AppConfig;
     use crate::effect_tuner::EffectTunerState;
     use crate::scene::{GenerationState, LightingState, MaterialState, RenderingState, StageState};
+    use crate::shapes::{ShapeCatalog, ShapeKind};
 
     #[test]
     fn capture_uses_runtime_stage_visibility() {
@@ -392,5 +405,59 @@ mod tests {
         assert!(snapshot.rendering.stage.enabled);
         assert!(snapshot.rendering.stage.floor.enabled);
         assert!(!snapshot.rendering.stage.backdrop.enabled);
+    }
+
+    #[test]
+    fn shape_node_snapshot_defaults_axis_scale_to_unit() {
+        let shape_catalog = ShapeCatalog::new();
+        let snapshot: ShapeNodeSnapshot = toml::from_str(
+            r#"
+shape_kind = "cube"
+level = 0
+center = [0.0, 0.0, 0.0]
+rotation = [0.0, 0.0, 0.0, 1.0]
+scale = 2.0
+radius = 999.0
+occupied_vertices = []
+occupied_edges = []
+occupied_faces = []
+origin = "Root"
+"#,
+        )
+        .expect("snapshot should parse");
+
+        let node = snapshot
+            .to_runtime(&shape_catalog)
+            .expect("snapshot should become a runtime node");
+
+        assert_eq!(node.axis_scale, Vec3::ONE);
+        assert!(
+            (node.radius - shape_catalog.geometry(ShapeKind::Cube).radius * 2.0).abs() <= 1.0e-6
+        );
+    }
+
+    #[test]
+    fn shape_node_snapshot_radius_uses_largest_axis_scale() {
+        let shape_catalog = ShapeCatalog::new();
+        let node = ShapeNodeSnapshot {
+            shape_kind: ShapeKind::Cube,
+            level: 0,
+            center: [0.0, 0.0, 0.0],
+            rotation: [0.0, 0.0, 0.0, 1.0],
+            scale: 2.0,
+            axis_scale: [1.0, 1.5, 0.5],
+            radius: 1.0,
+            occupied_vertices: Vec::new(),
+            occupied_edges: Vec::new(),
+            occupied_faces: Vec::new(),
+            origin: NodeOriginSnapshot::Root,
+        }
+        .to_runtime(&shape_catalog)
+        .expect("snapshot should become a runtime node");
+
+        assert_eq!(node.axis_scale, Vec3::new(1.0, 1.5, 0.5));
+        assert!(
+            (node.radius - shape_catalog.geometry(ShapeKind::Cube).radius * 3.0).abs() <= 1.0e-6
+        );
     }
 }

@@ -168,6 +168,7 @@ struct BlendNodeMetadata {
     center: [f32; 3],
     rotation: [f32; 4],
     scale: f32,
+    axis_scale: [f32; 3],
     radius: f32,
     occupied_vertices: Vec<bool>,
     occupied_edges: Vec<bool>,
@@ -318,7 +319,7 @@ impl BlendObject {
         let vertices = geometry
             .vertices
             .iter()
-            .map(|vertex| node.center + node.rotation * (*vertex * node.scale))
+            .map(|vertex| node.center + node.rotation * (*vertex * node.combined_scale()))
             .map(bevy_point_to_blender_array)
             .collect();
         let (parent_index, parent_attachment_mode, parent_attachment_index, parent_vertex_index) =
@@ -416,6 +417,7 @@ impl BlendNodeMetadata {
             center: node.center,
             rotation: node.rotation,
             scale: node.scale,
+            axis_scale: node.axis_scale,
             radius: node.radius,
             occupied_vertices: node.occupied_vertices.clone(),
             occupied_edges: node.occupied_edges.clone(),
