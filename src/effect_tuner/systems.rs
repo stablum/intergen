@@ -13,6 +13,7 @@ use crate::generation::{apply_live_material_state, recompute_generation_tree};
 use crate::runtime_scene::GenerationSceneAccess;
 use crate::scene::{apply_live_lighting_state, apply_live_rendering_state, sync_stage_entities};
 
+use super::EffectOverlayField;
 use super::state::{
     AdjustmentModifiers, EffectTunerEditContext, EffectTunerParameter, EffectTunerState,
     EffectTunerViewContext, SceneChangeTarget, SceneLfoApplicationResult,
@@ -147,8 +148,12 @@ pub(crate) fn effect_tuner_input_system(
         );
     }
 
+    let editing_selected_value = selected_field_edits_parameter_value(&effect_tuner);
+
     let adjusted_up = {
-        restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
+        if editing_selected_value {
+            restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
+        }
         let mut context = effect_tuner_edit_context(
             &scene.app_config,
             &mut scene.camera_rig,
@@ -172,8 +177,10 @@ pub(crate) fn effect_tuner_input_system(
         )
     };
     if adjusted_up {
-        apply_selected_parameter_side_effects(effect_tuner.selected_parameter(), &mut scene);
-        sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
+        if editing_selected_value {
+            apply_selected_parameter_side_effects(effect_tuner.selected_parameter(), &mut scene);
+            sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
+        }
         println!(
             "{}",
             effect_tuner.selected_status_message(
@@ -192,7 +199,9 @@ pub(crate) fn effect_tuner_input_system(
     }
 
     let adjusted_down = {
-        restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
+        if editing_selected_value {
+            restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
+        }
         let mut context = effect_tuner_edit_context(
             &scene.app_config,
             &mut scene.camera_rig,
@@ -216,8 +225,10 @@ pub(crate) fn effect_tuner_input_system(
         )
     };
     if adjusted_down {
-        apply_selected_parameter_side_effects(effect_tuner.selected_parameter(), &mut scene);
-        sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
+        if editing_selected_value {
+            apply_selected_parameter_side_effects(effect_tuner.selected_parameter(), &mut scene);
+            sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
+        }
         println!(
             "{}",
             effect_tuner.selected_status_message(
@@ -280,7 +291,9 @@ pub(crate) fn effect_tuner_input_system(
             );
         } else {
             let selected_parameter = effect_tuner.selected_parameter();
-            restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
+            if editing_selected_value {
+                restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
+            }
             {
                 let mut context = effect_tuner_edit_context(
                     &scene.app_config,
@@ -293,8 +306,10 @@ pub(crate) fn effect_tuner_input_system(
                 );
                 effect_tuner.reset_selected(&mut context, now_secs);
             }
-            apply_selected_parameter_side_effects(selected_parameter, &mut scene);
-            sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
+            if editing_selected_value {
+                apply_selected_parameter_side_effects(selected_parameter, &mut scene);
+                sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
+            }
             println!(
                 "Reset {}.",
                 effect_tuner.selected_status_message(
@@ -316,7 +331,9 @@ pub(crate) fn effect_tuner_input_system(
     if keys.just_pressed(KeyCode::Backspace) {
         let selected_parameter = effect_tuner.selected_parameter();
         let changed = {
-            restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
+            if editing_selected_value {
+                restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
+            }
             let mut context = effect_tuner_edit_context(
                 &scene.app_config,
                 &mut scene.camera_rig,
@@ -329,8 +346,10 @@ pub(crate) fn effect_tuner_input_system(
             effect_tuner.backspace_numeric_input(&mut context, now_secs)
         };
         if changed {
-            apply_selected_parameter_side_effects(selected_parameter, &mut scene);
-            sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
+            if editing_selected_value {
+                apply_selected_parameter_side_effects(selected_parameter, &mut scene);
+                sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
+            }
         }
     }
 
@@ -353,7 +372,9 @@ pub(crate) fn effect_tuner_input_system(
         {
             let selected_parameter = effect_tuner.selected_parameter();
             let changed = {
-                restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
+                if editing_selected_value {
+                    restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
+                }
                 let mut context = effect_tuner_edit_context(
                     &scene.app_config,
                     &mut scene.camera_rig,
@@ -366,8 +387,10 @@ pub(crate) fn effect_tuner_input_system(
                 effect_tuner.append_numeric_input(character, &mut context, now_secs)
             };
             if changed {
-                apply_selected_parameter_side_effects(selected_parameter, &mut scene);
-                sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
+                if editing_selected_value {
+                    apply_selected_parameter_side_effects(selected_parameter, &mut scene);
+                    sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
+                }
             }
         }
     }
@@ -434,6 +457,10 @@ fn mouse_wheel_selection_whole_steps(lines: f32) -> isize {
 
 fn is_numeric_entry_char(character: char) -> bool {
     matches!(character, '0'..='9' | '.' | ',' | '-' | '+')
+}
+
+fn selected_field_edits_parameter_value(effect_tuner: &EffectTunerState) -> bool {
+    effect_tuner.active_field() == EffectOverlayField::Value
 }
 
 fn restore_selected_scene_parameter_base_if_needed(
@@ -674,7 +701,12 @@ fn apply_scene_lfo_side_effects(
 mod tests {
     use bevy::input::mouse::MouseScrollUnit;
 
-    use super::{mouse_wheel_selection_lines, mouse_wheel_selection_whole_steps};
+    use super::{
+        mouse_wheel_selection_lines, mouse_wheel_selection_whole_steps,
+        selected_field_edits_parameter_value,
+    };
+    use crate::config::EffectsConfig;
+    use crate::effect_tuner::EffectTunerState;
 
     #[test]
     fn mouse_wheel_selection_lines_handles_line_and_pixel_units() {
@@ -701,5 +733,15 @@ mod tests {
         assert_eq!(mouse_wheel_selection_whole_steps(-0.8), 0);
         assert_eq!(mouse_wheel_selection_whole_steps(-1.0), -1);
         assert_eq!(mouse_wheel_selection_whole_steps(-1.6), -1);
+    }
+
+    #[test]
+    fn only_value_field_edits_trigger_direct_scene_restore_path() {
+        let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+
+        assert!(selected_field_edits_parameter_value(&effect_tuner));
+
+        assert!(effect_tuner.step_edit_mode(1, 0.0));
+        assert!(!selected_field_edits_parameter_value(&effect_tuner));
     }
 }

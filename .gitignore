@@ -2,5 +2,6 @@
 /blend-exports/
 /assets/fonts/*
 !/assets/fonts/README.md
+.target-verification-runs
 .env
 AGENTS.md
