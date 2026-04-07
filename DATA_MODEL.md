@@ -82,7 +82,7 @@ Each generation parameter is stored as a `ScalarParameterState`, which means:
 
 | Parameter | Stored Domain | Effective Domain / Notes |
 | --- | --- | --- |
-| `scale_ratio` | `ScalarParameterState` over finite `f32` | Effective value is clamped to `GenerationConfig.min_scale_ratio..max_scale_ratio`; default config is `0.15..1.0`. Affects future spawns only. Existing `ShapeNode.scale` values are not rewritten. |
+| `scale_ratio` | `ScalarParameterState` over finite `f32` | Effective value is clamped to `GenerationConfig.min_scale_ratio..max_scale_ratio`; default config is `0.15..1.0`. Affects future spawns only. Existing per-node `ShapeNode.scale` and `ShapeNode.axis_scale` values are not rewritten. |
 | `child_twist` | `ScalarParameterState` over finite `f32` | Effective value is clamped to the nonnegative twist bounds in `GenerationConfig`; default config is `0.0..PI`. Affects child orientation and can recompute existing child node rotations. |
 | `child_offset` | `ScalarParameterState` over finite `f32` | Effective value is clamped to the nonnegative offset bounds in `GenerationConfig`; default config is `0.0..6.0`. Measured in child-radius units. Can recompute existing child node centers. |
 | `child_spawn_exclusion_probability` | `ScalarParameterState` over finite `f32` | Effective value is clamped to `[0.0, 1.0]`. Affects future spawn candidate filtering only. No persistent per-attachment exclusion flag is stored. |
@@ -213,10 +213,28 @@ Each generated object in the recursive tree is a `ShapeNode`.
 | `center` | `Vec3` | Position in scene space. Valid generated scenes use finite components. |
 | `rotation` | `Quat` | Expected to be a normalized quaternion. This is stored per node, but for non-root nodes it is usually derived from the parent transform, the attachment, and the shared twist parameter. |
 | `scale` | finite `f32` | Valid generated scenes use `scale > 0.0`. It is the uniform scalar materialized at spawn time from the parent's scale and the shared scale ratio. Later scale-ratio changes do not retroactively rewrite existing node scales. |
-| `axis_scale` | `Vec3` of finite `f32` | Per-axis scale multiplier stored per node. `Vec3::ONE` means no non-uniform scaling. Runtime transforms use `scale * axis_scale` component-wise. |
+| `axis_scale` | `Vec3` of finite `f32` | Per-axis scale multiplier stored per node. `Vec3::ONE` means no non-uniform scaling. There is no hard runtime clamp on the components; negative values are mathematically possible and would mirror the mesh on that axis. |
 | `radius` | finite `f32` | Valid generated scenes use `radius > 0.0`. Cached scaled bounding radius for containment and placement math, derived from the largest absolute component of `scale * axis_scale`. |
 | `occupied_attachments` | `AttachmentOccupancy` | Per-node occupancy flags for vertices, edges, and faces. |
 | `origin` | `NodeOrigin` | Either `Root` or `Child { parent_index, attachment }`. |
+
+### Per-node scale model
+
+The current per-node scale model has two stored parameters and two important derived quantities:
+
+| Quantity | Domain | Notes |
+| --- | --- | --- |
+| `ShapeNode.scale` | finite `f32`, normally `> 0.0` in valid generated scenes | Uniform scalar portion of the node scale. Spawned children compute this from `parent.scale * scale_ratio`. |
+| `ShapeNode.axis_scale` | `Vec3` of finite `f32` | Per-axis multiplier. The root node and newly spawned children currently default to `Vec3::ONE`, so non-uniform scaling currently comes from snapshot/imported per-node data or later direct node edits, not from the shared generation parameters. |
+| `ShapeNode.combined_scale()` | `Vec3` of finite `f32` | Defined as `axis_scale * scale` component-wise. This is the scale actually sent into Bevy transforms and mesh export. |
+| `ShapeNode.bounding_radius(geometry)` | finite `f32`, normally `> 0.0` | Defined from `geometry.radius * max(abs(combined_scale.x), abs(combined_scale.y), abs(combined_scale.z))`. This is what the node caches in `radius`. |
+
+Current runtime behavior:
+
+- root nodes start with `axis_scale = Vec3::ONE`
+- newly spawned child nodes also start with `axis_scale = Vec3::ONE`
+- spawn-time shared `scale_ratio` only changes the uniform `scale` term for future children
+- recomputing the tree preserves each node's stored `axis_scale` and recomputes `radius` from it
 
 ### `ShapeKind`
 
@@ -296,6 +314,7 @@ These belong to individual generated objects:
 - shape kind
 - level
 - transform (`center`, `rotation`, `scale`, `axis_scale`)
+- derived transform scale (`combined_scale()`)
 - cached radius
 - parent/origin relationship
 - attachment occupancy for that node
@@ -405,7 +424,7 @@ The main serialized snapshot contains:
 | `rotation` | `[f32; 4]` | Serialized quaternion components. Normalized on load. |
 | `scale` | finite `f32` | Valid generated scenes use positive values. This is the stored uniform scalar. |
 | `axis_scale` | `[f32; 3]` of finite values | Per-axis scale multiplier. Missing serialized values default to `[1.0, 1.0, 1.0]` for backward compatibility. |
-| `radius` | finite `f32` | Valid generated scenes use positive values. Runtime loading recomputes it from geometry, `scale`, and `axis_scale` so cached values stay consistent. |
+| `radius` | finite `f32` | Valid generated scenes use positive values. Runtime loading recomputes it from geometry and `combined_scale = scale * axis_scale` so cached values stay consistent. |
 | `occupied_vertices` | `Vec<bool>` | Resized to current geometry length on load. |
 | `occupied_edges` | `Vec<bool>` | Resized to current geometry length on load. |
 | `occupied_faces` | `Vec<bool>` | Resized to current geometry length on load. |
