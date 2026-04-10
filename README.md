@@ -150,9 +150,9 @@ The in-app F2 control page starts from the values loaded from `config.toml` at l
 - The F2 control list covers shader effects plus scene, stage, and material runtime controls, including enum-like fields such as child shape, spawn placement mode, add mode, stage toggles, and procedural surface families.
 - The first `F2` press opens a parameter-group page, the second `F2` press opens the compact strip, the third `F2` press opens the full scrolling parameter list with an LFO detail panel beside the selected row, and the fourth `F2` press closes the page.
 - On the first F2 page, `Up` / `Down` choose a parameter group and `Enter` or `Space` opens that group's parameter list.
-- `Ctrl + Up` / `Ctrl + Down` select the active F2 control in the compact page, the full list page, or a group-specific parameter list, with hold-to-repeat.
+- `Up` / `Down` select the active F2 control in the compact page, the full list page, or a group-specific parameter list, with hold-to-repeat.
 - `Left` / `Right` or `Tab` / `Shift + Tab` switch the active F2 field between value, LFO amplitude, LFO frequency, and LFO shape when the selected parameter supports LFOs.
-- `Up` / `Down` adjust the active F2 field in the compact or parameter-list pages. `Shift` makes the step coarser and `Alt` makes it finer.
+- `Ctrl + Up` / `Ctrl + Down` adjust the active F2 field in the compact or parameter-list pages. `Shift` makes the step coarser and `Alt` makes it finer.
 - `Space` toggles the selected shader effect on or off in the compact or parameter-list pages.
 - `L` toggles the selected parameter LFO on or off when the selected parameter supports LFOs.
 - Type digits, `.`, `,`, `-`, or `+` to set the active numeric field directly. `Backspace` erases the typed numeric input in the compact or parameter-list pages.
@@ -268,9 +268,9 @@ cargo test-plain
 - `Esc`: close the current F-page, including help, F2, or F3
 - `Up` / `Down` in the first F2 page: select the active parameter group
 - `Enter` / `Space` in the first F2 page: open the selected group's parameter list
-- `Ctrl + Up` / `Ctrl + Down` in F2 compact or parameter-list pages: select the active F2 control, with hold-to-repeat
+- `Up` / `Down` in F2 compact or parameter-list pages: select the active F2 control, with hold-to-repeat
 - `Left` / `Right` or `Tab` / `Shift + Tab` in F2: switch the active F2 field
-- `Up` / `Down` in F2 compact or parameter-list pages: adjust the active F2 field
+- `Ctrl + Up` / `Ctrl + Down` in F2 compact or parameter-list pages: adjust the active F2 field
 - `Space` in F2 compact or parameter-list pages: toggle the selected shader effect on or off
 - `L` in F2: toggle the selected parameter LFO on or off when supported
 - `Shift` in F2: coarse adjustment modifier

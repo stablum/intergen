@@ -297,7 +297,7 @@ pub(crate) fn update_effect_tuner_group_overlay_system(
         if let Some(row_snapshot) = snapshot.rows.get(row.0) {
             *visibility = Visibility::Visible;
             *background = if row_snapshot.selected {
-                BackgroundColor(effect_tuner_panel_fill_color())
+                BackgroundColor(Color::srgb(1.0, 1.0, 1.0))
             } else {
                 BackgroundColor(Color::NONE)
             };
@@ -315,7 +315,11 @@ pub(crate) fn update_effect_tuner_group_overlay_system(
         };
 
         *text = Text::new(row_snapshot.group_label);
-        *text_color = TextColor(srgb(ui_config.title_text));
+        *text_color = TextColor(if row_snapshot.selected {
+            Color::srgb(0.0, 0.0, 0.0)
+        } else {
+            srgb(ui_config.title_text)
+        });
     }
 }
 

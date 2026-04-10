@@ -23,7 +23,7 @@ fn overlay_text_lists_help_and_spawn_controls() {
     assert!(text.contains(
         "In first F2 page: Enter or Space opens the selected group parameter list"
     ));
-    assert!(text.contains("In F2 compact or list page: Ctrl + Up / Down select control"));
+    assert!(text.contains("In F2 compact or list page: Up / Down select control"));
     assert!(text.contains(
         "In F2 page: Second F2 press opens compact controls, third press opens the full list"
     ));
@@ -32,7 +32,9 @@ fn overlay_text_lists_help_and_spawn_controls() {
             "In F2 compact or list page: Left / Right or Tab / Shift+Tab switch the active field"
         )
     );
-    assert!(text.contains("In F2 compact or list page: Up / Down adjust the active field"));
+    assert!(text.contains(
+        "In F2 compact or list page: Ctrl + Up / Down adjust the active field"
+    ));
     assert!(text.contains(
         "In F2 compact or list page: Space toggles the selected shader effect"
     ));
@@ -147,7 +149,7 @@ fn help_overlay_table_rows_cover_primary_bindings() {
     assert!(
         entries
             .iter()
-            .any(|entry| entry.binding == "Ctrl + Up / Down"
+            .any(|entry| entry.binding == "Up / Down"
                 && entry.explanation.contains("F2 compact or list page"))
     );
     assert!(

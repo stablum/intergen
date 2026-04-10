@@ -54,9 +54,9 @@ const FX_HELP: [HelpEntry; 14] = [
         explanation: "In the first F2 page, open the selected group parameter list.",
     },
     HelpEntry {
-        startup: "Ctrl+Up/Down selects a control in the compact and list pages",
-        overlay: "In F2 compact or list page: Ctrl + Up / Down select control",
-        binding: "Ctrl + Up / Down",
+        startup: "Up/Down selects a control in the compact and list pages",
+        overlay: "In F2 compact or list page: Up / Down select control",
+        binding: "Up / Down",
         explanation: "In the F2 compact or list page, select a control.",
     },
     HelpEntry {
@@ -72,9 +72,9 @@ const FX_HELP: [HelpEntry; 14] = [
         explanation: "In the F2 compact or list page, switch the active field.",
     },
     HelpEntry {
-        startup: "Up/Down adjust the active field",
-        overlay: "In F2 compact or list page: Up / Down adjust the active field",
-        binding: "Up / Down",
+        startup: "Ctrl+Up/Down adjust the active field",
+        overlay: "In F2 compact or list page: Ctrl + Up / Down adjust the active field",
+        binding: "Ctrl + Up / Down",
         explanation: "In the F2 compact or list page, adjust the active field.",
     },
     HelpEntry {

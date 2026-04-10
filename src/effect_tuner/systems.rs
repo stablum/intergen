@@ -154,9 +154,9 @@ pub(crate) fn effect_tuner_input_system(
     if effect_tuner.step_selection(
         -1,
         HoldInput {
-            just_pressed: ctrl_pressed && keys.just_pressed(KeyCode::ArrowUp),
-            pressed: ctrl_pressed && keys.pressed(KeyCode::ArrowUp),
-            just_released: !ctrl_pressed || keys.just_released(KeyCode::ArrowUp),
+            just_pressed: !ctrl_pressed && keys.just_pressed(KeyCode::ArrowUp),
+            pressed: !ctrl_pressed && keys.pressed(KeyCode::ArrowUp),
+            just_released: ctrl_pressed || keys.just_released(KeyCode::ArrowUp),
             delta_secs,
         },
         now_secs,
@@ -170,9 +170,9 @@ pub(crate) fn effect_tuner_input_system(
     if effect_tuner.step_selection(
         1,
         HoldInput {
-            just_pressed: ctrl_pressed && keys.just_pressed(KeyCode::ArrowDown),
-            pressed: ctrl_pressed && keys.pressed(KeyCode::ArrowDown),
-            just_released: !ctrl_pressed || keys.just_released(KeyCode::ArrowDown),
+            just_pressed: !ctrl_pressed && keys.just_pressed(KeyCode::ArrowDown),
+            pressed: !ctrl_pressed && keys.pressed(KeyCode::ArrowDown),
+            just_released: ctrl_pressed || keys.just_released(KeyCode::ArrowDown),
             delta_secs,
         },
         now_secs,
@@ -223,9 +223,9 @@ pub(crate) fn effect_tuner_input_system(
         effect_tuner.step_adjustment(
             1.0,
             HoldInput {
-                just_pressed: !ctrl_pressed && keys.just_pressed(KeyCode::ArrowUp),
-                pressed: !ctrl_pressed && keys.pressed(KeyCode::ArrowUp),
-                just_released: ctrl_pressed || keys.just_released(KeyCode::ArrowUp),
+                just_pressed: ctrl_pressed && keys.just_pressed(KeyCode::ArrowUp),
+                pressed: ctrl_pressed && keys.pressed(KeyCode::ArrowUp),
+                just_released: !ctrl_pressed || keys.just_released(KeyCode::ArrowUp),
                 delta_secs,
             },
             modifiers,
@@ -271,9 +271,9 @@ pub(crate) fn effect_tuner_input_system(
         effect_tuner.step_adjustment(
             -1.0,
             HoldInput {
-                just_pressed: !ctrl_pressed && keys.just_pressed(KeyCode::ArrowDown),
-                pressed: !ctrl_pressed && keys.pressed(KeyCode::ArrowDown),
-                just_released: ctrl_pressed || keys.just_released(KeyCode::ArrowDown),
+                just_pressed: ctrl_pressed && keys.just_pressed(KeyCode::ArrowDown),
+                pressed: ctrl_pressed && keys.pressed(KeyCode::ArrowDown),
+                just_released: !ctrl_pressed || keys.just_released(KeyCode::ArrowDown),
                 delta_secs,
             },
             modifiers,
