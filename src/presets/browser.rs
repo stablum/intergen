@@ -446,6 +446,7 @@ mod tests {
                 child_axis_scale: [1.0, 1.0, 1.0],
                 twist_per_vertex_radians: 0.0,
                 vertex_offset_ratio: 0.0,
+                child_position_offset: [0.0, 0.0, 0.0],
                 vertex_spawn_exclusion_probability: 0.0,
                 nodes: vec![ShapeNodeSnapshot {
                     shape_kind: ShapeKind::Cube,
@@ -454,6 +455,7 @@ mod tests {
                     rotation: [0.0, 0.0, 0.0, 1.0],
                     scale: 1.0,
                     axis_scale: [1.0, 1.0, 1.0],
+                    local_position_offset: [0.0, 0.0, 0.0],
                     radius: 1.0,
                     occupied_vertices: vec![],
                     occupied_edges: vec![],

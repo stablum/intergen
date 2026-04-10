@@ -5,7 +5,7 @@ pub(crate) enum EffectTunerParameter {
 }
 
 impl EffectTunerParameter {
-    const ALL: [Self; 126] = [
+    const ALL: [Self; 129] = [
         Self::Effect(EffectNumericParameter::WavefolderGain),
         Self::Effect(EffectNumericParameter::WavefolderModulus),
         Self::Effect(EffectNumericParameter::LensStrength),
@@ -39,6 +39,9 @@ impl EffectTunerParameter {
         Self::Scene(EffectTunerSceneParameter::ChildAxisScaleZ),
         Self::Scene(EffectTunerSceneParameter::ChildTwistPerVertexRadians),
         Self::Scene(EffectTunerSceneParameter::ChildOutwardOffsetRatio),
+        Self::Scene(EffectTunerSceneParameter::ChildPositionOffsetX),
+        Self::Scene(EffectTunerSceneParameter::ChildPositionOffsetY),
+        Self::Scene(EffectTunerSceneParameter::ChildPositionOffsetZ),
         Self::Scene(EffectTunerSceneParameter::ChildSpawnExclusionProbability),
         Self::Scene(EffectTunerSceneParameter::StageEnabled),
         Self::Scene(EffectTunerSceneParameter::StageFloorEnabled),

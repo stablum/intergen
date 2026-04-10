@@ -54,6 +54,8 @@ pub(crate) struct GenerationSnapshot {
     pub(crate) child_axis_scale: [f32; 3],
     pub(crate) twist_per_vertex_radians: f32,
     pub(crate) vertex_offset_ratio: f32,
+    #[serde(default = "zero_vec3_array")]
+    pub(crate) child_position_offset: [f32; 3],
     #[serde(default)]
     pub(crate) vertex_spawn_exclusion_probability: f32,
     pub(crate) nodes: Vec<ShapeNodeSnapshot>,
@@ -74,6 +76,8 @@ pub(crate) struct ShapeNodeSnapshot {
     pub(crate) scale: f32,
     #[serde(default = "unit_axis_scale_array")]
     pub(crate) axis_scale: [f32; 3],
+    #[serde(default = "zero_vec3_array")]
+    pub(crate) local_position_offset: [f32; 3],
     pub(crate) radius: f32,
     pub(crate) occupied_vertices: Vec<bool>,
     #[serde(default)]
@@ -221,6 +225,7 @@ impl GenerationSnapshot {
             child_axis_scale: vec3_to_array(generation_state.child_axis_scale_base()),
             twist_per_vertex_radians: generation_state.twist_per_vertex_radians_base(),
             vertex_offset_ratio: generation_state.vertex_offset_ratio_base(),
+            child_position_offset: vec3_to_array(generation_state.child_position_offset_base()),
             vertex_spawn_exclusion_probability: generation_state
                 .vertex_spawn_exclusion_probability_base(),
             nodes: generation_state
@@ -251,6 +256,7 @@ impl GenerationSnapshot {
                 vec3_from_array(self.child_axis_scale),
                 self.twist_per_vertex_radians,
                 self.vertex_offset_ratio,
+                vec3_from_array(self.child_position_offset),
                 self.vertex_spawn_exclusion_probability,
             ),
             spawn_hold: default(),
@@ -275,6 +281,7 @@ impl ShapeNodeSnapshot {
             rotation: quat_to_array(node.rotation),
             scale: node.scale,
             axis_scale: vec3_to_array(node.axis_scale),
+            local_position_offset: vec3_to_array(node.local_position_offset),
             radius: node.radius,
             occupied_vertices: node.occupied_attachments.vertices.clone(),
             occupied_edges: node.occupied_attachments.edges.clone(),
@@ -295,6 +302,7 @@ impl ShapeNodeSnapshot {
             rotation: quat_from_array(self.rotation),
             scale: self.scale,
             axis_scale: vec3_from_array(self.axis_scale),
+            local_position_offset: vec3_from_array(self.local_position_offset),
             radius: 0.0,
             occupied_attachments: AttachmentOccupancy {
                 vertices: resize_occupancy(&self.occupied_vertices, geometry.vertices.len()),
@@ -352,6 +360,10 @@ fn vec3_from_array(vector: [f32; 3]) -> Vec3 {
 
 fn unit_axis_scale_array() -> [f32; 3] {
     [1.0, 1.0, 1.0]
+}
+
+fn zero_vec3_array() -> [f32; 3] {
+    [0.0, 0.0, 0.0]
 }
 
 fn quat_to_array(quat: Quat) -> [f32; 4] {
@@ -435,6 +447,7 @@ origin = "Root"
             .expect("snapshot should become a runtime node");
 
         assert_eq!(node.axis_scale, Vec3::ONE);
+        assert_eq!(node.local_position_offset, Vec3::ZERO);
         assert!(
             (node.radius - shape_catalog.geometry(ShapeKind::Cube).radius * 2.0).abs() <= 1.0e-6
         );
@@ -454,6 +467,7 @@ nodes = []
         .expect("generation snapshot should parse");
 
         assert_eq!(snapshot.child_axis_scale, [1.0, 1.0, 1.0]);
+        assert_eq!(snapshot.child_position_offset, [0.0, 0.0, 0.0]);
     }
 
     #[test]
@@ -466,6 +480,7 @@ nodes = []
             rotation: [0.0, 0.0, 0.0, 1.0],
             scale: 2.0,
             axis_scale: [1.0, 1.5, 0.5],
+            local_position_offset: [0.0, 0.0, 0.0],
             radius: 1.0,
             occupied_vertices: Vec::new(),
             occupied_edges: Vec::new(),

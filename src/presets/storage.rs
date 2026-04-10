@@ -351,7 +351,18 @@ mod tests {
             .runtime_snapshot()
             .lfos
             .len();
-        let checked_in_scene_presets_raw_lfo_len = current_lfo_layout_len - 5;
+        let latent_generation_parameters = [
+            "generation.child_scale_ratio",
+            "generation.child_axis_scale.x",
+            "generation.child_axis_scale.y",
+            "generation.child_axis_scale.z",
+            "generation.child_position_offset.x",
+            "generation.child_position_offset.y",
+            "generation.child_position_offset.z",
+            "generation.child_spawn_exclusion_probability",
+        ];
+        let checked_in_scene_presets_raw_lfo_len =
+            current_lfo_layout_len - latent_generation_parameters.len();
         let default_encoded =
             toml::to_string(&default_snapshot).expect("default runtime snapshot should serialize");
         let default_lfos = raw_runtime_snapshot_lfo_entries(&default_encoded);
@@ -406,13 +417,7 @@ mod tests {
                 assert_eq!(restored_lfo.frequency_hz, expected_lfo.frequency_hz);
             }
 
-            for parameter in [
-                "generation.child_scale_ratio",
-                "generation.child_axis_scale.x",
-                "generation.child_axis_scale.y",
-                "generation.child_axis_scale.z",
-                "generation.child_spawn_exclusion_probability",
-            ] {
+            for parameter in latent_generation_parameters {
                 assert_eq!(
                     lfo_entry_by_parameter(&restored_lfos, parameter),
                     lfo_entry_by_parameter(&default_lfos, parameter),

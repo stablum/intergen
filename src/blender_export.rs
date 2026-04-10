@@ -153,6 +153,7 @@ struct BlendGenerationMetadata {
     child_axis_scale: [f32; 3],
     twist_per_vertex_radians: f32,
     vertex_offset_ratio: f32,
+    child_position_offset: [f32; 3],
     vertex_spawn_exclusion_probability: f32,
     nodes: Vec<BlendNodeMetadata>,
 }
@@ -170,6 +171,7 @@ struct BlendNodeMetadata {
     rotation: [f32; 4],
     scale: f32,
     axis_scale: [f32; 3],
+    local_position_offset: [f32; 3],
     radius: f32,
     occupied_vertices: Vec<bool>,
     occupied_edges: Vec<bool>,
@@ -393,6 +395,7 @@ impl BlendGenerationMetadata {
             child_axis_scale: generation_state.child_axis_scale,
             twist_per_vertex_radians: generation_state.twist_per_vertex_radians,
             vertex_offset_ratio: generation_state.vertex_offset_ratio,
+            child_position_offset: generation_state.child_position_offset,
             vertex_spawn_exclusion_probability: generation_state.vertex_spawn_exclusion_probability,
             nodes: generation_state
                 .nodes
@@ -420,6 +423,7 @@ impl BlendNodeMetadata {
             rotation: node.rotation,
             scale: node.scale,
             axis_scale: node.axis_scale,
+            local_position_offset: node.local_position_offset,
             radius: node.radius,
             occupied_vertices: node.occupied_vertices.clone(),
             occupied_edges: node.occupied_edges.clone(),

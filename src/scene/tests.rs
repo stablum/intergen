@@ -26,6 +26,7 @@ fn reset_generation_state_restores_root_only() {
         rotation: Quat::IDENTITY,
         scale: 0.4,
         axis_scale: Vec3::ONE,
+        local_position_offset: Vec3::ZERO,
         radius: 0.7,
         occupied_attachments: AttachmentOccupancy::default(),
         origin: NodeOrigin::Child {
@@ -47,6 +48,7 @@ fn reset_generation_state_restores_root_only() {
             Vec3::new(1.25, 0.75, 1.5),
             0.3,
             0.6,
+            Vec3::ZERO,
             0.2,
         ),
         spawn_hold: HoldRepeatState {

@@ -6,17 +6,23 @@ pub(crate) enum GenerationParameter {
     ChildAxisScaleZ,
     ChildTwistPerVertexRadians,
     ChildOutwardOffsetRatio,
+    ChildPositionOffsetX,
+    ChildPositionOffsetY,
+    ChildPositionOffsetZ,
     ChildSpawnExclusionProbability,
 }
 
 impl GenerationParameter {
-    pub(crate) const ALL: [Self; 7] = [
+    pub(crate) const ALL: [Self; 10] = [
         Self::ChildScaleRatio,
         Self::ChildAxisScaleX,
         Self::ChildAxisScaleY,
         Self::ChildAxisScaleZ,
         Self::ChildTwistPerVertexRadians,
         Self::ChildOutwardOffsetRatio,
+        Self::ChildPositionOffsetX,
+        Self::ChildPositionOffsetY,
+        Self::ChildPositionOffsetZ,
         Self::ChildSpawnExclusionProbability,
     ];
 }

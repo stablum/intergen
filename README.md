@@ -94,6 +94,10 @@ Live child-offset controls use these `generation` settings:
 - `vertex_offset_repeat_interval_secs`: time between repeated offset updates while held
 - `min_vertex_offset_ratio` / `max_vertex_offset_ratio`: live clamp range, with `0.0` as the minimum allowed floor
 
+Live child position-offset controls use these `generation` settings:
+- `default_child_position_offset`: startup default for the copied child-local `[x, y, z]` offset, clamped component-wise to `[-1.0, 1.0]`
+- `child_position_offset_adjust_step`: effect-tuner adjustment step for the copied child-local position offset components
+
 Live spawn-exclusion controls use these `generation` settings:
 - `default_vertex_spawn_exclusion_probability`: startup default for the chance that a given attachment in the current spawn mode is skipped during spawning
 - `vertex_spawn_exclusion_adjust_step`: per-keypress probability change

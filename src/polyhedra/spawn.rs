@@ -13,6 +13,7 @@ pub(crate) struct SpawnTuning {
     pub(crate) containment_epsilon: f32,
     pub(crate) twist_per_vertex_radians: f32,
     pub(crate) vertex_offset_ratio: f32,
+    pub(crate) child_position_offset: Vec3,
     pub(crate) vertex_spawn_exclusion_probability: f32,
     pub(crate) spawn_placement_mode: SpawnPlacementMode,
 }
@@ -141,6 +142,7 @@ pub(crate) struct ShapeNode {
     pub(crate) rotation: Quat,
     pub(crate) scale: f32,
     pub(crate) axis_scale: Vec3,
+    pub(crate) local_position_offset: Vec3,
     pub(crate) radius: f32,
     pub(crate) occupied_attachments: AttachmentOccupancy,
     pub(crate) origin: NodeOrigin,
@@ -208,6 +210,7 @@ pub(crate) fn root_node_with_axis_scale(
         rotation: Quat::IDENTITY,
         scale,
         axis_scale,
+        local_position_offset: Vec3::ZERO,
         radius: 0.0,
         occupied_attachments: AttachmentOccupancy::new(geometry),
         origin: NodeOrigin::Root,
@@ -412,6 +415,7 @@ pub(crate) fn recompute_spawn_tree(
             child_radius,
             twist_per_vertex_radians,
             vertex_offset_ratio,
+            node.local_position_offset,
         );
 
         node.center = center;
@@ -429,6 +433,7 @@ fn spawn_candidate(input: SpawnCandidateInput<'_>) -> ShapeNode {
         rotation: Quat::IDENTITY,
         scale,
         axis_scale: input.tuning.child_axis_scale,
+        local_position_offset: input.tuning.child_position_offset,
         radius: 0.0,
         occupied_attachments: AttachmentOccupancy::new(input.child_geometry),
         origin: NodeOrigin::Child {
@@ -444,6 +449,7 @@ fn spawn_candidate(input: SpawnCandidateInput<'_>) -> ShapeNode {
         node.radius,
         input.tuning.twist_per_vertex_radians,
         input.tuning.vertex_offset_ratio,
+        node.local_position_offset,
     );
     node.center = center;
     node.rotation = rotation;
@@ -491,6 +497,7 @@ fn child_transform(
     child_radius: f32,
     twist_per_vertex_radians: f32,
     vertex_offset_ratio: f32,
+    local_position_offset: Vec3,
 ) -> (Vec3, Quat) {
     let (world_anchor, outward) =
         transformed_attachment_anchor(parent, parent_geometry, attachment);
@@ -501,12 +508,79 @@ fn child_transform(
         PI / 5.0
     };
     let twist = Quat::from_axis_angle(outward, attachment.index as f32 * twist_step);
+    let rotation = twist * parent.rotation;
+    let anchor_after_offset =
+        world_anchor + world_position_offset(parent, parent_geometry, outward, rotation, local_position_offset);
+    let effective_outward = safe_normalize(anchor_after_offset - parent.center, outward);
     let vertex_offset = child_radius * vertex_offset_ratio.max(0.0);
 
     (
-        world_anchor + outward * vertex_offset,
-        twist * parent.rotation,
+        anchor_after_offset + effective_outward * vertex_offset,
+        rotation,
     )
+}
+
+fn world_position_offset(
+    parent: &ShapeNode,
+    parent_geometry: &ShapeGeometry,
+    outward: Vec3,
+    child_rotation: Quat,
+    local_position_offset: Vec3,
+) -> Vec3 {
+    if local_position_offset.length_squared() <= 1.0e-12 {
+        return Vec3::ZERO;
+    }
+
+    let (radial, tangent, bitangent) = spawn_frame(outward, child_rotation);
+    let radial_span = projected_span(parent, parent_geometry, radial);
+    let tangent_span = projected_span(parent, parent_geometry, tangent);
+    let bitangent_span = projected_span(parent, parent_geometry, bitangent);
+
+    radial * (local_position_offset.x * radial_span)
+        + tangent * (local_position_offset.y * tangent_span)
+        + bitangent * (local_position_offset.z * bitangent_span)
+}
+
+fn spawn_frame(outward: Vec3, child_rotation: Quat) -> (Vec3, Vec3, Vec3) {
+    let radial = outward;
+    let tangent = projected_unit(child_rotation * Vec3::Y, radial)
+        .or_else(|| projected_unit(child_rotation * Vec3::Z, radial))
+        .or_else(|| projected_unit(child_rotation * Vec3::X, radial))
+        .unwrap_or_else(|| fallback_perpendicular(radial));
+    let bitangent = radial.cross(tangent).normalize_or_zero();
+
+    (radial, tangent, bitangent)
+}
+
+fn projected_span(parent: &ShapeNode, parent_geometry: &ShapeGeometry, axis: Vec3) -> f32 {
+    let mut min_projection = f32::INFINITY;
+    let mut max_projection = f32::NEG_INFINITY;
+
+    for vertex in &parent_geometry.vertices {
+        let projected = (parent.rotation * (*vertex * parent.combined_scale())).dot(axis);
+        min_projection = min_projection.min(projected);
+        max_projection = max_projection.max(projected);
+    }
+
+    (max_projection - min_projection).max(0.0)
+}
+
+fn projected_unit(candidate: Vec3, axis: Vec3) -> Option<Vec3> {
+    let projected = candidate - axis * candidate.dot(axis);
+    (projected.length_squared() > 1.0e-12).then(|| projected.normalize())
+}
+
+fn fallback_perpendicular(axis: Vec3) -> Vec3 {
+    let candidate = if axis.y.abs() < 0.9 { Vec3::Y } else { Vec3::X };
+    projected_unit(candidate, axis).unwrap_or(Vec3::Z)
+}
+
+fn safe_normalize(vector: Vec3, fallback: Vec3) -> Vec3 {
+    if vector.length_squared() > 1.0e-12 {
+        vector.normalize()
+    } else {
+        fallback
+    }
 }
 
 fn transformed_attachment_anchor(
@@ -563,6 +637,7 @@ mod tests {
             containment_epsilon: 0.02,
             twist_per_vertex_radians: PI / 5.0,
             vertex_offset_ratio: 0.0,
+            child_position_offset: Vec3::ZERO,
             vertex_spawn_exclusion_probability: 0.0,
             spawn_placement_mode: SpawnPlacementMode::Vertex,
         }
@@ -643,6 +718,7 @@ mod tests {
             rotation: Quat::IDENTITY,
             scale: 1.0,
             axis_scale: Vec3::ONE,
+            local_position_offset: Vec3::ZERO,
             radius: 5.0,
             occupied_attachments: AttachmentOccupancy::default(),
             origin: NodeOrigin::Root,
@@ -677,6 +753,7 @@ mod tests {
             rotation: parent_rotation,
             scale: parent_scale,
             axis_scale: Vec3::ONE,
+            local_position_offset: Vec3::ZERO,
             radius: parent_geometry.radius * parent_scale,
             occupied_attachments: AttachmentOccupancy::new(parent_geometry),
             origin: NodeOrigin::Root,
@@ -710,6 +787,7 @@ mod tests {
             rotation: Quat::IDENTITY,
             scale: 1.4,
             axis_scale: Vec3::ONE,
+            local_position_offset: Vec3::ZERO,
             radius: parent_geometry.radius * 1.4,
             occupied_attachments: AttachmentOccupancy::new(parent_geometry),
             origin: NodeOrigin::Root,
@@ -747,6 +825,7 @@ mod tests {
             rotation: Quat::IDENTITY,
             scale: 1.4,
             axis_scale: Vec3::ONE,
+            local_position_offset: Vec3::ZERO,
             radius: parent_geometry.radius * 1.4,
             occupied_attachments: AttachmentOccupancy::new(parent_geometry),
             origin: NodeOrigin::Root,
@@ -790,6 +869,7 @@ mod tests {
             rotation: Quat::IDENTITY,
             scale: parent_scale,
             axis_scale: Vec3::ONE,
+            local_position_offset: Vec3::ZERO,
             radius: parent_geometry.radius * parent_scale,
             occupied_attachments: AttachmentOccupancy::new(parent_geometry),
             origin: NodeOrigin::Root,
@@ -835,6 +915,100 @@ mod tests {
         .expect("spawn should succeed");
 
         assert_eq!(spawn.node.axis_scale, Vec3::new(1.4, 0.8, 1.2));
+    }
+
+    #[test]
+    fn spawned_children_copy_the_shared_position_offset() {
+        let shapes = ShapeCatalog::new();
+        let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
+
+        let spawn = next_spawn(
+            &mut nodes,
+            &shapes,
+            ShapeKind::Tetrahedron,
+            0.35,
+            SpawnTuning {
+                child_position_offset: Vec3::new(0.25, -0.5, 0.75),
+                ..test_tuning()
+            },
+        )
+        .expect("spawn should succeed");
+
+        assert_eq!(spawn.node.local_position_offset, Vec3::new(0.25, -0.5, 0.75));
+    }
+
+    #[test]
+    fn position_offset_moves_children_even_without_vertex_offset_ratio() {
+        let shapes = ShapeCatalog::new();
+        let parent_geometry = shapes.geometry(ShapeKind::Cube);
+        let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
+        let spawn = next_spawn(
+            &mut nodes,
+            &shapes,
+            ShapeKind::Tetrahedron,
+            0.35,
+            SpawnTuning {
+                child_position_offset: Vec3::new(0.0, 0.35, 0.0),
+                ..test_tuning()
+            },
+        )
+        .expect("spawn should succeed");
+
+        let (world_anchor, _) = transformed_attachment_anchor(
+            &nodes[0],
+            parent_geometry,
+            SpawnAttachment {
+                mode: SpawnPlacementMode::Vertex,
+                index: 0,
+            },
+        );
+
+        assert!(spawn.node.center.distance(world_anchor) > 1.0e-4);
+    }
+
+    #[test]
+    fn position_offset_reorients_vertex_offset_direction_after_displacement() {
+        let shapes = ShapeCatalog::new();
+        let parent_geometry = shapes.geometry(ShapeKind::Cube);
+        let child_geometry = shapes.geometry(ShapeKind::Tetrahedron);
+        let scale_ratio = 0.35;
+        let vertex_offset_ratio = 0.5;
+        let child_position_offset = Vec3::new(0.0, 0.25, 0.0);
+        let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
+        let spawn = next_spawn(
+            &mut nodes,
+            &shapes,
+            ShapeKind::Tetrahedron,
+            scale_ratio,
+            SpawnTuning {
+                vertex_offset_ratio,
+                child_position_offset,
+                ..test_tuning()
+            },
+        )
+        .expect("spawn should succeed");
+
+        let attachment = SpawnAttachment {
+            mode: SpawnPlacementMode::Vertex,
+            index: 0,
+        };
+        let (world_anchor, outward) =
+            transformed_attachment_anchor(&nodes[0], parent_geometry, attachment);
+        let child_radius = child_geometry.radius * nodes[0].scale * scale_ratio;
+        let displaced_anchor = world_anchor
+            + world_position_offset(
+                &nodes[0],
+                parent_geometry,
+                outward,
+                spawn.node.rotation,
+                child_position_offset,
+            );
+        let effective_outward = safe_normalize(displaced_anchor - nodes[0].center, outward);
+        let expected_center =
+            displaced_anchor + effective_outward * child_radius * vertex_offset_ratio;
+
+        assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
+        assert!(effective_outward.distance(outward) > 1.0e-4);
     }
 
     #[test]
@@ -931,6 +1105,7 @@ mod tests {
             rotation: parent_rotation,
             scale: 1.4,
             axis_scale: Vec3::ONE,
+            local_position_offset: Vec3::ZERO,
             radius: parent_geometry.radius * 1.4,
             occupied_attachments: AttachmentOccupancy::new(parent_geometry),
             origin: NodeOrigin::Root,

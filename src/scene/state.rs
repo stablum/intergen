@@ -50,6 +50,9 @@ pub(crate) struct GenerationParameters {
     child_axis_scale_z: ScalarParameterState,
     child_twist: ScalarParameterState,
     child_offset: ScalarParameterState,
+    child_position_offset_x: ScalarParameterState,
+    child_position_offset_y: ScalarParameterState,
+    child_position_offset_z: ScalarParameterState,
     child_spawn_exclusion_probability: ScalarParameterState,
 }
 
@@ -74,6 +77,15 @@ impl GenerationParameters {
             child_offset: ScalarParameterState::new(
                 generation_config.parameter_spec(GenerationParameter::ChildOutwardOffsetRatio),
             ),
+            child_position_offset_x: ScalarParameterState::new(
+                generation_config.parameter_spec(GenerationParameter::ChildPositionOffsetX),
+            ),
+            child_position_offset_y: ScalarParameterState::new(
+                generation_config.parameter_spec(GenerationParameter::ChildPositionOffsetY),
+            ),
+            child_position_offset_z: ScalarParameterState::new(
+                generation_config.parameter_spec(GenerationParameter::ChildPositionOffsetZ),
+            ),
             child_spawn_exclusion_probability: ScalarParameterState::new(
                 generation_config
                     .parameter_spec(GenerationParameter::ChildSpawnExclusionProbability),
@@ -86,6 +98,7 @@ impl GenerationParameters {
         child_axis_scale: Vec3,
         child_twist: f32,
         child_offset: f32,
+        child_position_offset: Vec3,
         child_spawn_exclusion_probability: f32,
     ) -> Self {
         Self {
@@ -95,6 +108,9 @@ impl GenerationParameters {
             child_axis_scale_z: ScalarParameterState::from_base(child_axis_scale.z),
             child_twist: ScalarParameterState::from_base(child_twist),
             child_offset: ScalarParameterState::from_base(child_offset),
+            child_position_offset_x: ScalarParameterState::from_base(child_position_offset.x),
+            child_position_offset_y: ScalarParameterState::from_base(child_position_offset.y),
+            child_position_offset_z: ScalarParameterState::from_base(child_position_offset.z),
             child_spawn_exclusion_probability: ScalarParameterState::from_base(
                 child_spawn_exclusion_probability,
             ),
@@ -109,6 +125,9 @@ impl GenerationParameters {
             GenerationParameter::ChildAxisScaleZ => &self.child_axis_scale_z,
             GenerationParameter::ChildTwistPerVertexRadians => &self.child_twist,
             GenerationParameter::ChildOutwardOffsetRatio => &self.child_offset,
+            GenerationParameter::ChildPositionOffsetX => &self.child_position_offset_x,
+            GenerationParameter::ChildPositionOffsetY => &self.child_position_offset_y,
+            GenerationParameter::ChildPositionOffsetZ => &self.child_position_offset_z,
             GenerationParameter::ChildSpawnExclusionProbability => {
                 &self.child_spawn_exclusion_probability
             }
@@ -123,6 +142,9 @@ impl GenerationParameters {
             GenerationParameter::ChildAxisScaleZ => &mut self.child_axis_scale_z,
             GenerationParameter::ChildTwistPerVertexRadians => &mut self.child_twist,
             GenerationParameter::ChildOutwardOffsetRatio => &mut self.child_offset,
+            GenerationParameter::ChildPositionOffsetX => &mut self.child_position_offset_x,
+            GenerationParameter::ChildPositionOffsetY => &mut self.child_position_offset_y,
+            GenerationParameter::ChildPositionOffsetZ => &mut self.child_position_offset_z,
             GenerationParameter::ChildSpawnExclusionProbability => {
                 &mut self.child_spawn_exclusion_probability
             }
@@ -157,6 +179,7 @@ impl GenerationParameters {
                 GenerationParameter::ChildOutwardOffsetRatio,
                 generation_config,
             ),
+            self.evaluated_position_offset(generation_config),
             self.evaluated(
                 GenerationParameter::ChildSpawnExclusionProbability,
                 generation_config,
@@ -178,6 +201,22 @@ impl GenerationParameters {
             self.base_value(GenerationParameter::ChildAxisScaleX),
             self.base_value(GenerationParameter::ChildAxisScaleY),
             self.base_value(GenerationParameter::ChildAxisScaleZ),
+        )
+    }
+
+    fn evaluated_position_offset(&self, generation_config: &GenerationConfig) -> Vec3 {
+        Vec3::new(
+            self.evaluated(GenerationParameter::ChildPositionOffsetX, generation_config),
+            self.evaluated(GenerationParameter::ChildPositionOffsetY, generation_config),
+            self.evaluated(GenerationParameter::ChildPositionOffsetZ, generation_config),
+        )
+    }
+
+    fn base_position_offset(&self) -> Vec3 {
+        Vec3::new(
+            self.base_value(GenerationParameter::ChildPositionOffsetX),
+            self.base_value(GenerationParameter::ChildPositionOffsetY),
+            self.base_value(GenerationParameter::ChildPositionOffsetZ),
         )
     }
 
@@ -272,6 +311,14 @@ impl GenerationState {
     pub(crate) fn vertex_spawn_exclusion_probability_base(&self) -> f32 {
         self.parameters
             .base_value(GenerationParameter::ChildSpawnExclusionProbability)
+    }
+
+    pub(crate) fn child_position_offset(&self, generation_config: &GenerationConfig) -> Vec3 {
+        self.parameters.evaluated_position_offset(generation_config)
+    }
+
+    pub(crate) fn child_position_offset_base(&self) -> Vec3 {
+        self.parameters.base_position_offset()
     }
 
     pub(crate) fn child_axis_scale(&self, generation_config: &GenerationConfig) -> Vec3 {

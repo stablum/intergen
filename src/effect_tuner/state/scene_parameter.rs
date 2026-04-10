@@ -9,6 +9,9 @@ pub(crate) enum EffectTunerSceneParameter {
     ChildAxisScaleZ,
     ChildTwistPerVertexRadians,
     ChildOutwardOffsetRatio,
+    ChildPositionOffsetX,
+    ChildPositionOffsetY,
+    ChildPositionOffsetZ,
     ChildSpawnExclusionProbability,
     StageEnabled,
     StageFloorEnabled,
@@ -116,7 +119,7 @@ pub(crate) enum SceneChangeTarget {
 }
 
 impl EffectTunerSceneParameter {
-    const ALL: [Self; 102] = [
+    const ALL: [Self; 105] = [
         Self::ChildKind,
         Self::SpawnPlacementMode,
         Self::SpawnAddMode,
@@ -126,6 +129,9 @@ impl EffectTunerSceneParameter {
         Self::ChildAxisScaleZ,
         Self::ChildTwistPerVertexRadians,
         Self::ChildOutwardOffsetRatio,
+        Self::ChildPositionOffsetX,
+        Self::ChildPositionOffsetY,
+        Self::ChildPositionOffsetZ,
         Self::ChildSpawnExclusionProbability,
         Self::StageEnabled,
         Self::StageFloorEnabled,
@@ -221,9 +227,12 @@ impl EffectTunerSceneParameter {
         Self::LightingAccentTranslationZ,
     ];
 
-    const LFO_CAPABLE: [Self; 92] = [
+    const LFO_CAPABLE: [Self; 95] = [
         Self::ChildTwistPerVertexRadians,
         Self::ChildOutwardOffsetRatio,
+        Self::ChildPositionOffsetX,
+        Self::ChildPositionOffsetY,
+        Self::ChildPositionOffsetZ,
         Self::GlobalOpacity,
         Self::MaterialHueStepPerLevel,
         Self::MaterialSaturation,
@@ -316,13 +325,16 @@ impl EffectTunerSceneParameter {
         Self::ChildSpawnExclusionProbability,
     ];
 
-    const GENERATION_LFO_CAPABLE: [Self; 7] = [
+    const GENERATION_LFO_CAPABLE: [Self; 10] = [
         Self::ChildScaleRatio,
         Self::ChildAxisScaleX,
         Self::ChildAxisScaleY,
         Self::ChildAxisScaleZ,
         Self::ChildTwistPerVertexRadians,
         Self::ChildOutwardOffsetRatio,
+        Self::ChildPositionOffsetX,
+        Self::ChildPositionOffsetY,
+        Self::ChildPositionOffsetZ,
         Self::ChildSpawnExclusionProbability,
     ];
 
@@ -377,6 +389,9 @@ impl EffectTunerSceneParameter {
             Self::ChildAxisScaleZ => "generation.child_axis_scale.z",
             Self::ChildTwistPerVertexRadians => "generation.child_twist_per_vertex_radians",
             Self::ChildOutwardOffsetRatio => "generation.child_outward_offset_ratio",
+            Self::ChildPositionOffsetX => "generation.child_position_offset.x",
+            Self::ChildPositionOffsetY => "generation.child_position_offset.y",
+            Self::ChildPositionOffsetZ => "generation.child_position_offset.z",
             Self::ChildSpawnExclusionProbability => "generation.child_spawn_exclusion_probability",
             Self::StageEnabled => "stage.enabled",
             Self::StageFloorEnabled => "stage.floor.enabled",
@@ -495,6 +510,9 @@ impl EffectTunerSceneParameter {
             Self::ChildAxisScaleZ => "axis z",
             Self::ChildTwistPerVertexRadians => "twist",
             Self::ChildOutwardOffsetRatio => "offset",
+            Self::ChildPositionOffsetX => "pos x",
+            Self::ChildPositionOffsetY => "pos y",
+            Self::ChildPositionOffsetZ => "pos z",
             Self::ChildSpawnExclusionProbability => "spawn%",
             Self::StageEnabled => "enabled",
             Self::StageFloorEnabled => "floor",
@@ -615,6 +633,9 @@ impl EffectTunerSceneParameter {
             | Self::ChildAxisScaleZ
             | Self::ChildTwistPerVertexRadians
             | Self::ChildOutwardOffsetRatio
+            | Self::ChildPositionOffsetX
+            | Self::ChildPositionOffsetY
+            | Self::ChildPositionOffsetZ
             | Self::ChildSpawnExclusionProbability => "scene",
             Self::CameraDistance
             | Self::CameraAngularVelocityX
@@ -791,6 +812,9 @@ impl EffectTunerSceneParameter {
             | Self::ChildAxisScaleX
             | Self::ChildAxisScaleY
             | Self::ChildAxisScaleZ
+            | Self::ChildPositionOffsetX
+            | Self::ChildPositionOffsetY
+            | Self::ChildPositionOffsetZ
             | Self::ChildSpawnExclusionProbability => SceneChangeTarget::None,
         }
     }
@@ -835,6 +859,9 @@ impl EffectTunerSceneParameter {
                 Some(GenerationParameter::ChildTwistPerVertexRadians)
             }
             Self::ChildOutwardOffsetRatio => Some(GenerationParameter::ChildOutwardOffsetRatio),
+            Self::ChildPositionOffsetX => Some(GenerationParameter::ChildPositionOffsetX),
+            Self::ChildPositionOffsetY => Some(GenerationParameter::ChildPositionOffsetY),
+            Self::ChildPositionOffsetZ => Some(GenerationParameter::ChildPositionOffsetZ),
             Self::ChildSpawnExclusionProbability => {
                 Some(GenerationParameter::ChildSpawnExclusionProbability)
             }
@@ -944,6 +971,9 @@ impl EffectTunerSceneParameter {
                 | Self::ChildAxisScaleZ
                 | Self::ChildTwistPerVertexRadians
                 | Self::ChildOutwardOffsetRatio
+                | Self::ChildPositionOffsetX
+                | Self::ChildPositionOffsetY
+                | Self::ChildPositionOffsetZ
                 | Self::ChildSpawnExclusionProbability => 1.0,
             },
         }
@@ -982,6 +1012,9 @@ impl EffectTunerSceneParameter {
                 context.generation_state.twist_per_vertex_radians_base()
             }
             Self::ChildOutwardOffsetRatio => context.generation_state.vertex_offset_ratio_base(),
+            Self::ChildPositionOffsetX => context.generation_state.child_position_offset_base().x,
+            Self::ChildPositionOffsetY => context.generation_state.child_position_offset_base().y,
+            Self::ChildPositionOffsetZ => context.generation_state.child_position_offset_base().z,
             Self::ChildSpawnExclusionProbability => context
                 .generation_state
                 .vertex_spawn_exclusion_probability_base(),
@@ -1623,6 +1656,15 @@ impl EffectTunerSceneParameter {
                     .generation_state
                     .vertex_offset_ratio(context.generation_config),
             ),
+            Self::ChildPositionOffsetX => {
+                Some(context.generation_state.child_position_offset(context.generation_config).x)
+            }
+            Self::ChildPositionOffsetY => {
+                Some(context.generation_state.child_position_offset(context.generation_config).y)
+            }
+            Self::ChildPositionOffsetZ => {
+                Some(context.generation_state.child_position_offset(context.generation_config).z)
+            }
             Self::ChildSpawnExclusionProbability => Some(
                 context
                     .generation_state

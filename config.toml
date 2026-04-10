@@ -61,6 +61,8 @@ twist_per_vertex_radians = 0.62831855
 twist_adjust_step = 0.017453292
 min_twist_per_vertex_radians = 0.0
 max_twist_per_vertex_radians = 3.1415927
+default_child_position_offset = [0.0, 0.0, 0.0]
+child_position_offset_adjust_step = 0.05
 
 [lighting.directional]
 color = [1.0, 0.93, 0.82]
