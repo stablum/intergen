@@ -56,6 +56,7 @@ min_scale_ratio = 0.15
 max_scale_ratio = 1.0
 spawn_hold_delay_secs = 0.24
 spawn_repeat_interval_secs = 0.00005
+fill_mode_lfo_virtual_time_step_secs = 0.25
 containment_epsilon = 0.02
 twist_per_vertex_radians = 0.62831855
 twist_adjust_step = 0.017453292

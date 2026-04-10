@@ -160,6 +160,7 @@ The in-app F2 control page starts from the values loaded from `config.toml` at l
 - `Enter` confirms typed numeric F2 input, or resets the selected F2 field when no numeric input is active.
 - `Shift + Enter` resets all F2 controls to their startup defaults.
 - Shader-effect parameters expose LFO fields, and so do the supported numeric scene/runtime parameters, including live scene updates and generation values that only take effect during future spawning. Other scene, stage, and material controls remain value-only.
+- In fill-current-level spawn mode, each successfully spawned child advances a virtual LFO sample time by `generation.fill_mode_lfo_virtual_time_step_secs`, so spawn-time generation LFOs can vary across one batch without waiting for real time to pass.
 - `Esc` closes the current F-page, including help, F2, or F3.
 - The tuner does not write changes back to `config.toml` automatically.
 
@@ -282,6 +283,7 @@ cargo test-plain
 - `R`: reset the scene with the currently selected shape as the new root
 - `Space`: spawn child shapes with the current placement mode, or hold to keep spawning
 - `Ctrl + Space`: cycle the add mode between single spawn and fill-current-level spawning
+- Fill-current-level spawning advances spawn-time generation LFO sampling by `generation.fill_mode_lfo_virtual_time_step_secs` per successful child
 - `G`: cycle the spawn placement mode between vertices, edges, and faces
 - `1`: select cube
 - `2`: select tetrahedron

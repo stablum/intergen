@@ -293,6 +293,7 @@ pub(crate) struct GenerationConfig {
     pub(crate) max_child_axis_scale: f32,
     pub(crate) spawn_hold_delay_secs: f32,
     pub(crate) spawn_repeat_interval_secs: f32,
+    pub(crate) fill_mode_lfo_virtual_time_step_secs: f32,
     pub(crate) containment_epsilon: f32,
     pub(crate) twist_per_vertex_radians: f32,
     pub(crate) twist_adjust_step: f32,
@@ -458,6 +459,10 @@ impl GenerationConfig {
             .default_value()
     }
 
+    pub(crate) fn fill_mode_lfo_virtual_time_step_secs_clamped(&self) -> f32 {
+        self.fill_mode_lfo_virtual_time_step_secs.max(0.0)
+    }
+
     pub(crate) fn spawn_tuning(
         &self,
         child_axis_scale: Vec3,
@@ -518,6 +523,7 @@ impl Default for GenerationConfig {
             max_child_axis_scale: 100.0,
             spawn_hold_delay_secs: 0.24,
             spawn_repeat_interval_secs: 0.07,
+            fill_mode_lfo_virtual_time_step_secs: 0.25,
             containment_epsilon: 0.02,
             twist_per_vertex_radians: std::f32::consts::PI / 5.0,
             twist_adjust_step: std::f32::consts::PI / 18.0,
@@ -1070,6 +1076,24 @@ mod tests {
 
         assert_eq!(config.generation.twist_hold_delay_secs, 0.12);
         assert_eq!(config.generation.twist_repeat_interval_secs, 0.03);
+    }
+
+    #[test]
+    fn fill_mode_lfo_virtual_time_step_never_goes_negative() {
+        let config = parse_config(
+            r#"
+            [generation]
+            fill_mode_lfo_virtual_time_step_secs = -0.5
+            "#,
+        )
+        .expect("fill-mode LFO virtual time config should parse");
+
+        assert_eq!(
+            config
+                .generation
+                .fill_mode_lfo_virtual_time_step_secs_clamped(),
+            0.0
+        );
     }
 
     #[test]

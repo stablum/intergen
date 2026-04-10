@@ -6,6 +6,7 @@ use crate::config::{
 };
 use crate::effect_tuner::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LfoShape};
 use crate::effect_tuner::metadata::{EffectEditMode, EffectOverlayField};
+use crate::parameters::GenerationParameter;
 use crate::{camera::CameraRig, scene::{GenerationState, LightingState, MaterialState, RenderingState, StageState}};
 
 use super::{
@@ -633,6 +634,34 @@ fn latent_generation_lfos_modulate_spawn_inputs_without_recompute_side_effects()
             .abs()
             < 1.0e-6
     );
+}
+
+#[test]
+fn sampled_generation_parameter_value_uses_requested_sample_time() {
+    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+    let base_value = 0.58;
+    let parameter = EffectTunerSceneParameter::ChildScaleRatio;
+    let lfo_index = lfo_index_for_parameter(EffectTunerParameter::Scene(parameter))
+        .expect("scale ratio should have an LFO slot");
+
+    effect_tuner.lfos[lfo_index].enabled = true;
+    effect_tuner.lfos[lfo_index].shape = LfoShape::Sine;
+    effect_tuner.lfos[lfo_index].amplitude = 0.2;
+    effect_tuner.lfos[lfo_index].frequency_hz = 1.0;
+
+    let initial = effect_tuner.sampled_generation_parameter_value(
+        GenerationParameter::ChildScaleRatio,
+        base_value,
+        0.0,
+    );
+    let advanced = effect_tuner.sampled_generation_parameter_value(
+        GenerationParameter::ChildScaleRatio,
+        base_value,
+        0.25,
+    );
+
+    assert!((initial - base_value).abs() < 1.0e-6);
+    assert!(advanced > initial);
 }
 
 #[test]

@@ -609,6 +609,37 @@ impl EffectTunerState {
         result
     }
 
+    pub(crate) fn sampled_generation_parameter_value(
+        &self,
+        parameter: GenerationParameter,
+        base_value: f32,
+        sample_secs: f32,
+    ) -> f32 {
+        let Some(scene_parameter) = EffectTunerSceneParameter::generation_lfo_capable()
+            .iter()
+            .copied()
+            .find(|candidate| candidate.generation_parameter() == Some(parameter))
+        else {
+            return base_value;
+        };
+
+        let Some(lfo_index) = lfo_index_for_parameter(EffectTunerParameter::Scene(scene_parameter))
+        else {
+            return base_value;
+        };
+
+        let lfo = self.lfos[lfo_index];
+        if !lfo.is_active() {
+            return base_value;
+        }
+
+        base_value
+            + lfo.amplitude
+                * lfo
+                    .shape
+                    .sample(sample_secs * lfo.frequency_hz, lfo_seed_for_index(lfo_index))
+    }
+
     pub(crate) fn evaluated_effects(&self, now_secs: f32) -> EffectsConfig {
         let mut effects = self.current.clone();
 

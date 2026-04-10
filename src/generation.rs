@@ -15,6 +15,7 @@ use crate::scene::{
 };
 use crate::shapes::{
     ShapeKind, SpawnAddMode, SpawnPlacementMode, SpawnedShape, recompute_spawn_tree, spawn_batch,
+    spawn_batch_with_inputs,
 };
 
 const RADIANS_TO_DEGREES: f32 = 180.0 / std::f32::consts::PI;
@@ -102,9 +103,11 @@ pub(crate) fn generation_input_system(
 
     handle_spawn_input(
         &keys,
+        time.elapsed_secs(),
         time.delta_secs(),
         input_mask,
         ctrl_pressed,
+        &effect_tuner,
         &mut scene,
     );
 }
@@ -398,9 +401,11 @@ fn handle_scene_reset(
 
 fn handle_spawn_input(
     keys: &ButtonInput<KeyCode>,
+    now_secs: f32,
     delta_secs: f32,
     input_mask: ControlPageInputMask,
     ctrl_pressed: bool,
+    effect_tuner: &EffectTunerState,
     scene: &mut GenerationSceneAccess<'_, '_>,
 ) {
     let spawn_requested = scene.generation_state.spawn_hold.update(
@@ -416,21 +421,100 @@ fn handle_spawn_input(
     }
 
     let selected_shape_kind = scene.generation_state.selected_shape_kind;
-    let scale_ratio = scene
-        .generation_state
-        .scale_ratio(&scene.app_config.generation);
-    let spawn_tuning = scene
-        .generation_state
-        .spawn_tuning(&scene.app_config.generation);
     let add_mode = scene.generation_state.spawn_add_mode;
-    let spawned = spawn_batch(
-        &mut scene.generation_state.nodes,
-        &scene.shape_assets.catalog,
-        selected_shape_kind,
-        scale_ratio,
-        spawn_tuning,
-        add_mode,
-    );
+    let generation_config = &scene.app_config.generation;
+    let spawned = if add_mode == SpawnAddMode::FillLevel {
+        let virtual_time_step_secs =
+            generation_config.fill_mode_lfo_virtual_time_step_secs_clamped();
+        let scale_ratio_base = scene.generation_state.scale_ratio_base();
+        let child_axis_scale_base = scene.generation_state.child_axis_scale_base();
+        let child_position_offset_base = scene.generation_state.child_position_offset_base();
+        let spawn_exclusion_probability_base = scene
+            .generation_state
+            .vertex_spawn_exclusion_probability_base();
+        let twist_per_vertex_radians = scene
+            .generation_state
+            .twist_per_vertex_radians(generation_config);
+        let vertex_offset_ratio = scene
+            .generation_state
+            .vertex_offset_ratio(generation_config);
+        let spawn_placement_mode = scene.generation_state.spawn_placement_mode;
+
+        spawn_batch_with_inputs(
+            &mut scene.generation_state.nodes,
+            &scene.shape_assets.catalog,
+            selected_shape_kind,
+            add_mode,
+            |spawn_index| {
+                let sample_secs = now_secs + virtual_time_step_secs * spawn_index as f32;
+                let scale_ratio = effect_tuner.sampled_generation_parameter_value(
+                    GenerationParameter::ChildScaleRatio,
+                    scale_ratio_base,
+                    sample_secs,
+                );
+                let child_axis_scale = Vec3::new(
+                    effect_tuner.sampled_generation_parameter_value(
+                        GenerationParameter::ChildAxisScaleX,
+                        child_axis_scale_base.x,
+                        sample_secs,
+                    ),
+                    effect_tuner.sampled_generation_parameter_value(
+                        GenerationParameter::ChildAxisScaleY,
+                        child_axis_scale_base.y,
+                        sample_secs,
+                    ),
+                    effect_tuner.sampled_generation_parameter_value(
+                        GenerationParameter::ChildAxisScaleZ,
+                        child_axis_scale_base.z,
+                        sample_secs,
+                    ),
+                );
+                let child_position_offset = Vec3::new(
+                    effect_tuner.sampled_generation_parameter_value(
+                        GenerationParameter::ChildPositionOffsetX,
+                        child_position_offset_base.x,
+                        sample_secs,
+                    ),
+                    effect_tuner.sampled_generation_parameter_value(
+                        GenerationParameter::ChildPositionOffsetY,
+                        child_position_offset_base.y,
+                        sample_secs,
+                    ),
+                    effect_tuner.sampled_generation_parameter_value(
+                        GenerationParameter::ChildPositionOffsetZ,
+                        child_position_offset_base.z,
+                        sample_secs,
+                    ),
+                );
+                let spawn_exclusion_probability = effect_tuner.sampled_generation_parameter_value(
+                    GenerationParameter::ChildSpawnExclusionProbability,
+                    spawn_exclusion_probability_base,
+                    sample_secs,
+                );
+                let spawn_tuning = generation_config.spawn_tuning(
+                    child_axis_scale,
+                    twist_per_vertex_radians,
+                    vertex_offset_ratio,
+                    child_position_offset,
+                    spawn_exclusion_probability,
+                    spawn_placement_mode,
+                );
+
+                (scale_ratio, spawn_tuning)
+            },
+        )
+    } else {
+        let scale_ratio = scene.generation_state.scale_ratio(generation_config);
+        let spawn_tuning = scene.generation_state.spawn_tuning(generation_config);
+        spawn_batch(
+            &mut scene.generation_state.nodes,
+            &scene.shape_assets.catalog,
+            selected_shape_kind,
+            scale_ratio,
+            spawn_tuning,
+            add_mode,
+        )
+    };
     if spawned.is_empty() {
         eprintln!("No valid spawn position is currently available.");
         return;

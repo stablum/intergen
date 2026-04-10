@@ -245,7 +245,20 @@ pub(crate) fn spawn_batch(
     tuning: SpawnTuning,
     add_mode: SpawnAddMode,
 ) -> Vec<SpawnedShape> {
-    let Some(first) = next_spawn(nodes, shapes, child_kind, scale_ratio, tuning) else {
+    spawn_batch_with_inputs(nodes, shapes, child_kind, add_mode, |_| {
+        (scale_ratio, tuning)
+    })
+}
+
+pub(crate) fn spawn_batch_with_inputs(
+    nodes: &mut Vec<ShapeNode>,
+    shapes: &ShapeCatalog,
+    child_kind: ShapeKind,
+    add_mode: SpawnAddMode,
+    mut inputs_for_spawn: impl FnMut(usize) -> (f32, SpawnTuning),
+) -> Vec<SpawnedShape> {
+    let (first_scale_ratio, first_tuning) = inputs_for_spawn(0);
+    let Some(first) = next_spawn(nodes, shapes, child_kind, first_scale_ratio, first_tuning) else {
         return Vec::new();
     };
 
@@ -255,9 +268,10 @@ pub(crate) fn spawn_batch(
     }
 
     let target_level = spawned[0].node.level;
-    while let Some(spawn) =
+    while let Some(spawn) = {
+        let (scale_ratio, tuning) = inputs_for_spawn(spawned.len());
         next_spawn_at_level(nodes, shapes, child_kind, scale_ratio, tuning, target_level)
-    {
+    } {
         spawned.push(spawn);
     }
 
@@ -777,6 +791,28 @@ mod tests {
         assert!(!second_batch.is_empty());
         assert!(second_batch.iter().all(|spawn| spawn.node.level == 2));
         assert_eq!(nodes.iter().map(|node| node.level).max(), Some(2));
+    }
+
+    #[test]
+    fn fill_level_mode_can_vary_spawn_inputs_per_successful_child() {
+        let shapes = ShapeCatalog::new();
+        let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
+
+        let spawned = spawn_batch_with_inputs(
+            &mut nodes,
+            &shapes,
+            ShapeKind::Cube,
+            SpawnAddMode::FillLevel,
+            |spawn_index| {
+                let mut tuning = test_tuning();
+                tuning.child_axis_scale = Vec3::new(1.0 + spawn_index as f32, 1.0, 1.0);
+                (0.35, tuning)
+            },
+        );
+
+        assert!(spawned.len() > 1);
+        assert_eq!(spawned[0].node.axis_scale, Vec3::new(1.0, 1.0, 1.0));
+        assert_eq!(spawned[1].node.axis_scale, Vec3::new(2.0, 1.0, 1.0));
     }
 
     #[test]
