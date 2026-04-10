@@ -14,21 +14,35 @@ fn overlay_text_lists_help_and_spawn_controls() {
 
     assert!(text.contains("F1: Cycle help views"));
     assert!(text.contains(
-        "F2: Open compact controls, second press opens the list, third press closes"
+        "F2: Open parameter groups, second press opens compact controls, third press opens the full list, fourth press closes"
     ));
     assert!(text.contains("F3: Toggle the scene preset page"));
     assert!(text.contains("Esc: Close the current F-page"));
     assert!(text.contains("F4: Export the current scene as a Blender .blend"));
-    assert!(text.contains("In F2 page: Ctrl + Up / Down select control"));
-    assert!(text.contains("In F2 page: Second F2 press opens the scrolling parameter list"));
+    assert!(text.contains("In first F2 page: Up / Down select parameter group"));
+    assert!(text.contains(
+        "In first F2 page: Enter or Space opens the selected group parameter list"
+    ));
+    assert!(text.contains("In F2 compact or list page: Ctrl + Up / Down select control"));
+    assert!(text.contains(
+        "In F2 page: Second F2 press opens compact controls, third press opens the full list"
+    ));
     assert!(
-        text.contains("In F2 page: Left / Right or Tab / Shift+Tab switch the active field")
+        text.contains(
+            "In F2 compact or list page: Left / Right or Tab / Shift+Tab switch the active field"
+        )
     );
-    assert!(text.contains("In F2 page: Up / Down adjust the active field"));
-    assert!(text.contains("In F2 page: Space toggles the selected shader effect"));
-    assert!(text.contains("In F2 page: L toggles the selected parameter LFO when supported"));
-    assert!(text.contains("In F2 page: Type digits / . / , / - / +"));
-    assert!(text.contains("In F2 page: Backspace erases the typed numeric input"));
+    assert!(text.contains("In F2 compact or list page: Up / Down adjust the active field"));
+    assert!(text.contains(
+        "In F2 compact or list page: Space toggles the selected shader effect"
+    ));
+    assert!(text.contains(
+        "In F2 compact or list page: L toggles the selected parameter LFO when supported"
+    ));
+    assert!(text.contains("In F2 compact or list page: Type digits / . / , / - / +"));
+    assert!(text.contains(
+        "In F2 compact or list page: Backspace erases the typed numeric input"
+    ));
     assert!(text.contains("Shift + Enter: Reset all F2 controls"));
     assert!(text.contains(
         "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions"
@@ -134,7 +148,7 @@ fn help_overlay_table_rows_cover_primary_bindings() {
         entries
             .iter()
             .any(|entry| entry.binding == "Ctrl + Up / Down"
-                && entry.explanation.contains("F2 page"))
+                && entry.explanation.contains("F2 compact or list page"))
     );
     assert!(
         entries

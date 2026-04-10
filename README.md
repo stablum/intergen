@@ -148,13 +148,14 @@ Camera-output edge detection uses these `effects.edge_detection` settings:
 The in-app F2 control page starts from the values loaded from `config.toml` at launch.
 - Live edits affect the running app only.
 - The F2 control list covers shader effects plus scene, stage, and material runtime controls, including enum-like fields such as child shape, spawn placement mode, add mode, stage toggles, and procedural surface families.
-- The first `F2` press opens the compact strip, the second `F2` press opens a scrolling parameter list with an LFO detail panel beside the selected row, and the third `F2` press closes the page.
-- `Ctrl + Up` / `Ctrl + Down` select the active F2 control, with hold-to-repeat.
+- The first `F2` press opens a parameter-group page, the second `F2` press opens the compact strip, the third `F2` press opens the full scrolling parameter list with an LFO detail panel beside the selected row, and the fourth `F2` press closes the page.
+- On the first F2 page, `Up` / `Down` choose a parameter group and `Enter` or `Space` opens that group's parameter list.
+- `Ctrl + Up` / `Ctrl + Down` select the active F2 control in the compact page, the full list page, or a group-specific parameter list, with hold-to-repeat.
 - `Left` / `Right` or `Tab` / `Shift + Tab` switch the active F2 field between value, LFO amplitude, LFO frequency, and LFO shape when the selected parameter supports LFOs.
-- `Up` / `Down` adjust the active F2 field. `Shift` makes the step coarser and `Alt` makes it finer.
-- `Space` toggles the selected shader effect on or off.
+- `Up` / `Down` adjust the active F2 field in the compact or parameter-list pages. `Shift` makes the step coarser and `Alt` makes it finer.
+- `Space` toggles the selected shader effect on or off in the compact or parameter-list pages.
 - `L` toggles the selected parameter LFO on or off when the selected parameter supports LFOs.
-- Type digits, `.`, `,`, `-`, or `+` to set the active numeric field directly. `Backspace` erases the typed numeric input.
+- Type digits, `.`, `,`, `-`, or `+` to set the active numeric field directly. `Backspace` erases the typed numeric input in the compact or parameter-list pages.
 - LFO shapes currently available are `sine`, `triangle`, `saw`, `square`, `stepped random`, and `brownian motion`.
 - `Enter` confirms typed numeric F2 input, or resets the selected F2 field when no numeric input is active.
 - `Shift + Enter` resets all F2 controls to their startup defaults.
@@ -262,17 +263,19 @@ cargo test-plain
 - `W` / `S`: zoom in / out
 - `Backspace`: stop camera rotation momentum, or erase typed numeric F2 input while the F2 page is focused
 - `F1`: cycle help views between hidden, text, and keyboard-map overlays
-- `F2`: open the compact F2 control page, second press opens the list page, third press closes it
+- `F2`: open the parameter-group F2 page, second press opens the compact page, third press opens the full list page, fourth press closes it
 - `F3`: open or close the scene preset page
 - `Esc`: close the current F-page, including help, F2, or F3
-- `Ctrl + Up` / `Ctrl + Down` in F2: select the active F2 control, with hold-to-repeat
+- `Up` / `Down` in the first F2 page: select the active parameter group
+- `Enter` / `Space` in the first F2 page: open the selected group's parameter list
+- `Ctrl + Up` / `Ctrl + Down` in F2 compact or parameter-list pages: select the active F2 control, with hold-to-repeat
 - `Left` / `Right` or `Tab` / `Shift + Tab` in F2: switch the active F2 field
-- `Up` / `Down` in F2: adjust the active F2 field
-- `Space` in F2: toggle the selected shader effect on or off
+- `Up` / `Down` in F2 compact or parameter-list pages: adjust the active F2 field
+- `Space` in F2 compact or parameter-list pages: toggle the selected shader effect on or off
 - `L` in F2: toggle the selected parameter LFO on or off when supported
 - `Shift` in F2: coarse adjustment modifier
 - `Alt` in F2: fine adjustment modifier
-- `Enter` in F2: confirm typed numeric input, or reset the active F2 field when no numeric input is active
+- `Enter` in F2 compact or parameter-list pages: confirm typed numeric input, or reset the active F2 field when no numeric input is active
 - `Shift + Enter` in F2: reset all F2 controls to their startup defaults
 - `F4`: export the current scene to `blend-exports/` as a Blender `.blend`
 - `F12`: save a screenshot to `screenshots/`

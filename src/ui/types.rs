@@ -7,6 +7,7 @@ const EFFECT_TUNER_FIELD_PADDING_Y: f32 = 4.0;
 const EFFECT_TUNER_LIVE_VALUE_CHARS: usize = 8;
 const EFFECT_TUNER_NUMERIC_INPUT_CHARS: usize = 10;
 const EFFECT_TUNER_LIST_VISIBLE_ROWS: usize = 9;
+const EFFECT_TUNER_GROUP_PANEL_MAX_WIDTH: f32 = 360.0;
 const EFFECT_TUNER_LIST_PANEL_MAX_WIDTH: f32 = 1060.0;
 const KEYBOARD_HELP_UNUSED_TEXT: &str = "Unused in neutral mode.";
 const KEYBOARD_HELP_KEY_WIDTH: f32 = 44.0;
@@ -35,7 +36,7 @@ const KEYBOARD_FUNCTION_ROW: [KeyboardHelpKeySpec; 13] = [
         "F2",
         1.0,
         true,
-        "Open compact controls, second press opens the list, third press closes.",
+        "Open parameter groups, second press opens compact controls, third press opens the full list, fourth press closes.",
     ),
     keyboard_help_key("F3", 1.0, true, "Toggle the scene preset page."),
     keyboard_help_key(
@@ -234,6 +235,21 @@ pub(crate) struct EffectTunerOverlay;
 
 #[derive(Component)]
 pub(crate) struct EffectTunerPinnedBadge;
+
+#[derive(Component)]
+pub(crate) struct EffectTunerGroupOverlay;
+
+#[derive(Component)]
+pub(crate) struct EffectTunerGroupPinnedBadge;
+
+#[derive(Component)]
+pub(crate) struct EffectTunerGroupWindowText;
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerGroupRow(usize);
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerGroupRowText(usize);
 
 #[derive(Component)]
 pub(crate) struct EffectTunerListOverlay;

@@ -11,8 +11,7 @@ use crate::{camera::CameraRig, scene::{GenerationState, LightingState, MaterialS
 use super::{
     EffectNumericParameter, EffectRuntimeSnapshot, EffectTunerEditContext, EffectTunerPageMode,
     EffectTunerParameter, EffectTunerSceneParameter, EffectTunerState, EffectTunerViewContext,
-    HoldInput,
-    lfo_index_for_parameter,
+    HoldInput, effect_tuner_group_index, effect_tuner_group_labels, lfo_index_for_parameter,
 };
 
 fn default_scene_state() -> (
@@ -202,22 +201,48 @@ fn open_and_close_page_manage_page_modes() {
     let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
 
     effect_tuner.open_page(1.0);
+    assert_eq!(effect_tuner.page_mode(), EffectTunerPageMode::GroupSelect);
+
+    effect_tuner.show_selected_group_list_page(1.05);
+    assert_eq!(effect_tuner.page_mode(), EffectTunerPageMode::GroupList);
+
+    effect_tuner.show_compact_page(1.1);
     assert_eq!(effect_tuner.page_mode(), EffectTunerPageMode::Compact);
 
-    effect_tuner.show_list_page(1.1);
+    effect_tuner.show_list_page(1.2);
     assert_eq!(effect_tuner.page_mode(), EffectTunerPageMode::List);
 
     effect_tuner.close_page();
-    assert_eq!(effect_tuner.page_mode(), EffectTunerPageMode::Compact);
+    assert_eq!(effect_tuner.page_mode(), EffectTunerPageMode::GroupSelect);
 }
 
 #[test]
 fn scroll_selection_moves_without_hold_input() {
     let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+    effect_tuner.show_compact_page(0.0);
     let initial = effect_tuner.selected_parameter();
 
     assert!(effect_tuner.scroll_selection(1, 1.0));
     assert_ne!(effect_tuner.selected_parameter(), initial);
+}
+
+#[test]
+fn group_overlay_snapshot_tracks_selected_group() {
+    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+    effect_tuner.open_page(1.0);
+    effect_tuner.selected_group_index = effect_tuner_group_index("scene");
+
+    let snapshot = effect_tuner.group_overlay_snapshot(5);
+
+    assert_eq!(snapshot.total_groups, effect_tuner_group_labels().len());
+    assert_eq!(snapshot.rows.len(), 5);
+    assert!(snapshot.rows.iter().any(|row| row.selected));
+    assert!(
+        snapshot
+            .rows
+            .iter()
+            .any(|row| row.selected && row.group_label == "scene")
+    );
 }
 
 #[test]
@@ -258,6 +283,40 @@ fn list_overlay_snapshot_scrolls_to_keep_selection_visible() {
         snapshot.detail.parameter_label,
         effect_tuner.selected_parameter().short_label()
     );
+}
+
+#[test]
+fn group_list_overlay_snapshot_filters_to_the_selected_group() {
+    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+    let (
+        generation_config,
+        generation_state,
+        material_config,
+        material_state,
+        stage_config,
+        stage_state,
+    ) = default_scene_state();
+    effect_tuner.selected_group_index = effect_tuner_group_index("scene");
+    effect_tuner.show_selected_group_list_page(1.0);
+
+    let snapshot = effect_tuner.list_overlay_snapshot(
+        &view_context(
+            &generation_config,
+            &generation_state,
+            &material_config,
+            &material_state,
+            &stage_config,
+            &stage_state,
+        ),
+        1.0,
+        7,
+    );
+
+    assert_eq!(effect_tuner.page_mode(), EffectTunerPageMode::GroupList);
+    assert!(snapshot.total_parameters < EffectTunerParameter::all().len());
+    assert!(snapshot.rows.iter().all(|row| row.effect_label == "scene"));
+    assert!(snapshot.window_text.starts_with("scene "));
+    assert_eq!(snapshot.detail.effect_label, "scene");
 }
 
 #[test]
@@ -966,6 +1025,7 @@ fn switching_field_clears_numeric_entry_highlight_text() {
 #[test]
 fn selecting_another_parameter_clears_numeric_entry() {
     let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+    effect_tuner.show_compact_page(0.0);
     let (
         generation_config,
         mut generation_state,

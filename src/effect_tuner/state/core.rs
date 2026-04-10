@@ -18,8 +18,24 @@ pub(crate) struct EffectTunerOverlaySnapshot {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum EffectTunerPageMode {
+    GroupSelect,
     Compact,
+    GroupList,
     List,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerGroupRowSnapshot {
+    pub(crate) group_label: &'static str,
+    pub(crate) selected: bool,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) struct EffectTunerGroupOverlaySnapshot {
+    pub(crate) pinned: bool,
+    pub(crate) total_groups: usize,
+    pub(crate) window_start: usize,
+    pub(crate) rows: Vec<EffectTunerGroupRowSnapshot>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -42,6 +58,7 @@ pub(crate) struct EffectTunerListOverlaySnapshot {
     pub(crate) pinned: bool,
     pub(crate) total_parameters: usize,
     pub(crate) window_start: usize,
+    pub(crate) window_text: String,
     pub(crate) rows: Vec<EffectTunerListRowSnapshot>,
     pub(crate) detail: EffectTunerOverlaySnapshot,
 }
@@ -257,6 +274,7 @@ pub(crate) struct EffectTunerState {
     generation_recompute_lfo_applied: bool,
     scene_numeric_lfo_applied: bool,
     selected_index: usize,
+    selected_group_index: usize,
     page_mode: EffectTunerPageMode,
     edit_mode: EffectEditMode,
     numeric_entry: NumericEntryBuffer,
@@ -280,7 +298,8 @@ impl EffectTunerState {
             generation_recompute_lfo_applied: false,
             scene_numeric_lfo_applied: false,
             selected_index: 0,
-            page_mode: EffectTunerPageMode::Compact,
+            selected_group_index: 0,
+            page_mode: EffectTunerPageMode::GroupSelect,
             edit_mode: EffectEditMode::Value,
             numeric_entry: NumericEntryBuffer::default(),
             last_numeric_entry_edit_secs: None,
@@ -299,6 +318,13 @@ impl EffectTunerState {
 
     pub(crate) fn page_mode(&self) -> EffectTunerPageMode {
         self.page_mode
+    }
+
+    pub(crate) fn selected_group_label(&self) -> &'static str {
+        effect_tuner_group_labels()
+            .get(self.selected_group_index)
+            .copied()
+            .unwrap_or_else(|| self.selected_parameter().group_label())
     }
 
     pub(crate) fn selected_effect_group(&self) -> Option<EffectGroup> {
@@ -353,10 +379,12 @@ impl EffectTunerState {
             *target = source;
         }
         self.selected_index = 0;
-        self.page_mode = EffectTunerPageMode::Compact;
+        self.selected_group_index = 0;
+        self.page_mode = EffectTunerPageMode::GroupSelect;
         self.edit_mode = EffectEditMode::Value;
         self.clear_numeric_entry();
         self.reset_hold_states();
+        self.sync_selected_group_to_parameter();
     }
 
     pub(crate) fn sync_scene_lfo_bases(&mut self, context: &EffectTunerViewContext<'_>) {
@@ -704,19 +732,73 @@ impl EffectTunerState {
         visible_rows: usize,
     ) -> EffectTunerListOverlaySnapshot {
         let live_effects = self.evaluated_effects(now_secs);
-        let (window_start, window_end) = self.selection_window_bounds(visible_rows.max(1));
-        let rows = (window_start..window_end)
+        let parameter_indices = self.visible_parameter_indices();
+        let total_parameters = parameter_indices.len();
+        let selected_list_index = parameter_indices
+            .iter()
+            .position(|index| *index == self.selected_index)
+            .unwrap_or(0);
+        let (window_start, window_end) = Self::selection_window_bounds(
+            selected_list_index,
+            total_parameters,
+            visible_rows.max(1),
+        );
+        let rows: Vec<EffectTunerListRowSnapshot> = parameter_indices[window_start..window_end]
+            .iter()
             .map(|index| {
-                self.list_row_snapshot(EffectTunerParameter::all()[index], context, &live_effects)
+                self.list_row_snapshot(EffectTunerParameter::all()[*index], context, &live_effects)
             })
             .collect();
+        let visible_end = window_start + rows.len();
+        let window_text = if self.page_mode == EffectTunerPageMode::GroupList {
+            format!(
+                "{} {}-{} / {}",
+                self.selected_group_label(),
+                window_start + 1,
+                visible_end,
+                total_parameters
+            )
+        } else {
+            format!(
+                "LIST {}-{} / {}",
+                window_start + 1,
+                visible_end,
+                total_parameters
+            )
+        };
 
         EffectTunerListOverlaySnapshot {
             pinned: self.pinned,
-            total_parameters: EffectTunerParameter::all().len(),
+            total_parameters,
             window_start,
+            window_text,
             rows,
             detail: self.overlay_snapshot(context, now_secs),
+        }
+    }
+
+    pub(crate) fn group_overlay_snapshot(&self, visible_rows: usize) -> EffectTunerGroupOverlaySnapshot {
+        let groups = effect_tuner_group_labels();
+        let total_groups = groups.len();
+        let (window_start, window_end) = Self::selection_window_bounds(
+            self.selected_group_index,
+            total_groups,
+            visible_rows.max(1),
+        );
+        let rows = groups[window_start..window_end]
+            .iter()
+            .enumerate()
+            .map(|(offset, group_label)| EffectTunerGroupRowSnapshot {
+                group_label: *group_label,
+                selected: window_start + offset == self.selected_group_index,
+            })
+            .collect();
+
+        EffectTunerGroupOverlaySnapshot {
+            pinned: self.pinned,
+            total_groups,
+            window_start,
+            rows,
         }
     }
 
@@ -725,18 +807,36 @@ impl EffectTunerState {
     }
 
     pub(crate) fn open_page(&mut self, now_secs: f32) {
-        self.page_mode = EffectTunerPageMode::Compact;
+        self.page_mode = EffectTunerPageMode::GroupSelect;
+        self.sync_selected_group_to_parameter();
         self.pinned = true;
+        self.reset_hold_states();
+        self.note_interaction(now_secs);
+    }
+
+    pub(crate) fn show_compact_page(&mut self, now_secs: f32) {
+        self.page_mode = EffectTunerPageMode::Compact;
+        self.reset_hold_states();
         self.note_interaction(now_secs);
     }
 
     pub(crate) fn show_list_page(&mut self, now_secs: f32) {
         self.page_mode = EffectTunerPageMode::List;
+        self.sync_selected_group_to_parameter();
+        self.reset_hold_states();
+        self.note_interaction(now_secs);
+    }
+
+    pub(crate) fn show_selected_group_list_page(&mut self, now_secs: f32) {
+        self.align_selected_parameter_with_group();
+        self.page_mode = EffectTunerPageMode::GroupList;
+        self.reset_hold_states();
         self.note_interaction(now_secs);
     }
 
     pub(crate) fn close_page(&mut self) {
-        self.page_mode = EffectTunerPageMode::Compact;
+        self.page_mode = EffectTunerPageMode::GroupSelect;
+        self.sync_selected_group_to_parameter();
         self.pinned = false;
         self.visible_until_secs = 0.0;
         self.clear_numeric_entry();
@@ -981,11 +1081,19 @@ impl EffectTunerState {
 
     fn cycle_selection(&mut self, direction: isize, now_secs: f32) {
         self.clear_numeric_entry();
-        let parameter_count = EffectTunerParameter::all().len() as isize;
-        let next_index =
-            (self.selected_index as isize + direction).rem_euclid(parameter_count) as usize;
-        self.selected_index = next_index;
-        self.coerce_edit_mode_for_selected();
+        match self.page_mode {
+            EffectTunerPageMode::GroupSelect => self.cycle_group_selection(direction),
+            EffectTunerPageMode::Compact | EffectTunerPageMode::List => {
+                self.cycle_parameter_selection(direction);
+                self.sync_selected_group_to_parameter();
+                self.coerce_edit_mode_for_selected();
+            }
+            EffectTunerPageMode::GroupList => {
+                self.cycle_parameter_selection_in_group(direction);
+                self.sync_selected_group_to_parameter();
+                self.coerce_edit_mode_for_selected();
+            }
+        }
         self.note_interaction(now_secs);
     }
 
@@ -1127,20 +1235,82 @@ impl EffectTunerState {
         self.increase_hold.reset();
     }
 
-    fn selection_window_bounds(&self, visible_rows: usize) -> (usize, usize) {
-        let total = EffectTunerParameter::all().len();
+    fn selection_window_bounds(
+        selected_index: usize,
+        total: usize,
+        visible_rows: usize,
+    ) -> (usize, usize) {
         if total <= visible_rows {
             return (0, total);
         }
 
         let half_window = visible_rows / 2;
         let max_start = total - visible_rows;
-        let window_start = self
-            .selected_index
-            .saturating_sub(half_window)
-            .min(max_start);
+        let window_start = selected_index.saturating_sub(half_window).min(max_start);
         let window_end = (window_start + visible_rows).min(total);
         (window_start, window_end)
+    }
+
+    fn cycle_group_selection(&mut self, direction: isize) {
+        let groups = effect_tuner_group_labels();
+        let group_count = groups.len() as isize;
+        if group_count == 0 {
+            return;
+        }
+        self.selected_group_index =
+            (self.selected_group_index as isize + direction).rem_euclid(group_count) as usize;
+    }
+
+    fn cycle_parameter_selection(&mut self, direction: isize) {
+        let parameter_count = EffectTunerParameter::all().len() as isize;
+        if parameter_count == 0 {
+            return;
+        }
+        let next_index =
+            (self.selected_index as isize + direction).rem_euclid(parameter_count) as usize;
+        self.selected_index = next_index;
+    }
+
+    fn cycle_parameter_selection_in_group(&mut self, direction: isize) {
+        let indices = effect_tuner_parameter_indices_in_group(self.selected_group_label());
+        if indices.is_empty() {
+            return;
+        }
+        let current_position = indices
+            .iter()
+            .position(|index| *index == self.selected_index)
+            .unwrap_or(0) as isize;
+        let next_position = (current_position + direction).rem_euclid(indices.len() as isize) as usize;
+        self.selected_index = indices[next_position];
+    }
+
+    fn sync_selected_group_to_parameter(&mut self) {
+        self.selected_group_index = effect_tuner_group_index(self.selected_parameter().group_label());
+    }
+
+    fn align_selected_parameter_with_group(&mut self) {
+        if self.selected_parameter().group_label() == self.selected_group_label() {
+            return;
+        }
+
+        if let Some(index) = effect_tuner_parameter_indices_in_group(self.selected_group_label())
+            .into_iter()
+            .next()
+        {
+            self.selected_index = index;
+            self.coerce_edit_mode_for_selected();
+        }
+    }
+
+    fn visible_parameter_indices(&self) -> Vec<usize> {
+        match self.page_mode {
+            EffectTunerPageMode::GroupList => {
+                effect_tuner_parameter_indices_in_group(self.selected_group_label())
+            }
+            EffectTunerPageMode::GroupSelect | EffectTunerPageMode::Compact | EffectTunerPageMode::List => {
+                (0..EffectTunerParameter::all().len()).collect()
+            }
+        }
     }
 
     fn list_row_snapshot(

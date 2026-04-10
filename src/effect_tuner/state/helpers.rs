@@ -164,3 +164,29 @@ fn lfo_index_for_parameter(parameter: EffectTunerParameter) -> Option<usize> {
 fn lfo_seed_for_index(index: usize) -> u32 {
     index as u32 + 1
 }
+
+fn effect_tuner_group_labels() -> Vec<&'static str> {
+    let mut groups = Vec::new();
+    for parameter in EffectTunerParameter::all() {
+        let group_label = parameter.group_label();
+        if groups.last().copied() != Some(group_label) {
+            groups.push(group_label);
+        }
+    }
+    groups
+}
+
+fn effect_tuner_group_index(group_label: &'static str) -> usize {
+    effect_tuner_group_labels()
+        .iter()
+        .position(|candidate| *candidate == group_label)
+        .unwrap_or(0)
+}
+
+fn effect_tuner_parameter_indices_in_group(group_label: &'static str) -> Vec<usize> {
+    EffectTunerParameter::all()
+        .iter()
+        .enumerate()
+        .filter_map(|(index, parameter)| (parameter.group_label() == group_label).then_some(index))
+        .collect()
+}

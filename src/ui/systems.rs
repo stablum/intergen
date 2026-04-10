@@ -217,6 +217,108 @@ pub(crate) fn update_effect_tuner_overlay_system(
     }
 }
 
+pub(crate) fn update_effect_tuner_group_overlay_system(
+    time: Res<Time>,
+    control_page: Res<ControlPageState>,
+    effect_tuner: Res<EffectTunerState>,
+    view: EffectTunerUiViewAccess,
+    mut overlay_query: Query<(&mut Visibility, &mut Node), With<EffectTunerGroupOverlay>>,
+    mut pinned_badge_query: Query<
+        &mut Visibility,
+        (
+            With<EffectTunerGroupPinnedBadge>,
+            Without<EffectTunerGroupOverlay>,
+        ),
+    >,
+    mut window_text_query: Query<
+        &mut Text,
+        (
+            With<EffectTunerGroupWindowText>,
+            Without<EffectTunerGroupRowText>,
+        ),
+    >,
+    mut row_query: Query<
+        (&EffectTunerGroupRow, &mut Visibility, &mut BackgroundColor),
+        (
+            Without<EffectTunerGroupOverlay>,
+            Without<EffectTunerGroupPinnedBadge>,
+        ),
+    >,
+    mut row_text_query: Query<
+        (&EffectTunerGroupRowText, &mut Text, &mut TextColor),
+        (
+            Without<EffectTunerGroupWindowText>,
+            Without<EffectTunerGroupRow>,
+        ),
+    >,
+) {
+    let now_secs = time.elapsed_secs();
+    let snapshot = effect_tuner.group_overlay_snapshot(EFFECT_TUNER_LIST_VISIBLE_ROWS);
+    let ui_config = &view.app_config.ui;
+    let visible = control_page.page_has_focus(ControlPage::EffectTuner)
+        && effect_tuner.page_mode() == EffectTunerPageMode::GroupSelect
+        && effect_tuner.is_visible(now_secs);
+
+    let Ok((mut overlay_visibility, mut overlay_node)) = overlay_query.single_mut() else {
+        return;
+    };
+    *overlay_visibility = if visible {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+    overlay_node.display = if visible {
+        Display::Flex
+    } else {
+        Display::None
+    };
+
+    let Ok(mut pinned_badge_visibility) = pinned_badge_query.single_mut() else {
+        return;
+    };
+    *pinned_badge_visibility = if visible && snapshot.pinned {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+
+    let Ok(mut window_text) = window_text_query.single_mut() else {
+        return;
+    };
+    let visible_end = snapshot.window_start + snapshot.rows.len();
+    *window_text = Text::new(format!(
+        "GROUPS {}-{} / {}",
+        snapshot.window_start + 1,
+        visible_end,
+        snapshot.total_groups
+    ));
+
+    for (row, mut visibility, mut background) in row_query.iter_mut() {
+        if let Some(row_snapshot) = snapshot.rows.get(row.0) {
+            *visibility = Visibility::Visible;
+            *background = if row_snapshot.selected {
+                BackgroundColor(effect_tuner_panel_fill_color())
+            } else {
+                BackgroundColor(Color::NONE)
+            };
+        } else {
+            *visibility = Visibility::Hidden;
+            *background = BackgroundColor(Color::NONE);
+        }
+    }
+
+    for (text_meta, mut text, mut text_color) in row_text_query.iter_mut() {
+        let Some(row_snapshot) = snapshot.rows.get(text_meta.0) else {
+            *text = Text::new("");
+            *text_color = TextColor(srgb(ui_config.body_text));
+            continue;
+        };
+
+        *text = Text::new(row_snapshot.group_label);
+        *text_color = TextColor(srgb(ui_config.title_text));
+    }
+}
+
 pub(crate) fn update_effect_tuner_list_overlay_system(
     time: Res<Time>,
     control_page: Res<ControlPageState>,
@@ -297,7 +399,10 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
     );
     let ui_config = &view.app_config.ui;
     let visible = control_page.page_has_focus(ControlPage::EffectTuner)
-        && effect_tuner.page_mode() == EffectTunerPageMode::List
+        && matches!(
+            effect_tuner.page_mode(),
+            EffectTunerPageMode::List | EffectTunerPageMode::GroupList
+        )
         && effect_tuner.is_visible(now_secs);
 
     let Ok((mut overlay_visibility, mut overlay_node)) = overlay_query.single_mut() else {
@@ -326,13 +431,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
     let Ok(mut window_text) = window_text_query.single_mut() else {
         return;
     };
-    let visible_end = snapshot.window_start + snapshot.rows.len();
-    *window_text = Text::new(format!(
-        "LIST {}-{} / {}",
-        snapshot.window_start + 1,
-        visible_end,
-        snapshot.total_parameters
-    ));
+    *window_text = Text::new(snapshot.window_text.clone());
 
     for (row, mut visibility, mut background) in row_query.iter_mut() {
         if let Some(row_snapshot) = snapshot.rows.get(row.0) {

@@ -42,6 +42,63 @@ pub(crate) fn effect_tuner_input_system(
         alt_pressed: modifier_pressed(&keys, &[KeyCode::AltLeft, KeyCode::AltRight]),
     };
     let delta_secs = time.delta_secs();
+    let enter_pressed =
+        keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::NumpadEnter);
+
+    if effect_tuner.page_mode() == super::state::EffectTunerPageMode::GroupSelect {
+        if effect_tuner.step_selection(
+            -1,
+            HoldInput {
+                just_pressed: keys.just_pressed(KeyCode::ArrowUp),
+                pressed: keys.pressed(KeyCode::ArrowUp),
+                just_released: keys.just_released(KeyCode::ArrowUp),
+                delta_secs,
+            },
+            now_secs,
+        ) {
+            println!("Selected group: {}", effect_tuner.selected_group_label());
+        }
+
+        if effect_tuner.step_selection(
+            1,
+            HoldInput {
+                just_pressed: keys.just_pressed(KeyCode::ArrowDown),
+                pressed: keys.pressed(KeyCode::ArrowDown),
+                just_released: keys.just_released(KeyCode::ArrowDown),
+                delta_secs,
+            },
+            now_secs,
+        ) {
+            println!("Selected group: {}", effect_tuner.selected_group_label());
+        }
+
+        let mut scrolled_selection = false;
+        for mouse_wheel in mouse_wheel_reader.read() {
+            *mouse_wheel_selection_remainder +=
+                mouse_wheel_selection_lines(mouse_wheel.y, mouse_wheel.unit);
+        }
+        let selection_steps = mouse_wheel_selection_whole_steps(*mouse_wheel_selection_remainder);
+        if selection_steps != 0 {
+            *mouse_wheel_selection_remainder -= selection_steps as f32;
+            let direction = if selection_steps > 0 { -1 } else { 1 };
+            for _ in 0..selection_steps.unsigned_abs() {
+                if effect_tuner.scroll_selection(direction, now_secs) {
+                    scrolled_selection = true;
+                }
+            }
+        }
+        if scrolled_selection {
+            println!("Selected group: {}", effect_tuner.selected_group_label());
+        }
+
+        if !modifiers.shift_pressed && (enter_pressed || keys.just_pressed(KeyCode::Space)) {
+            let selected_group = effect_tuner.selected_group_label();
+            effect_tuner.show_selected_group_list_page(now_secs);
+            println!("F2 {} parameter list page pinned open.", selected_group);
+        }
+
+        return;
+    }
 
     if keys.just_pressed(KeyCode::Space) {
         if let Some(selected_effect) = effect_tuner.selected_effect_group() {
@@ -246,8 +303,6 @@ pub(crate) fn effect_tuner_input_system(
         );
     }
 
-    let enter_pressed =
-        keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::NumpadEnter);
     if enter_pressed {
         if modifiers.shift_pressed {
             {

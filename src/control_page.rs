@@ -327,6 +327,10 @@ pub(crate) fn control_page_input_system(
 
         if control_page.is_active(ControlPage::EffectTuner) {
             match effect_tuner.page_mode() {
+                EffectTunerPageMode::GroupSelect | EffectTunerPageMode::GroupList => {
+                    effect_tuner.show_compact_page(time.elapsed_secs());
+                    println!("F2 control page pinned open.");
+                }
                 EffectTunerPageMode::Compact => {
                     effect_tuner.show_list_page(time.elapsed_secs());
                     println!("F2 parameter list page pinned open.");
@@ -344,7 +348,7 @@ pub(crate) fn control_page_input_system(
             close_page(previous_page, &mut effect_tuner, &mut preset_browser);
         }
         effect_tuner.open_page(time.elapsed_secs());
-        println!("F2 control page pinned open.");
+        println!("F2 parameter group page pinned open.");
         return;
     }
 
@@ -529,7 +533,30 @@ mod tests {
             world.resource::<ControlPageState>().active_page(),
             Some(ControlPage::EffectTuner)
         );
+        assert_eq!(
+            world.resource::<EffectTunerState>().page_mode(),
+            crate::effect_tuner::EffectTunerPageMode::GroupSelect
+        );
         assert!(world.resource::<EffectTunerState>().is_visible(0.0));
+    }
+
+    #[test]
+    fn second_f2_press_opens_the_compact_tuner_page() {
+        let mut world = input_world();
+        world
+            .resource_mut::<ControlPageState>()
+            .open_page(ControlPage::EffectTuner);
+        world.resource_mut::<EffectTunerState>().open_page(0.0);
+        world
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::F2);
+
+        run_control_page_input(&mut world);
+
+        assert_eq!(
+            world.resource::<EffectTunerState>().page_mode(),
+            crate::effect_tuner::EffectTunerPageMode::Compact
+        );
     }
 
     #[test]

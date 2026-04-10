@@ -509,8 +509,14 @@ fn child_transform(
     };
     let twist = Quat::from_axis_angle(outward, attachment.index as f32 * twist_step);
     let rotation = twist * parent.rotation;
-    let anchor_after_offset =
-        world_anchor + world_position_offset(parent, parent_geometry, outward, rotation, local_position_offset);
+    let anchor_after_offset = world_anchor
+        + world_position_offset(
+            parent,
+            parent_geometry,
+            outward,
+            rotation,
+            local_position_offset,
+        );
     let effective_outward = safe_normalize(anchor_after_offset - parent.center, outward);
     let vertex_offset = child_radius * vertex_offset_ratio.max(0.0);
 
@@ -934,7 +940,10 @@ mod tests {
         )
         .expect("spawn should succeed");
 
-        assert_eq!(spawn.node.local_position_offset, Vec3::new(0.25, -0.5, 0.75));
+        assert_eq!(
+            spawn.node.local_position_offset,
+            Vec3::new(0.25, -0.5, 0.75)
+        );
     }
 
     #[test]

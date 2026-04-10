@@ -124,6 +124,35 @@ fn spawn_effect_tuner_list_text_slot(
         });
 }
 
+fn spawn_effect_tuner_group_text_slot(
+    parent: &mut ChildSpawnerCommands,
+    ui_theme: &UiTheme,
+    font_size: f32,
+    slot: usize,
+    color: Color,
+) {
+    parent
+        .spawn(Node {
+            width: percent(100),
+            min_width: px(effect_tuner_effect_label_width(font_size)),
+            align_items: AlignItems::Center,
+            ..default()
+        })
+        .with_children(|text_parent| {
+            text_parent.spawn((
+                Text::new(""),
+                ui_theme.text_font(font_size),
+                TextColor(color),
+                effect_tuner_text_layout(Justify::Left),
+                Node {
+                    width: percent(100),
+                    ..default()
+                },
+                EffectTunerGroupRowText(slot),
+            ));
+        });
+}
+
 fn spawn_effect_tuner_list_value_slot(
     parent: &mut ChildSpawnerCommands,
     ui_theme: &UiTheme,
@@ -795,6 +824,124 @@ fn spawn_effect_tuner_list_overlay(
         });
 }
 
+fn spawn_effect_tuner_group_overlay(
+    commands: &mut Commands,
+    ui_theme: &UiTheme,
+    scene_camera: Entity,
+    ui_config: &UiConfig,
+) {
+    let header_font_size = (ui_config.hint_font_size - 1.0).max(12.0);
+    let row_font_size = (ui_config.body_font_size - 1.0).max(14.0);
+
+    commands
+        .spawn((
+            Node {
+                display: Display::None,
+                position_type: PositionType::Absolute,
+                left: px(ui_config.hint_left),
+                right: px(ui_config.hint_left),
+                bottom: px(control_page_bottom(ui_config)),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            GlobalZIndex(22),
+            Visibility::Hidden,
+            EffectTunerGroupOverlay,
+            UiTargetCamera(scene_camera),
+        ))
+        .with_children(|parent| {
+            parent
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        max_width: px(
+                            EFFECT_TUNER_GROUP_PANEL_MAX_WIDTH.min(ui_config.panel_max_width)
+                        ),
+                        flex_direction: FlexDirection::Column,
+                        row_gap: px(8.0),
+                        padding: UiRect::all(px(ui_config.panel_padding * 0.7)),
+                        border_radius: effect_tuner_corner_radius(),
+                        ..default()
+                    },
+                    BackgroundColor(Color::NONE),
+                ))
+                .with_children(|panel| {
+                    panel
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Row,
+                            align_items: AlignItems::Center,
+                            column_gap: px(8.0),
+                            ..default()
+                        })
+                        .with_children(|header| {
+                            spawn_effect_tuner_label(
+                                header,
+                                ui_theme,
+                                header_font_size,
+                                "GRP",
+                                srgb(ui_config.body_text),
+                            );
+                            header
+                                .spawn((
+                                    Node {
+                                        padding: UiRect::axes(px(7.0), px(3.0)),
+                                        border_radius: effect_tuner_corner_radius(),
+                                        ..default()
+                                    },
+                                    BackgroundColor(effect_tuner_panel_fill_color()),
+                                    Visibility::Hidden,
+                                    EffectTunerGroupPinnedBadge,
+                                ))
+                                .with_children(|badge| {
+                                    badge.spawn((
+                                        Text::new("PIN"),
+                                        ui_theme.text_font(header_font_size),
+                                        TextColor(srgb(ui_config.hint_text)),
+                                        effect_tuner_text_layout(Justify::Center),
+                                    ));
+                                });
+                            header.spawn((
+                                Text::new(""),
+                                ui_theme.text_font(header_font_size),
+                                TextColor(srgb(ui_config.title_text)),
+                                effect_tuner_text_layout(Justify::Left),
+                                EffectTunerGroupWindowText,
+                            ));
+                        });
+
+                    panel
+                        .spawn(Node {
+                            flex_direction: FlexDirection::Column,
+                            row_gap: px(6.0),
+                            ..default()
+                        })
+                        .with_children(|rows| {
+                            for slot in 0..EFFECT_TUNER_LIST_VISIBLE_ROWS {
+                                rows.spawn((
+                                    Node {
+                                        width: percent(100),
+                                        padding: UiRect::axes(px(10.0), px(5.0)),
+                                        border_radius: effect_tuner_corner_radius(),
+                                        ..default()
+                                    },
+                                    BackgroundColor(Color::NONE),
+                                    EffectTunerGroupRow(slot),
+                                ))
+                                .with_children(|row| {
+                                    spawn_effect_tuner_group_text_slot(
+                                        row,
+                                        ui_theme,
+                                        row_font_size,
+                                        slot,
+                                        srgb(ui_config.title_text),
+                                    );
+                                });
+                            }
+                        });
+                });
+        });
+}
+
 fn spawn_preset_ui(
     commands: &mut Commands,
     ui_theme: &UiTheme,
@@ -965,6 +1112,7 @@ pub(crate) fn spawn_help_ui(
 
     spawn_preset_ui(commands, ui_theme, scene_camera, ui_config, strip_font_size);
     spawn_keyboard_help_overlay(commands, ui_theme, scene_camera, ui_config);
+    spawn_effect_tuner_group_overlay(commands, ui_theme, scene_camera, ui_config);
     spawn_effect_tuner_list_overlay(commands, ui_theme, scene_camera, ui_config);
 
     commands
