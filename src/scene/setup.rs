@@ -23,6 +23,10 @@ pub(crate) fn setup_scene(
             selected_shape_kind: app_config.generation.default_child_shape_kind,
             spawn_placement_mode: app_config.generation.default_spawn_placement_mode,
             spawn_add_mode: SpawnAddMode::default(),
+            single_attachment_repeat_count: app_config
+                .generation
+                .default_single_attachment_repeat_count,
+            single_spawn_source_cursor: None,
             parameters: GenerationParameters::from_config(&app_config.generation),
             spawn_hold: HoldRepeatState::default(),
         },
@@ -89,6 +93,8 @@ pub(crate) fn setup_scene(
         selected_shape_kind: app_config.generation.default_child_shape_kind,
         spawn_placement_mode: initial_spawn_placement_mode,
         spawn_add_mode: SpawnAddMode::default(),
+        single_attachment_repeat_count: app_config.generation.default_single_attachment_repeat_count,
+        single_spawn_source_cursor: None,
         parameters: initial_parameters,
         spawn_hold: HoldRepeatState::default(),
     });
@@ -108,6 +114,12 @@ pub(crate) fn setup_scene(
         spawn_placement_mode_status_message(initial_spawn_placement_mode)
     );
     println!("{}", spawn_add_mode_status_message(SpawnAddMode::default()));
+    println!(
+        "{}",
+        crate::generation::single_attachment_repeat_count_status_message(
+            app_config.generation.default_single_attachment_repeat_count
+        )
+    );
     println!("{}", twist_status_message(initial_twist));
     println!("{}", vertex_offset_status_message(initial_vertex_offset));
     println!(

@@ -71,7 +71,7 @@ Current configuration sections:
 - `window`: title, resolution, and present mode
 - `rendering`: clear color, ambient light, and optional stage floor/backdrop surfaces
 - `camera`: initial orbit, motion tuning, and angular-momentum preservation
-- `generation`: root shape, default child shape, default spawn placement mode, scale limits, twist defaults and bounds, spawn cadence, and spawn heuristics
+- `generation`: root shape, default child shape, default spawn placement mode, scale limits, twist defaults and bounds, spawn cadence, single-spawn source repeat defaults, and spawn heuristics
 - `lighting`: directional, point, and optional accent light colors, positions, and intensities
 - `effects`: camera-output shader effects
 - `materials`: color progression, legacy or scene-wide procedural material families, PBR tuning, and live opacity defaults
@@ -104,6 +104,9 @@ Live spawn-exclusion controls use these `generation` settings:
 - `vertex_spawn_exclusion_hold_delay_secs`: how long to hold before repeat starts
 - `vertex_spawn_exclusion_repeat_interval_secs`: time between repeated probability updates while held
 - `min_vertex_spawn_exclusion_probability` / `max_vertex_spawn_exclusion_probability`: live clamp range, limited internally to `[0.0, 1.0]`
+
+Single-spawn attachment reuse uses this `generation` setting:
+- `default_single_attachment_repeat_count`: startup default for how many successful single-mode spawns stay on the current source attachment before advancing. `0` means stay on the current source attachment indefinitely, `1` preserves the old one-spawn-per-source behavior, and values above `1` stay that many successful spawns before advancing.
 
 Camera-output effects run in this order:
 - `effects.lens_distortion`: warp the camera image with radial, tangential, and chromatic lens terms
@@ -189,7 +192,7 @@ Current scene preset contents:
 - stage visibility plus floor/backdrop toggles
 - material palette/PBR settings, procedural surface-family settings, and the saved base global opacity
 - camera position, distance, and momentum
-- selected child shape, spawn placement mode, scale ratio, base twist/outward-offset values, and global spawn-exclusion probability
+- selected child shape, spawn placement mode, spawn add mode, single-spawn source repeat count, scale ratio, base twist/outward-offset values, and global spawn-exclusion probability
 - the shape tree rebuilt from those saved base values, including each node's scalar and per-axis scale
 - effect-tuner values plus all per-parameter LFO settings
 
@@ -283,6 +286,8 @@ cargo test-plain
 - `R`: reset the scene with the currently selected shape as the new root
 - `Space`: spawn child shapes with the current placement mode, or hold to keep spawning
 - `Ctrl + Space`: cycle the add mode between single spawn and fill-current-level spawning
+- `,`: decrease the single-spawn source repeat count
+- `.`: increase the single-spawn source repeat count
 - Fill-current-level spawning advances spawn-time generation LFO sampling by `generation.fill_mode_lfo_virtual_time_step_secs` per successful child
 - `G`: cycle the spawn placement mode between vertices, edges, and faces
 - `1`: select cube
@@ -299,6 +304,7 @@ cargo test-plain
 - `V`: decrease the global spawn-exclusion probability, or hold to keep decreasing
 - `B`: increase the global spawn-exclusion probability, or hold to keep increasing
 - `N`: reset the global spawn-exclusion probability to the configured default
+- In single-spawn mode, `generation.default_single_attachment_repeat_count = 0` keeps reusing the current source attachment, `1` preserves the original one-spawn-per-source behavior, and larger values stay on one source attachment for that many successful spawns before advancing
 - `O`: decrease global object opacity
 - `P`: increase global object opacity
 - `I`: reset global object opacity to the configured default

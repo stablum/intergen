@@ -226,6 +226,17 @@ pub(crate) fn next_spawn(
     scale_ratio: f32,
     tuning: SpawnTuning,
 ) -> Option<SpawnedShape> {
+    next_spawn_with_attachment_marking(nodes, shapes, child_kind, scale_ratio, tuning, true)
+}
+
+pub(crate) fn next_spawn_with_attachment_marking(
+    nodes: &mut Vec<ShapeNode>,
+    shapes: &ShapeCatalog,
+    child_kind: ShapeKind,
+    scale_ratio: f32,
+    tuning: SpawnTuning,
+    mark_parent_attachment_occupied: bool,
+) -> Option<SpawnedShape> {
     find_next_spawn(
         nodes,
         shapes,
@@ -234,9 +245,10 @@ pub(crate) fn next_spawn(
         tuning,
         SpawnLevelConstraint::Any,
     )
-    .map(|pending| apply_spawn(nodes, pending))
+    .map(|pending| apply_spawn(nodes, pending, mark_parent_attachment_occupied))
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn spawn_batch(
     nodes: &mut Vec<ShapeNode>,
     shapes: &ShapeCatalog,
@@ -248,6 +260,28 @@ pub(crate) fn spawn_batch(
     spawn_batch_with_inputs(nodes, shapes, child_kind, add_mode, |_| {
         (scale_ratio, tuning)
     })
+}
+
+pub(crate) fn next_spawn_on_attachment(
+    nodes: &mut Vec<ShapeNode>,
+    shapes: &ShapeCatalog,
+    child_kind: ShapeKind,
+    scale_ratio: f32,
+    tuning: SpawnTuning,
+    parent_index: usize,
+    attachment: SpawnAttachment,
+    mark_parent_attachment_occupied: bool,
+) -> Option<SpawnedShape> {
+    find_spawn_at_attachment(
+        nodes,
+        shapes,
+        child_kind,
+        scale_ratio,
+        tuning,
+        parent_index,
+        attachment,
+    )
+    .map(|pending| apply_spawn(nodes, pending, mark_parent_attachment_occupied))
 }
 
 pub(crate) fn spawn_batch_with_inputs(
@@ -294,7 +328,7 @@ fn next_spawn_at_level(
         tuning,
         SpawnLevelConstraint::Exact(target_level),
     )
-    .map(|pending| apply_spawn(nodes, pending))
+    .map(|pending| apply_spawn(nodes, pending, true))
 }
 
 fn find_next_spawn(
@@ -328,50 +362,24 @@ fn find_next_spawn(
             .collect();
 
         for parent_index in parent_indices {
-            let parent = nodes[parent_index].clone();
-            let parent_geometry = shapes.geometry(parent.kind);
-            let child_geometry = shapes.geometry(child_kind);
-
+            let parent_geometry = shapes.geometry(nodes[parent_index].kind);
             for attachment_index in 0..parent_geometry.attachment_count(tuning.spawn_placement_mode)
             {
                 let attachment = SpawnAttachment {
                     mode: tuning.spawn_placement_mode,
                     index: attachment_index,
                 };
-                if parent.occupied_attachments.is_occupied(attachment) {
-                    continue;
-                }
-                if attachment_is_excluded(
-                    parent_index,
-                    attachment,
-                    tuning.vertex_spawn_exclusion_probability,
-                ) {
-                    continue;
-                }
-
-                let candidate = spawn_candidate(SpawnCandidateInput {
-                    parent: &parent,
-                    parent_geometry,
+                if let Some(pending) = find_spawn_at_attachment(
+                    nodes,
+                    shapes,
                     child_kind,
-                    child_geometry,
-                    parent_index,
-                    attachment,
                     scale_ratio,
                     tuning,
-                });
-
-                if is_fully_contained(&candidate, nodes, shapes, tuning.containment_epsilon)
-                    || contains_existing(&candidate, nodes, shapes, tuning.containment_epsilon)
-                {
-                    continue;
-                }
-
-                return Some(PendingSpawn {
                     parent_index,
-                    parent_level: parent.level,
                     attachment,
-                    node: candidate,
-                });
+                ) {
+                    return Some(pending);
+                }
             }
         }
     }
@@ -379,11 +387,73 @@ fn find_next_spawn(
     None
 }
 
-fn apply_spawn(nodes: &mut Vec<ShapeNode>, pending: PendingSpawn) -> SpawnedShape {
+fn find_spawn_at_attachment(
+    nodes: &[ShapeNode],
+    shapes: &ShapeCatalog,
+    child_kind: ShapeKind,
+    scale_ratio: f32,
+    tuning: SpawnTuning,
+    parent_index: usize,
+    attachment: SpawnAttachment,
+) -> Option<PendingSpawn> {
+    if attachment.mode != tuning.spawn_placement_mode {
+        return None;
+    }
+
+    let scale_ratio = scale_ratio.clamp(tuning.min_scale_ratio, tuning.max_scale_ratio);
+    let parent = nodes.get(parent_index)?.clone();
+    let parent_geometry = shapes.geometry(parent.kind);
+    if attachment.index >= parent_geometry.attachment_count(attachment.mode) {
+        return None;
+    }
+    if parent.occupied_attachments.is_occupied(attachment) {
+        return None;
+    }
+    if attachment_is_excluded(
+        parent_index,
+        attachment,
+        tuning.vertex_spawn_exclusion_probability,
+    ) {
+        return None;
+    }
+
+    let child_geometry = shapes.geometry(child_kind);
+    let candidate = spawn_candidate(SpawnCandidateInput {
+        parent: &parent,
+        parent_geometry,
+        child_kind,
+        child_geometry,
+        parent_index,
+        attachment,
+        scale_ratio,
+        tuning,
+    });
+
+    if is_fully_contained(&candidate, nodes, shapes, tuning.containment_epsilon)
+        || contains_existing(&candidate, nodes, shapes, tuning.containment_epsilon)
+    {
+        return None;
+    }
+
+    Some(PendingSpawn {
+        parent_index,
+        parent_level: parent.level,
+        attachment,
+        node: candidate,
+    })
+}
+
+fn apply_spawn(
+    nodes: &mut Vec<ShapeNode>,
+    pending: PendingSpawn,
+    mark_parent_attachment_occupied: bool,
+) -> SpawnedShape {
     let node = pending.node;
-    nodes[pending.parent_index]
-        .occupied_attachments
-        .mark_occupied(pending.attachment);
+    if mark_parent_attachment_occupied {
+        nodes[pending.parent_index]
+            .occupied_attachments
+            .mark_occupied(pending.attachment);
+    }
     nodes.push(node.clone());
 
     SpawnedShape {
@@ -813,6 +883,57 @@ mod tests {
         assert!(spawned.len() > 1);
         assert_eq!(spawned[0].node.axis_scale, Vec3::new(1.0, 1.0, 1.0));
         assert_eq!(spawned[1].node.axis_scale, Vec3::new(2.0, 1.0, 1.0));
+    }
+
+    #[test]
+    fn targeted_spawn_can_reuse_the_same_attachment_when_left_unoccupied() {
+        let shapes = ShapeCatalog::new();
+        let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
+        let attachment = SpawnAttachment {
+            mode: SpawnPlacementMode::Vertex,
+            index: 0,
+        };
+
+        let first = next_spawn_on_attachment(
+            &mut nodes,
+            &shapes,
+            ShapeKind::Cube,
+            0.35,
+            test_tuning(),
+            0,
+            attachment,
+            false,
+        )
+        .expect("first targeted spawn should succeed");
+
+        let mut offset_tuning = test_tuning();
+        offset_tuning.child_position_offset = Vec3::new(0.4, 0.0, 0.0);
+        let second = next_spawn_on_attachment(
+            &mut nodes,
+            &shapes,
+            ShapeKind::Cube,
+            0.35,
+            offset_tuning,
+            0,
+            attachment,
+            true,
+        )
+        .expect("second targeted spawn should succeed");
+
+        assert_eq!(
+            nodes[0].occupied_attachments.vertices[attachment.index],
+            true
+        );
+        assert_ne!(first.node.center, second.node.center);
+        let NodeOrigin::Child {
+            parent_index,
+            attachment: origin_attachment,
+        } = second.node.origin
+        else {
+            panic!("spawned node should be a child");
+        };
+        assert_eq!(parent_index, 0);
+        assert_eq!(origin_attachment, attachment);
     }
 
     #[test]

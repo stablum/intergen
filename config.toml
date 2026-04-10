@@ -54,6 +54,7 @@ default_scale_ratio = 0.58
 scale_adjust_step = 0.05
 min_scale_ratio = 0.15
 max_scale_ratio = 1.0
+default_single_attachment_repeat_count = 1
 spawn_hold_delay_secs = 0.24
 spawn_repeat_interval_secs = 0.00005
 fill_mode_lfo_virtual_time_step_secs = 0.25

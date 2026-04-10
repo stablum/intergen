@@ -10,11 +10,12 @@ use crate::effect_tuner::{
 use crate::parameters::GenerationParameter;
 use crate::runtime_scene::GenerationSceneAccess;
 use crate::scene::{
-    ShapeEntity, alpha_mode_for_opacity, material_appearance, opacity_status_message,
-    reset_generation_state, spawn_shape_entity, sync_shape_transforms,
+    ShapeEntity, SingleSpawnSourceCursor, alpha_mode_for_opacity, material_appearance,
+    opacity_status_message, reset_generation_state, spawn_shape_entity, sync_shape_transforms,
 };
 use crate::shapes::{
-    ShapeKind, SpawnAddMode, SpawnPlacementMode, SpawnedShape, recompute_spawn_tree, spawn_batch,
+    NodeOrigin, ShapeKind, SpawnAddMode, SpawnPlacementMode, SpawnedShape,
+    next_spawn_on_attachment, next_spawn_with_attachment_marking, recompute_spawn_tree,
     spawn_batch_with_inputs,
 };
 
@@ -25,6 +26,8 @@ const VERTEX_OFFSET_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyZ];
 const VERTEX_OFFSET_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyX];
 const VERTEX_EXCLUSION_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyV];
 const VERTEX_EXCLUSION_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyB];
+const SINGLE_ATTACHMENT_REPEAT_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::Comma];
+const SINGLE_ATTACHMENT_REPEAT_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::Period];
 
 const SHAPE_SELECTION_KEYS: [(KeyCode, ShapeKind); 4] = [
     (KeyCode::Digit1, ShapeKind::Cube),
@@ -50,6 +53,7 @@ pub(crate) fn generation_input_system(
         &scene.app_config.generation,
         &mut scene.generation_state,
     );
+    handle_single_attachment_repeat_input(&keys, input_mask, &mut scene.generation_state);
     handle_opacity_input(&keys, input_mask, &mut effect_tuner, &mut scene);
 
     let mut transform_changed = false;
@@ -136,6 +140,7 @@ fn handle_mode_shortcuts(
     generation_state: &mut crate::scene::GenerationState,
 ) -> bool {
     if just_pressed_unmasked(keys, input_mask, KeyCode::KeyG) {
+        generation_state.finalize_single_spawn_source_cursor();
         generation_state.spawn_placement_mode = generation_state.spawn_placement_mode.next();
         println!(
             "{}",
@@ -145,6 +150,7 @@ fn handle_mode_shortcuts(
 
     let ctrl_pressed = control_pressed(keys);
     if ctrl_pressed && just_pressed_unmasked(keys, input_mask, KeyCode::Space) {
+        generation_state.finalize_single_spawn_source_cursor();
         generation_state.spawn_add_mode = generation_state.spawn_add_mode.next();
         println!(
             "{}",
@@ -182,6 +188,44 @@ fn handle_scale_input(
             .adjust_clamped_base_value(scale_spec.step(), scale_spec);
         println!("Child scale ratio: {:.2}", scale_ratio);
     }
+}
+
+fn handle_single_attachment_repeat_input(
+    keys: &ButtonInput<KeyCode>,
+    input_mask: ControlPageInputMask,
+    generation_state: &mut crate::scene::GenerationState,
+) {
+    let mut next_value = None;
+    if key_group_just_pressed(keys, input_mask, &SINGLE_ATTACHMENT_REPEAT_DECREASE_KEYS) {
+        next_value = Some(
+            generation_state
+                .single_attachment_repeat_count
+                .saturating_sub(1),
+        );
+    }
+    if key_group_just_pressed(keys, input_mask, &SINGLE_ATTACHMENT_REPEAT_INCREASE_KEYS) {
+        next_value = Some(
+            generation_state
+                .single_attachment_repeat_count
+                .saturating_add(1),
+        );
+    }
+
+    let Some(next_value) = next_value else {
+        return;
+    };
+    if next_value == generation_state.single_attachment_repeat_count {
+        return;
+    }
+
+    generation_state.finalize_single_spawn_source_cursor();
+    generation_state.single_attachment_repeat_count = next_value;
+    println!(
+        "{}",
+        single_attachment_repeat_count_status_message(
+            generation_state.single_attachment_repeat_count
+        )
+    );
 }
 
 fn handle_opacity_input(
@@ -422,8 +466,8 @@ fn handle_spawn_input(
 
     let selected_shape_kind = scene.generation_state.selected_shape_kind;
     let add_mode = scene.generation_state.spawn_add_mode;
-    let generation_config = &scene.app_config.generation;
     let spawned = if add_mode == SpawnAddMode::FillLevel {
+        let generation_config = &scene.app_config.generation;
         let virtual_time_step_secs =
             generation_config.fill_mode_lfo_virtual_time_step_secs_clamped();
         let scale_ratio_base = scene.generation_state.scale_ratio_base();
@@ -504,16 +548,8 @@ fn handle_spawn_input(
             },
         )
     } else {
-        let scale_ratio = scene.generation_state.scale_ratio(generation_config);
-        let spawn_tuning = scene.generation_state.spawn_tuning(generation_config);
-        spawn_batch(
-            &mut scene.generation_state.nodes,
-            &scene.shape_assets.catalog,
-            selected_shape_kind,
-            scale_ratio,
-            spawn_tuning,
-            add_mode,
-        )
+        let generation_config = scene.app_config.generation.clone();
+        spawn_single_shape(selected_shape_kind, generation_config, scene)
     };
     if spawned.is_empty() {
         eprintln!("No valid spawn position is currently available.");
@@ -536,6 +572,82 @@ fn handle_spawn_input(
         );
     }
     println!("{}", spawn_summary_status_message(&spawned, add_mode));
+}
+
+fn spawn_single_shape(
+    selected_shape_kind: ShapeKind,
+    generation_config: crate::config::GenerationConfig,
+    scene: &mut GenerationSceneAccess<'_, '_>,
+) -> Vec<SpawnedShape> {
+    let repeat_count = scene.generation_state.single_attachment_repeat_count;
+    let scale_ratio = scene.generation_state.scale_ratio(&generation_config);
+    let spawn_tuning = scene.generation_state.spawn_tuning(&generation_config);
+
+    if scene.generation_state.single_spawn_source_cursor.is_some()
+        && !scene.generation_state.single_spawn_source_cursor_is_valid()
+    {
+        scene.generation_state.reset_single_spawn_source_cursor();
+    }
+
+    if let Some(cursor) = scene.generation_state.single_spawn_source_cursor {
+        let should_advance_after_spawn =
+            repeat_count > 0 && cursor.successful_spawns.saturating_add(1) >= repeat_count;
+        let spawn = next_spawn_on_attachment(
+            &mut scene.generation_state.nodes,
+            &scene.shape_assets.catalog,
+            selected_shape_kind,
+            scale_ratio,
+            spawn_tuning,
+            cursor.parent_index,
+            cursor.attachment,
+            should_advance_after_spawn,
+        );
+        return match spawn {
+            Some(spawn) => {
+                if should_advance_after_spawn {
+                    scene.generation_state.reset_single_spawn_source_cursor();
+                } else {
+                    scene.generation_state.single_spawn_source_cursor =
+                        Some(SingleSpawnSourceCursor {
+                            parent_index: cursor.parent_index,
+                            attachment: cursor.attachment,
+                            successful_spawns: cursor.successful_spawns.saturating_add(1),
+                        });
+                }
+                vec![spawn]
+            }
+            None => Vec::new(),
+        };
+    }
+
+    let mark_parent_attachment_occupied = repeat_count == 1;
+    let spawn = next_spawn_with_attachment_marking(
+        &mut scene.generation_state.nodes,
+        &scene.shape_assets.catalog,
+        selected_shape_kind,
+        scale_ratio,
+        spawn_tuning,
+        mark_parent_attachment_occupied,
+    );
+    let Some(spawn) = spawn else {
+        return Vec::new();
+    };
+    if !mark_parent_attachment_occupied {
+        let NodeOrigin::Child {
+            parent_index,
+            attachment,
+        } = spawn.node.origin
+        else {
+            return vec![spawn];
+        };
+        scene.generation_state.single_spawn_source_cursor = Some(SingleSpawnSourceCursor {
+            parent_index,
+            attachment,
+            successful_spawns: 1,
+        });
+    }
+
+    vec![spawn]
 }
 
 fn key_group_just_pressed(
@@ -633,6 +745,16 @@ pub(crate) fn spawn_add_mode_status_message(mode: SpawnAddMode) -> String {
     format!("Object add mode: {}", mode.label())
 }
 
+pub(crate) fn single_attachment_repeat_count_status_message(repeat_count: usize) -> String {
+    match repeat_count {
+        0 => "Single-spawn source repeat count: 0 (never advance automatically)".to_string(),
+        1 => "Single-spawn source repeat count: 1 (advance every spawn)".to_string(),
+        count => {
+            format!("Single-spawn source repeat count: {count} (advance after {count} spawns)")
+        }
+    }
+}
+
 pub(crate) fn spawn_placement_mode_status_message(mode: SpawnPlacementMode) -> String {
     format!("Spawn placement mode: {}", mode.plural_label())
 }
@@ -663,8 +785,9 @@ fn spawn_summary_status_message(spawned: &[SpawnedShape], add_mode: SpawnAddMode
 #[cfg(test)]
 mod tests {
     use super::{
-        adjust_clamped_value, spawn_add_mode_status_message, twist_status_message,
-        vertex_exclusion_status_message, vertex_offset_status_message,
+        adjust_clamped_value, single_attachment_repeat_count_status_message,
+        spawn_add_mode_status_message, twist_status_message, vertex_exclusion_status_message,
+        vertex_offset_status_message,
     };
     use crate::config::GenerationConfig;
     use crate::parameters::HoldRepeatState;
@@ -781,5 +904,12 @@ mod tests {
         let status = spawn_add_mode_status_message(SpawnAddMode::FillLevel);
 
         assert!(status.contains("fill current level"));
+    }
+
+    #[test]
+    fn single_attachment_repeat_count_status_message_mentions_zero_locking_behavior() {
+        let status = single_attachment_repeat_count_status_message(0);
+
+        assert!(status.contains("never advance automatically"));
     }
 }

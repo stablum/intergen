@@ -5,7 +5,8 @@ use crate::camera::CameraRig;
 use crate::config::{AppConfig, LightingConfig, MaterialConfig, RenderingConfig};
 use crate::effect_tuner::{EffectRuntimeSnapshot, EffectTunerState};
 use crate::scene::{
-    GenerationParameters, GenerationState, LightingState, MaterialState, RenderingState, StageState,
+    GenerationParameters, GenerationState, LightingState, MaterialState, RenderingState,
+    SingleSpawnSourceCursor, StageState,
 };
 use crate::shapes::{
     AttachmentOccupancy, NodeOrigin, ShapeKind, ShapeNode, SpawnAddMode, SpawnAttachment,
@@ -49,6 +50,8 @@ pub(crate) struct GenerationSnapshot {
     pub(crate) spawn_placement_mode: SpawnPlacementMode,
     #[serde(default)]
     pub(crate) spawn_add_mode: SpawnAddMode,
+    #[serde(default = "default_single_attachment_repeat_count")]
+    pub(crate) single_attachment_repeat_count: usize,
     pub(crate) scale_ratio: f32,
     #[serde(default = "unit_axis_scale_array")]
     pub(crate) child_axis_scale: [f32; 3],
@@ -58,6 +61,8 @@ pub(crate) struct GenerationSnapshot {
     pub(crate) child_position_offset: [f32; 3],
     #[serde(default)]
     pub(crate) vertex_spawn_exclusion_probability: f32,
+    #[serde(default)]
+    pub(crate) single_spawn_source_cursor: Option<SingleSpawnSourceCursorSnapshot>,
     pub(crate) nodes: Vec<ShapeNodeSnapshot>,
 }
 
@@ -97,6 +102,15 @@ pub(crate) enum NodeOriginSnapshot {
         #[serde(alias = "vertex_index")]
         attachment_index: usize,
     },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub(crate) struct SingleSpawnSourceCursorSnapshot {
+    pub(crate) parent_index: usize,
+    #[serde(default)]
+    pub(crate) attachment_mode: SpawnPlacementMode,
+    pub(crate) attachment_index: usize,
+    pub(crate) successful_spawns: usize,
 }
 
 impl SceneStateSnapshot {
@@ -221,6 +235,7 @@ impl GenerationSnapshot {
             selected_shape_kind: generation_state.selected_shape_kind,
             spawn_placement_mode: generation_state.spawn_placement_mode,
             spawn_add_mode: generation_state.spawn_add_mode,
+            single_attachment_repeat_count: generation_state.single_attachment_repeat_count,
             scale_ratio: generation_state.scale_ratio_base(),
             child_axis_scale: vec3_to_array(generation_state.child_axis_scale_base()),
             twist_per_vertex_radians: generation_state.twist_per_vertex_radians_base(),
@@ -228,6 +243,9 @@ impl GenerationSnapshot {
             child_position_offset: vec3_to_array(generation_state.child_position_offset_base()),
             vertex_spawn_exclusion_probability: generation_state
                 .vertex_spawn_exclusion_probability_base(),
+            single_spawn_source_cursor: generation_state
+                .single_spawn_source_cursor
+                .map(SingleSpawnSourceCursorSnapshot::capture),
             nodes: generation_state
                 .nodes
                 .iter()
@@ -251,6 +269,11 @@ impl GenerationSnapshot {
             selected_shape_kind: self.selected_shape_kind,
             spawn_placement_mode: self.spawn_placement_mode,
             spawn_add_mode: self.spawn_add_mode,
+            single_attachment_repeat_count: self.single_attachment_repeat_count,
+            single_spawn_source_cursor: self
+                .single_spawn_source_cursor
+                .as_ref()
+                .map(SingleSpawnSourceCursorSnapshot::to_runtime),
             parameters: GenerationParameters::from_base_values_with_axis_scale(
                 self.scale_ratio,
                 vec3_from_array(self.child_axis_scale),
@@ -350,6 +373,28 @@ impl NodeOriginSnapshot {
     }
 }
 
+impl SingleSpawnSourceCursorSnapshot {
+    pub(crate) fn capture(cursor: SingleSpawnSourceCursor) -> Self {
+        Self {
+            parent_index: cursor.parent_index,
+            attachment_mode: cursor.attachment.mode,
+            attachment_index: cursor.attachment.index,
+            successful_spawns: cursor.successful_spawns,
+        }
+    }
+
+    pub(crate) fn to_runtime(&self) -> SingleSpawnSourceCursor {
+        SingleSpawnSourceCursor {
+            parent_index: self.parent_index,
+            attachment: SpawnAttachment {
+                mode: self.attachment_mode,
+                index: self.attachment_index,
+            },
+            successful_spawns: self.successful_spawns,
+        }
+    }
+}
+
 fn vec3_to_array(vector: Vec3) -> [f32; 3] {
     [vector.x, vector.y, vector.z]
 }
@@ -360,6 +405,10 @@ fn vec3_from_array(vector: [f32; 3]) -> Vec3 {
 
 fn unit_axis_scale_array() -> [f32; 3] {
     [1.0, 1.0, 1.0]
+}
+
+fn default_single_attachment_repeat_count() -> usize {
+    1
 }
 
 fn zero_vec3_array() -> [f32; 3] {
@@ -466,8 +515,10 @@ nodes = []
         )
         .expect("generation snapshot should parse");
 
+        assert_eq!(snapshot.single_attachment_repeat_count, 1);
         assert_eq!(snapshot.child_axis_scale, [1.0, 1.0, 1.0]);
         assert_eq!(snapshot.child_position_offset, [0.0, 0.0, 0.0]);
+        assert!(snapshot.single_spawn_source_cursor.is_none());
     }
 
     #[test]

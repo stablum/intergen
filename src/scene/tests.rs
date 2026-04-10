@@ -8,7 +8,8 @@ use crate::shapes::{
 };
 
 use super::{
-    GenerationParameters, GenerationState, alpha_mode_for_opacity, reset_generation_state,
+    GenerationParameters, GenerationState, SingleSpawnSourceCursor, alpha_mode_for_opacity,
+    reset_generation_state,
     root_generation_node,
 };
 
@@ -43,6 +44,15 @@ fn reset_generation_state_restores_root_only() {
         selected_shape_kind: ShapeKind::Octahedron,
         spawn_placement_mode: SpawnPlacementMode::Face,
         spawn_add_mode: SpawnAddMode::FillLevel,
+        single_attachment_repeat_count: 3,
+        single_spawn_source_cursor: Some(SingleSpawnSourceCursor {
+            parent_index: 0,
+            attachment: SpawnAttachment {
+                mode: SpawnPlacementMode::Vertex,
+                index: 0,
+            },
+            successful_spawns: 2,
+        }),
         parameters: GenerationParameters::from_base_values_with_axis_scale(
             0.42,
             Vec3::new(1.25, 0.75, 1.5),
@@ -147,6 +157,8 @@ fn reset_generation_state_restores_root_only() {
         SpawnPlacementMode::Face
     );
     assert_eq!(generation_state.spawn_add_mode, SpawnAddMode::FillLevel);
+    assert_eq!(generation_state.single_attachment_repeat_count, 3);
+    assert!(generation_state.single_spawn_source_cursor.is_none());
     assert!(
         generation_state.nodes[0]
             .occupied_attachments

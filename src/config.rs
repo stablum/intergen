@@ -291,6 +291,7 @@ pub(crate) struct GenerationConfig {
     pub(crate) child_axis_scale_adjust_step: f32,
     pub(crate) min_child_axis_scale: f32,
     pub(crate) max_child_axis_scale: f32,
+    pub(crate) default_single_attachment_repeat_count: usize,
     pub(crate) spawn_hold_delay_secs: f32,
     pub(crate) spawn_repeat_interval_secs: f32,
     pub(crate) fill_mode_lfo_virtual_time_step_secs: f32,
@@ -521,6 +522,7 @@ impl Default for GenerationConfig {
             child_axis_scale_adjust_step: 0.05,
             min_child_axis_scale: 0.01,
             max_child_axis_scale: 100.0,
+            default_single_attachment_repeat_count: 1,
             spawn_hold_delay_secs: 0.24,
             spawn_repeat_interval_secs: 0.07,
             fill_mode_lfo_virtual_time_step_secs: 0.25,
@@ -1094,6 +1096,19 @@ mod tests {
                 .fill_mode_lfo_virtual_time_step_secs_clamped(),
             0.0
         );
+    }
+
+    #[test]
+    fn single_attachment_repeat_count_parses_from_config() {
+        let config = parse_config(
+            r#"
+            [generation]
+            default_single_attachment_repeat_count = 0
+            "#,
+        )
+        .expect("single attachment repeat count config should parse");
+
+        assert_eq!(config.generation.default_single_attachment_repeat_count, 0);
     }
 
     #[test]

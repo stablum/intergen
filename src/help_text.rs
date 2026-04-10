@@ -134,7 +134,7 @@ const PRESET_HELP: [HelpEntry; 1] = [HelpEntry {
     explanation: "In the preset page, save, free slots, load presets, and resolve collisions.",
 }];
 
-const SCENE_HELP: [HelpEntry; 23] = [
+const SCENE_HELP: [HelpEntry; 24] = [
     HelpEntry {
         startup: "Arrow Up/Down pitch camera",
         overlay: "Arrow Up / Down: Pitch camera",
@@ -254,6 +254,12 @@ const SCENE_HELP: [HelpEntry; 23] = [
         overlay: "V / B: Adjust spawn exclusion probability (hold to repeat)",
         binding: "V / B",
         explanation: "Adjust spawn exclusion probability, and hold to repeat.",
+    },
+    HelpEntry {
+        startup: ",/. adjust single-spawn source repeat count",
+        overlay: ", / .: Adjust single-spawn source repeat count",
+        binding: ", / .",
+        explanation: "Adjust how many successful single-mode spawns stay on the current source attachment before advancing.",
     },
     HelpEntry {
         startup: "C resets child outward offset",

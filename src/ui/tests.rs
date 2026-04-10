@@ -61,6 +61,7 @@ fn overlay_text_lists_help_and_spawn_controls() {
     assert!(text.contains("[ / ]: Adjust child twist angle (hold to repeat)"));
     assert!(text.contains("Z / X: Adjust child outward offset (hold to repeat)"));
     assert!(text.contains("V / B: Adjust spawn exclusion probability (hold to repeat)"));
+    assert!(text.contains(", / .: Adjust single-spawn source repeat count"));
     assert!(text.contains("C: Reset child outward offset"));
     assert!(text.contains("N: Reset spawn exclusion probability"));
     assert!(text.contains("T: Reset child twist angle"));
@@ -121,8 +122,8 @@ fn keyboard_help_rows_include_active_and_inactive_keys() {
     assert!(specs.iter().any(|spec| spec.label == "F1" && spec.used));
     assert!(specs.iter().any(|spec| spec.label == "A" && !spec.used));
     assert!(specs.iter().any(|spec| spec.label == "H" && !spec.used));
-    assert!(specs.iter().any(|spec| spec.label == "," && !spec.used));
-    assert!(specs.iter().any(|spec| spec.label == "." && !spec.used));
+    assert!(specs.iter().any(|spec| spec.label == "," && spec.used));
+    assert!(specs.iter().any(|spec| spec.label == "." && spec.used));
     assert!(specs.iter().any(|spec| spec.label == "F11" && !spec.used));
     assert!(
         KEYBOARD_TOP_LETTER_ROW

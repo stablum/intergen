@@ -233,8 +233,17 @@ pub(crate) struct GenerationState {
     pub(crate) selected_shape_kind: ShapeKind,
     pub(crate) spawn_placement_mode: SpawnPlacementMode,
     pub(crate) spawn_add_mode: SpawnAddMode,
+    pub(crate) single_attachment_repeat_count: usize,
+    pub(crate) single_spawn_source_cursor: Option<SingleSpawnSourceCursor>,
     pub(crate) parameters: GenerationParameters,
     pub(crate) spawn_hold: HoldRepeatState,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SingleSpawnSourceCursor {
+    pub(crate) parent_index: usize,
+    pub(crate) attachment: SpawnAttachment,
+    pub(crate) successful_spawns: usize,
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -248,6 +257,8 @@ impl GenerationState {
             selected_shape_kind: generation_config.default_child_shape_kind,
             spawn_placement_mode: generation_config.default_spawn_placement_mode,
             spawn_add_mode: SpawnAddMode::default(),
+            single_attachment_repeat_count: generation_config.default_single_attachment_repeat_count,
+            single_spawn_source_cursor: None,
             parameters: GenerationParameters::from_config(generation_config),
             spawn_hold: HoldRepeatState::default(),
         }
@@ -332,6 +343,43 @@ impl GenerationState {
     pub(crate) fn spawn_tuning(&self, generation_config: &GenerationConfig) -> SpawnTuning {
         self.parameters
             .spawn_tuning(generation_config, self.spawn_placement_mode)
+    }
+
+    pub(crate) fn finalize_single_spawn_source_cursor(&mut self) {
+        let Some(cursor) = self.single_spawn_source_cursor.take() else {
+            return;
+        };
+        let Some(parent) = self.nodes.get_mut(cursor.parent_index) else {
+            return;
+        };
+        let occupied = match cursor.attachment.mode {
+            SpawnPlacementMode::Vertex => &mut parent.occupied_attachments.vertices,
+            SpawnPlacementMode::Edge => &mut parent.occupied_attachments.edges,
+            SpawnPlacementMode::Face => &mut parent.occupied_attachments.faces,
+        };
+        if cursor.attachment.index < occupied.len() {
+            occupied[cursor.attachment.index] = true;
+        }
+    }
+
+    pub(crate) fn reset_single_spawn_source_cursor(&mut self) {
+        self.single_spawn_source_cursor = None;
+    }
+
+    pub(crate) fn single_spawn_source_cursor_is_valid(&self) -> bool {
+        let Some(cursor) = self.single_spawn_source_cursor else {
+            return false;
+        };
+        let Some(parent) = self.nodes.get(cursor.parent_index) else {
+            return false;
+        };
+        let occupied = match cursor.attachment.mode {
+            SpawnPlacementMode::Vertex => &parent.occupied_attachments.vertices,
+            SpawnPlacementMode::Edge => &parent.occupied_attachments.edges,
+            SpawnPlacementMode::Face => &parent.occupied_attachments.faces,
+        };
+
+        cursor.attachment.mode == self.spawn_placement_mode && cursor.attachment.index < occupied.len()
     }
 }
 
@@ -669,6 +717,7 @@ pub(crate) fn reset_generation_state(
     );
     generation_state.nodes = vec![root.clone()];
     generation_state.spawn_hold.reset();
+    generation_state.reset_single_spawn_source_cursor();
     generation_state.parameters.clear_runtime_state();
     root
 }

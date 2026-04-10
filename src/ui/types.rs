@@ -113,8 +113,8 @@ const KEYBOARD_BOTTOM_LETTER_ROW: [KeyboardHelpKeySpec; 12] = [
     keyboard_help_key("B", 1.0, true, "Increase spawn exclusion probability."),
     keyboard_help_key("N", 1.0, true, "Reset spawn exclusion probability."),
     keyboard_help_key("M", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
-    keyboard_help_key(",", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
-    keyboard_help_key(".", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
+    keyboard_help_key(",", 1.0, true, "Decrease single-spawn source repeat count."),
+    keyboard_help_key(".", 1.0, true, "Increase single-spawn source repeat count."),
     keyboard_help_key("/", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("Shift", 2.3, false, KEYBOARD_HELP_UNUSED_TEXT),
 ];
