@@ -346,17 +346,9 @@ fn find_next_spawn(
                     tuning,
                 });
 
-                if is_fully_contained(
-                    candidate.center,
-                    candidate.radius,
-                    nodes,
-                    tuning.containment_epsilon,
-                ) || contains_existing(
-                    candidate.center,
-                    candidate.radius,
-                    nodes,
-                    tuning.containment_epsilon,
-                ) {
+                if is_fully_contained(&candidate, nodes, shapes, tuning.containment_epsilon)
+                    || contains_existing(&candidate, nodes, shapes, tuning.containment_epsilon)
+                {
                     continue;
                 }
 
@@ -596,39 +588,111 @@ fn transformed_attachment_anchor(
 ) -> (Vec3, Vec3) {
     let anchor_local = parent_geometry.attachment_anchor(attachment.mode, attachment.index);
     let scaled_anchor_local = anchor_local * parent.combined_scale();
-    let outward_local = if scaled_anchor_local.length_squared() > 1.0e-12 {
-        scaled_anchor_local.normalize()
-    } else {
-        parent_geometry.attachment_direction(attachment.mode, attachment.index)
-    };
-    let outward = parent.rotation * outward_local;
-    let world_anchor = parent.center + outward * parent.radius;
+    let world_anchor = parent.center + parent.rotation * scaled_anchor_local;
+    let outward = safe_normalize(
+        world_anchor - parent.center,
+        parent.rotation * parent_geometry.attachment_direction(attachment.mode, attachment.index),
+    );
 
     (world_anchor, outward)
 }
 
 fn is_fully_contained(
-    center: Vec3,
-    radius: f32,
+    candidate: &ShapeNode,
     nodes: &[ShapeNode],
+    shapes: &ShapeCatalog,
     containment_epsilon: f32,
 ) -> bool {
+    let candidate_geometry = shapes.geometry(candidate.kind);
+    let candidate_vertices = transformed_vertices(candidate, candidate_geometry);
+
     nodes.iter().any(|node| {
-        let distance = center.distance(node.center);
-        distance + radius <= node.radius - containment_epsilon
+        let distance = candidate.center.distance(node.center);
+        if distance + candidate.radius > node.radius - containment_epsilon {
+            return false;
+        }
+
+        fully_contains_transformed_vertices(
+            node,
+            shapes.geometry(node.kind),
+            &candidate_vertices,
+            containment_epsilon,
+        )
     })
 }
 
 fn contains_existing(
-    center: Vec3,
-    radius: f32,
+    candidate: &ShapeNode,
     nodes: &[ShapeNode],
+    shapes: &ShapeCatalog,
     containment_epsilon: f32,
 ) -> bool {
     nodes.iter().any(|node| {
-        let distance = center.distance(node.center);
-        distance + node.radius <= radius - containment_epsilon
+        let distance = candidate.center.distance(node.center);
+        if distance + node.radius > candidate.radius - containment_epsilon {
+            return false;
+        }
+
+        let node_geometry = shapes.geometry(node.kind);
+        let node_vertices = transformed_vertices(node, node_geometry);
+        fully_contains_transformed_vertices(
+            candidate,
+            shapes.geometry(candidate.kind),
+            &node_vertices,
+            containment_epsilon,
+        )
     })
+}
+
+fn transformed_vertices(node: &ShapeNode, geometry: &ShapeGeometry) -> Vec<Vec3> {
+    geometry
+        .vertices
+        .iter()
+        .map(|vertex| node.center + node.rotation * (*vertex * node.combined_scale()))
+        .collect()
+}
+
+fn fully_contains_transformed_vertices(
+    container: &ShapeNode,
+    container_geometry: &ShapeGeometry,
+    vertices: &[Vec3],
+    containment_epsilon: f32,
+) -> bool {
+    vertices.iter().all(|vertex| {
+        point_is_inside_node(*vertex, container, container_geometry, containment_epsilon)
+    })
+}
+
+fn point_is_inside_node(
+    point: Vec3,
+    node: &ShapeNode,
+    geometry: &ShapeGeometry,
+    containment_epsilon: f32,
+) -> bool {
+    geometry.faces.iter().all(|face| {
+        let face_vertices: Vec<Vec3> = face
+            .iter()
+            .map(|index| {
+                node.center + node.rotation * (geometry.vertices[*index] * node.combined_scale())
+            })
+            .collect();
+        let outward = outward_face_normal(&face_vertices, node.center);
+        (point - face_vertices[0]).dot(outward) <= -containment_epsilon
+    })
+}
+
+fn outward_face_normal(vertices: &[Vec3], center: Vec3) -> Vec3 {
+    let mut normal = Vec3::ZERO;
+    for triangle in 1..vertices.len() - 1 {
+        normal += (vertices[triangle] - vertices[0]).cross(vertices[triangle + 1] - vertices[0]);
+    }
+    let normal = normal.normalize_or_zero();
+    let face_center = vertices.iter().copied().sum::<Vec3>() / vertices.len() as f32;
+    if normal.dot(face_center - center) >= 0.0 {
+        normal
+    } else {
+        -normal
+    }
 }
 
 #[cfg(test)]
@@ -717,6 +781,7 @@ mod tests {
 
     #[test]
     fn full_containment_is_rejected() {
+        let shapes = ShapeCatalog::new();
         let nodes = vec![ShapeNode {
             kind: ShapeKind::Cube,
             level: 0,
@@ -729,23 +794,27 @@ mod tests {
             occupied_attachments: AttachmentOccupancy::default(),
             origin: NodeOrigin::Root,
         }];
+        let mut contained = root_node(ShapeKind::Cube, 0.3, &shapes);
+        contained.center = Vec3::new(0.5, 0.0, 0.0);
+        let mut outside = root_node(ShapeKind::Cube, 0.3, &shapes);
+        outside.center = Vec3::new(5.0, 0.0, 0.0);
 
         assert!(is_fully_contained(
-            Vec3::new(0.5, 0.0, 0.0),
-            1.0,
+            &contained,
             &nodes,
+            &shapes,
             test_tuning().containment_epsilon,
         ));
         assert!(!is_fully_contained(
-            Vec3::new(5.0, 0.0, 0.0),
-            1.0,
+            &outside,
             &nodes,
+            &shapes,
             test_tuning().containment_epsilon,
         ));
     }
 
     #[test]
-    fn spawned_child_center_matches_parent_vertex_position() {
+    fn spawned_child_center_matches_parent_vertex_anchor() {
         let shapes = ShapeCatalog::new();
         let parent_rotation = Quat::from_euler(EulerRot::YXZ, 0.45, -0.3, 0.2);
         let parent_center = Vec3::new(1.5, -0.75, 2.25);
@@ -775,15 +844,14 @@ mod tests {
         .expect("spawn should succeed");
         let expected_center = parent_center
             + parent_rotation
-                * (parent_geometry.attachment_direction(SpawnPlacementMode::Vertex, 0)
-                    * parent_geometry.radius
-                    * parent_scale);
+                * (parent_geometry.attachment_anchor(SpawnPlacementMode::Vertex, 0)
+                    * Vec3::splat(parent_scale));
 
         assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
     }
 
     #[test]
-    fn spawned_child_center_matches_parent_edge_ray() {
+    fn spawned_child_center_matches_parent_edge_anchor() {
         let shapes = ShapeCatalog::new();
         let parent_geometry = shapes.geometry(ShapeKind::Cube);
         let mut nodes = vec![ShapeNode {
@@ -811,17 +879,15 @@ mod tests {
         )
         .expect("spawn should succeed");
         let expected_center = nodes[0].center
-            + (nodes[0].rotation
+            + nodes[0].rotation
                 * (parent_geometry.attachment_anchor(SpawnPlacementMode::Edge, 0)
-                    * nodes[0].combined_scale()))
-            .normalize()
-                * nodes[0].radius;
+                    * nodes[0].combined_scale());
 
         assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
     }
 
     #[test]
-    fn spawned_child_center_matches_parent_face_ray() {
+    fn spawned_child_center_matches_parent_face_anchor() {
         let shapes = ShapeCatalog::new();
         let parent_geometry = shapes.geometry(ShapeKind::Cube);
         let mut nodes = vec![ShapeNode {
@@ -849,11 +915,9 @@ mod tests {
         )
         .expect("spawn should succeed");
         let expected_center = nodes[0].center
-            + (nodes[0].rotation
+            + nodes[0].rotation
                 * (parent_geometry.attachment_anchor(SpawnPlacementMode::Face, 0)
-                    * nodes[0].combined_scale()))
-            .normalize()
-                * nodes[0].radius;
+                    * nodes[0].combined_scale());
 
         assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
     }
@@ -892,11 +956,11 @@ mod tests {
             },
         )
         .expect("spawn should succeed");
-        let outward = (nodes[0].rotation
-            * (parent_geometry.attachment_anchor(SpawnPlacementMode::Vertex, 0)
-                * nodes[0].combined_scale()))
-        .normalize();
-        let world_anchor = nodes[0].center + outward * nodes[0].radius;
+        let world_anchor = nodes[0].center
+            + nodes[0].rotation
+                * (parent_geometry.attachment_anchor(SpawnPlacementMode::Vertex, 0)
+                    * nodes[0].combined_scale());
+        let outward = (world_anchor - nodes[0].center).normalize();
         let child_radius = child_geometry.radius * parent_scale * scale_ratio;
         let expected_center = world_anchor + outward * child_radius * vertex_offset_ratio;
 
@@ -1021,7 +1085,7 @@ mod tests {
     }
 
     #[test]
-    fn spawned_child_center_uses_transformed_face_ray_for_non_uniform_parent_scale() {
+    fn spawned_child_center_uses_transformed_face_anchor_for_non_uniform_parent_scale() {
         let shapes = ShapeCatalog::new();
         let parent_geometry = shapes.geometry(ShapeKind::Cube);
         let parent_rotation = Quat::from_euler(EulerRot::YXZ, 0.25, -0.4, 0.1);
@@ -1045,13 +1109,38 @@ mod tests {
         )
         .expect("spawn should succeed");
         let expected_center = nodes[0].center
-            + (nodes[0].rotation
+            + nodes[0].rotation
                 * (parent_geometry.attachment_anchor(SpawnPlacementMode::Face, 0)
-                    * nodes[0].combined_scale()))
-            .normalize()
-                * nodes[0].radius;
+                    * nodes[0].combined_scale());
 
         assert!(spawn.node.center.distance(expected_center) <= 1.0e-5);
+    }
+
+    #[test]
+    fn reduced_child_axis_scale_keeps_face_spawn_intersecting_parent() {
+        let shapes = ShapeCatalog::new();
+        let parent_geometry = shapes.geometry(ShapeKind::Cube);
+        let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
+
+        let spawn = next_spawn(
+            &mut nodes,
+            &shapes,
+            ShapeKind::Tetrahedron,
+            0.35,
+            SpawnTuning {
+                child_axis_scale: Vec3::new(0.2, 0.2, 1.0),
+                spawn_placement_mode: SpawnPlacementMode::Face,
+                ..test_tuning()
+            },
+        )
+        .expect("spawn should succeed");
+        let child_vertices = transformed_vertices(&spawn.node, shapes.geometry(spawn.node.kind));
+
+        assert!(
+            child_vertices
+                .iter()
+                .any(|vertex| { point_is_inside_node(*vertex, &nodes[0], parent_geometry, 0.0) })
+        );
     }
 
     #[test]
