@@ -33,26 +33,36 @@ impl RecentChangesState {
         label: impl Into<String>,
         value: impl Into<String>,
         now_secs: f32,
-    ) {
+    ) -> bool {
         let label = label.into();
         let value = value.into();
-        if label.trim().is_empty() {
-            return;
+        let Some((label, value)) = normalized_change_entry(label, value) else {
+            return false;
+        };
+
+        self.upsert(label, value, now_secs);
+        true
+    }
+
+    pub(crate) fn record_throttled(
+        &mut self,
+        label: impl Into<String>,
+        value: impl Into<String>,
+        now_secs: f32,
+        min_interval_secs: f32,
+    ) -> bool {
+        let label = label.into();
+        let value = value.into();
+        let Some((label, value)) = normalized_change_entry(label, value) else {
+            return false;
+        };
+
+        if self.is_throttled(&label, now_secs, min_interval_secs.max(0.0)) {
+            return false;
         }
 
-        if let Some(existing_index) = self.entries.iter().position(|entry| entry.label == label) {
-            self.entries.remove(existing_index);
-        }
-
-        self.entries.insert(
-            0,
-            RecentChangeEntry {
-                label,
-                value,
-                changed_at_secs: now_secs,
-            },
-        );
-        self.entries.truncate(MAX_RECENT_CHANGES);
+        self.upsert(label, value, now_secs);
+        true
     }
 
     pub(crate) fn record_status_message(&mut self, message: impl Into<String>, now_secs: f32) {
@@ -83,6 +93,43 @@ impl RecentChangesState {
             rows,
         }
     }
+
+    fn is_throttled(&self, label: &str, now_secs: f32, min_interval_secs: f32) -> bool {
+        if min_interval_secs <= 0.0 {
+            return false;
+        }
+
+        self.entries.iter().any(|entry| {
+            entry.label == label
+                && now_secs >= entry.changed_at_secs
+                && now_secs - entry.changed_at_secs < min_interval_secs
+        })
+    }
+
+    fn upsert(&mut self, label: String, value: String, now_secs: f32) {
+        if let Some(existing_index) = self.entries.iter().position(|entry| entry.label == label) {
+            self.entries.remove(existing_index);
+        }
+
+        self.entries.insert(
+            0,
+            RecentChangeEntry {
+                label,
+                value,
+                changed_at_secs: now_secs,
+            },
+        );
+        self.entries.truncate(MAX_RECENT_CHANGES);
+    }
+}
+
+fn normalized_change_entry(label: String, value: String) -> Option<(String, String)> {
+    let label = label.trim().to_string();
+    if label.is_empty() {
+        return None;
+    }
+
+    Some((label, value.trim().to_string()))
 }
 
 #[cfg(test)]
@@ -138,5 +185,31 @@ mod tests {
 
         assert_eq!(snapshot.rows[0].label, "Child scale ratio");
         assert_eq!(snapshot.rows[0].value, "0.62");
+    }
+
+    #[test]
+    fn throttled_recording_keeps_the_previous_value_inside_the_interval() {
+        let mut changes = RecentChangesState::default();
+        assert!(changes.record_throttled("camera.zoom_velocity", "-0.20", 1.0, 0.25));
+        assert!(!changes.record_throttled("camera.zoom_velocity", "-0.40", 1.1, 0.25));
+
+        let snapshot = changes.snapshot(1.1);
+
+        assert_eq!(snapshot.rows.len(), 1);
+        assert_eq!(snapshot.rows[0].label, "camera.zoom_velocity");
+        assert_eq!(snapshot.rows[0].value, "-0.20");
+    }
+
+    #[test]
+    fn throttled_recording_updates_after_the_interval() {
+        let mut changes = RecentChangesState::default();
+        assert!(changes.record_throttled("camera.zoom_velocity", "-0.20", 1.0, 0.25));
+        assert!(changes.record_throttled("camera.zoom_velocity", "-0.40", 1.3, 0.25));
+
+        let snapshot = changes.snapshot(1.3);
+
+        assert_eq!(snapshot.rows.len(), 1);
+        assert_eq!(snapshot.rows[0].label, "camera.zoom_velocity");
+        assert_eq!(snapshot.rows[0].value, "-0.40");
     }
 }

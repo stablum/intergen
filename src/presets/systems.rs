@@ -10,6 +10,7 @@ use crate::camera::{CameraRig, sync_scene_camera_transform};
 use crate::config::AppConfig;
 use crate::control_page::{ControlPage, ControlPageState};
 use crate::effect_tuner::EffectTunerState;
+use crate::recent_changes::RecentChangesState;
 use crate::runtime_scene::SceneMutationAccess;
 use crate::scene::{
     GenerationState, LightingState, MaterialState, RenderingState, StageState,
@@ -51,13 +52,17 @@ pub(crate) fn automated_scene_preset_load_system(
 
 pub(crate) fn preset_input_system(
     keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
     control_page: Res<ControlPageState>,
     mut preset_browser: ResMut<PresetBrowserState>,
+    mut recent_changes: ResMut<RecentChangesState>,
     mut scene: SceneMutationAccess,
 ) {
     if !control_page.is_active(ControlPage::ScenePresets) {
         return;
     }
+
+    let now_secs = time.elapsed_secs();
 
     if let Some(chooser) = preset_browser.chooser.as_mut() {
         if keys.just_pressed(KeyCode::ArrowUp) && chooser.selected > 0 {
@@ -68,7 +73,12 @@ pub(crate) fn preset_input_system(
             chooser.selected += 1;
         }
         if keys.just_pressed(KeyCode::Enter) {
-            match resolve_collision(&mut preset_browser, &mut scene) {
+            match resolve_collision(
+                &mut preset_browser,
+                &mut recent_changes,
+                &mut scene,
+                now_secs,
+            ) {
                 Ok(Some(message)) => println!("{message}"),
                 Ok(None) => {}
                 Err(error) => eprintln!("{error}"),
@@ -95,7 +105,13 @@ pub(crate) fn preset_input_system(
     };
 
     let result = match preset_browser.command {
-        PresetCommand::Load => load_assigned_preset(&mut preset_browser, index, &mut scene),
+        PresetCommand::Load => load_assigned_preset(
+            &mut preset_browser,
+            index,
+            &mut recent_changes,
+            &mut scene,
+            now_secs,
+        ),
         PresetCommand::Save => save_scene_preset(
             &mut preset_browser,
             index,
@@ -121,7 +137,9 @@ pub(crate) fn preset_input_system(
 fn load_assigned_preset(
     preset_browser: &mut PresetBrowserState,
     index: PresetIndex,
+    recent_changes: &mut RecentChangesState,
     scene: &mut SceneMutationAccess<'_, '_>,
+    now_secs: f32,
 ) -> Result<Option<String>, String> {
     let records = preset_browser.records_for_index(index);
     if records.is_empty() {
@@ -141,6 +159,7 @@ fn load_assigned_preset(
     let record = &records[0];
     apply_scene_preset(&record.file.scene, scene)?;
     preset_browser.highlight_index(index);
+    record_scene_preset_load(recent_changes, index, now_secs);
     Ok(finish_with_status(
         preset_browser,
         format!(
@@ -224,7 +243,9 @@ fn free_assigned_slot(
 
 fn resolve_collision(
     preset_browser: &mut PresetBrowserState,
+    recent_changes: &mut RecentChangesState,
     scene: &mut SceneMutationAccess<'_, '_>,
+    now_secs: f32,
 ) -> Result<Option<String>, String> {
     let Some(chooser) = preset_browser.chooser.take() else {
         return Ok(None);
@@ -252,6 +273,7 @@ fn resolve_collision(
     if chooser.load_after_resolution {
         apply_scene_preset(&chosen.file.scene, scene)?;
         preset_browser.highlight_index(chooser.index);
+        record_scene_preset_load(recent_changes, chooser.index, now_secs);
     }
 
     Ok(finish_with_status(
@@ -262,6 +284,14 @@ fn resolve_collision(
             chosen.file.summary
         ),
     ))
+}
+
+fn record_scene_preset_load(
+    recent_changes: &mut RecentChangesState,
+    index: PresetIndex,
+    now_secs: f32,
+) {
+    recent_changes.record("Scene preset", format!("loaded {}", index.code()), now_secs);
 }
 
 fn apply_scene_preset(

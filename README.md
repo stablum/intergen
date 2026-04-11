@@ -33,7 +33,7 @@ The current prototype focuses on a fast local development loop and a usable vert
 - adjustable child scale ratio
 - two-step in-app help overlay with text controls plus a hoverable neutral-mode keyboard map
 - pinned F2 control pages for shader FX toggles/LFOs and scene, stage, and material runtime parameters, including group selection, scrolling lists, and direct numeric entry
-- F5 recent-changes page for monitoring interactive parameter edits without treating LFO modulation as a change
+- F5 recent-changes page for monitoring interactive parameter edits, camera momentum controls, and preset loads without treating LFO modulation as a change
 - built-in screenshot capture for manual and scripted verification
 - scene preset save/load/free workflow with 100 slots and collision resolution
 - Blender `.blend` export with compositor reconstruction and embedded effect/LFO metadata
@@ -166,6 +166,7 @@ The in-app F2 control page starts from the values loaded from `config.toml` at l
 - Shader-effect parameters expose LFO fields, and so do the supported numeric scene/runtime parameters, including live scene updates and generation values that only take effect during future spawning. Other scene, stage, and material controls remain value-only.
 - In fill-current-level spawn mode, each successfully spawned child advances a virtual LFO sample time by `generation.fill_mode_lfo_virtual_time_step_secs`, so spawn-time generation LFOs can vary across one batch without waiting for real time to pass.
 - `F5` toggles a recent interactive changes page. It keeps the last changed parameter visible and also lists any other parameters changed in the last few seconds.
+- Continuous manual controls such as held camera or tuner keys are coalesced so the page updates without flooding its history.
 - LFO modulation updates are not counted as F5 changes; only explicit interactive edits are recorded.
 - `Esc` closes the current F-page, including help, F2, F3, or F5.
 - The tuner does not write changes back to `config.toml` automatically.
