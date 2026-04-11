@@ -607,7 +607,12 @@ pub(crate) fn update_recent_changes_overlay_system(
         ),
     >,
     mut row_query: Query<
-        (&RecentChangesRow, &mut Visibility, &mut BackgroundColor),
+        (
+            &RecentChangesRow,
+            &mut Visibility,
+            &mut Node,
+            &mut BackgroundColor,
+        ),
         (Without<RecentChangesOverlay>, Without<RecentChangesWindowText>),
     >,
     mut row_text_query: Query<
@@ -617,6 +622,7 @@ pub(crate) fn update_recent_changes_overlay_system(
 ) {
     let now_secs = time.elapsed_secs();
     let snapshot = recent_changes.snapshot(now_secs);
+    let display_rows = recent_changes_display_rows(&snapshot);
     let ui_config = &view.app_config.ui;
     let visible = control_page.page_has_focus(ControlPage::RecentChanges);
 
@@ -637,19 +643,24 @@ pub(crate) fn update_recent_changes_overlay_system(
     let Ok(mut window_text) = window_text_query.single_mut() else {
         return;
     };
-    *window_text = if snapshot.rows.len() <= 1 {
+    *window_text = if display_rows.len() <= 1 {
         Text::new("LAST INTERACTIVE CHANGE")
     } else {
         Text::new(format!(
-            "RECENT INTERACTIVE CHANGES < {:.0}s",
+            "RECENT INTERACTIVE CHANGES A-Z < {:.0}s",
             snapshot.timeout_secs
         ))
     };
 
-    let placeholder_visible = snapshot.rows.is_empty();
-    for (row, mut visibility, mut background) in row_query.iter_mut() {
-        let has_row = snapshot.rows.get(row.0).is_some();
+    let placeholder_visible = display_rows.is_empty();
+    for (row, mut visibility, mut node, mut background) in row_query.iter_mut() {
+        let has_row = display_rows.get(row.0).is_some();
         let visible_row = has_row || (placeholder_visible && row.0 == 0);
+        node.display = if visible_row {
+            Display::Flex
+        } else {
+            Display::None
+        };
         *visibility = if visible_row {
             Visibility::Visible
         } else {
@@ -672,7 +683,7 @@ pub(crate) fn update_recent_changes_overlay_system(
             continue;
         }
 
-        let Some(row_snapshot) = snapshot.rows.get(text_meta.slot) else {
+        let Some(row_snapshot) = display_rows.get(text_meta.slot) else {
             *text = Text::new("");
             *text_color = TextColor(srgb(ui_config.body_text));
             continue;
@@ -687,6 +698,21 @@ pub(crate) fn update_recent_changes_overlay_system(
             RecentChangesRowTextKind::Value => srgb(ui_config.body_text),
         });
     }
+}
+
+fn recent_changes_display_rows(
+    snapshot: &crate::recent_changes::RecentChangesSnapshot,
+) -> Vec<crate::recent_changes::RecentChangeSnapshotRow> {
+    let mut rows = snapshot.rows.clone();
+    rows.sort_by(|left, right| {
+        left.label
+            .to_ascii_lowercase()
+            .cmp(&right.label.to_ascii_lowercase())
+            .then_with(|| left.label.cmp(&right.label))
+            .then_with(|| left.value.cmp(&right.value))
+    });
+    rows.truncate(RECENT_CHANGES_VISIBLE_ROWS);
+    rows
 }
 
 pub(crate) fn update_preset_overlay_system(

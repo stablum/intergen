@@ -6,6 +6,10 @@ fn control_page_secondary_bottom(ui_config: &UiConfig) -> f32 {
     control_page_bottom(ui_config) + ui_config.hint_padding_y * 2.0 + ui_config.hint_font_size + 8.0
 }
 
+fn recent_changes_bottom(ui_config: &UiConfig) -> f32 {
+    (control_page_bottom(ui_config) * 0.5).max(6.0)
+}
+
 fn effect_tuner_text_layout(justify: Justify) -> TextLayout {
     TextLayout::new_with_justify(justify).with_no_wrap()
 }

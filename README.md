@@ -166,6 +166,7 @@ The in-app F2 control page starts from the values loaded from `config.toml` at l
 - Shader-effect parameters expose LFO fields, and so do the supported numeric scene/runtime parameters, including live scene updates and generation values that only take effect during future spawning. Other scene, stage, and material controls remain value-only.
 - In fill-current-level spawn mode, each successfully spawned child advances a virtual LFO sample time by `generation.fill_mode_lfo_virtual_time_step_secs`, so spawn-time generation LFOs can vary across one batch without waiting for real time to pass.
 - `F5` toggles a recent interactive changes page. It keeps the last changed parameter visible and also lists any other parameters changed in the last few seconds.
+- The F5 page renders visible changes alphabetically near the bottom of the screen, growing upward as more changed parameters are shown.
 - Continuous manual controls such as held camera or tuner keys are coalesced so the page updates without flooding its history.
 - LFO modulation updates are not counted as F5 changes; only explicit interactive edits are recorded.
 - `Esc` closes the current F-page, including help, F2, F3, or F5.

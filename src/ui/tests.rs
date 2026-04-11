@@ -5,8 +5,9 @@ use super::{
     controls_overlay_text, effect_tuner_lfo_state_width, effect_tuner_live_value_width,
     effect_tuner_numeric_field_width, effect_tuner_parameter_label_chars,
     effect_tuner_shape_label_chars, effect_tuner_text_width, font_status_line,
-    help_overlay_binding_fragments,
+    help_overlay_binding_fragments, recent_changes_bottom, recent_changes_display_rows,
 };
+use crate::recent_changes::{RecentChangeSnapshotRow, RecentChangesSnapshot};
 
 #[test]
 fn overlay_text_lists_help_and_spawn_controls() {
@@ -181,6 +182,42 @@ fn control_pages_share_the_same_bottom_anchor() {
     assert_eq!(
         control_page_secondary_bottom(&ui_config),
         ui_config.hint_top + 38.0
+    );
+}
+
+#[test]
+fn recent_changes_panel_sits_below_standard_control_pages() {
+    let ui_config = crate::config::UiConfig::default();
+
+    assert!(recent_changes_bottom(&ui_config) < control_page_bottom(&ui_config));
+    assert!(recent_changes_bottom(&ui_config) >= 6.0);
+}
+
+#[test]
+fn recent_changes_display_rows_are_alphabetical() {
+    let snapshot = RecentChangesSnapshot {
+        timeout_secs: 6.0,
+        rows: vec![
+            RecentChangeSnapshotRow {
+                label: "camera.zoom_velocity".to_string(),
+                value: "+0.20".to_string(),
+            },
+            RecentChangeSnapshotRow {
+                label: "Child scale ratio".to_string(),
+                value: "0.58".to_string(),
+            },
+            RecentChangeSnapshotRow {
+                label: "Bloom effect".to_string(),
+                value: "ON".to_string(),
+            },
+        ],
+    };
+
+    let rows = recent_changes_display_rows(&snapshot);
+
+    assert_eq!(
+        rows.iter().map(|row| row.label.as_str()).collect::<Vec<_>>(),
+        vec!["Bloom effect", "camera.zoom_velocity", "Child scale ratio"]
     );
 }
 

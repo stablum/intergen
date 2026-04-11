@@ -994,7 +994,7 @@ fn spawn_recent_changes_overlay(
                 position_type: PositionType::Absolute,
                 left: px(ui_config.hint_left),
                 right: px(ui_config.hint_left),
-                bottom: px(control_page_bottom(ui_config)),
+                bottom: px(recent_changes_bottom(ui_config)),
                 justify_content: JustifyContent::Center,
                 ..default()
             },
