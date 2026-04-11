@@ -120,10 +120,10 @@ const FX_HELP: [HelpEntry; 14] = [
         explanation: "In the F2 compact or list page, use fine adjustment.",
     },
     HelpEntry {
-        startup: "Enter confirms typed input or resets the field",
-        overlay: "In F2 compact or list page: Enter confirms typed input, or resets the selected field when no numeric input is active",
+        startup: "Enter confirms typed F2 input",
+        overlay: "In F2 compact or list page: Enter confirms typed numeric input",
         binding: "Enter",
-        explanation: "In the F2 compact or list page, confirm typed numeric input, or reset the selected field when no numeric input is active.",
+        explanation: "In the F2 compact or list page, confirm typed numeric input.",
     },
     HelpEntry {
         startup: "Shift+Enter resets all F2 controls",

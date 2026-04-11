@@ -286,7 +286,7 @@ cargo test-plain
 - `L` in F2: toggle the selected parameter LFO on or off when supported
 - `Shift` in F2: coarse adjustment modifier
 - `Alt` in F2: fine adjustment modifier
-- `Enter` in F2 compact or parameter-list pages: confirm typed numeric input, or reset the active F2 field when no numeric input is active
+- `Enter` in F2 compact or parameter-list pages: confirm typed numeric input
 - `Shift + Enter` in F2: reset all F2 controls to their startup defaults
 - `F12`: save a screenshot to `screenshots/`
 - `R`: reset the scene with the currently selected shape as the new root

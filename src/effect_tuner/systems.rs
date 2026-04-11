@@ -360,43 +360,6 @@ pub(crate) fn effect_tuner_input_system(
                     now_secs,
                 )
             );
-        } else {
-            let selected_parameter = effect_tuner.selected_parameter();
-            if editing_selected_value {
-                restore_selected_scene_parameter_base_if_needed(&mut effect_tuner, &mut scene);
-            }
-            {
-                let mut context = effect_tuner_edit_context(
-                    &scene.app_config,
-                    &mut scene.camera_rig,
-                    &mut scene.generation_state,
-                    &mut scene.rendering_state,
-                    &mut scene.lighting_state,
-                    &mut scene.material_state,
-                    &mut scene.stage_state,
-                );
-                effect_tuner.reset_selected(&mut context, now_secs);
-            }
-            if editing_selected_value {
-                apply_selected_parameter_side_effects(selected_parameter, &mut scene);
-                sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
-            }
-            record_selected_change(&effect_tuner, &scene, &mut recent_changes, now_secs);
-            println!(
-                "Reset {}.",
-                effect_tuner.selected_status_message(
-                    &effect_tuner_view_context(
-                        &scene.app_config,
-                        &scene.camera_rig,
-                        &scene.generation_state,
-                        &scene.rendering_state,
-                        &scene.lighting_state,
-                        &scene.material_state,
-                        &scene.stage_state,
-                    ),
-                    now_secs,
-                )
-            );
         }
     }
 

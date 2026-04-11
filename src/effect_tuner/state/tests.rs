@@ -4,7 +4,7 @@ use crate::config::{
     CameraConfig, EffectGroup, EffectsConfig, GenerationConfig, LightingConfig, MaterialConfig,
     MaterialSurfaceMode, RenderingConfig, StageConfig,
 };
-use crate::effect_tuner::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LfoShape};
+use crate::effect_tuner::lfo::LfoShape;
 use crate::effect_tuner::metadata::{EffectEditMode, EffectOverlayField};
 use crate::parameters::GenerationParameter;
 use crate::{camera::CameraRig, scene::{GenerationState, LightingState, MaterialState, RenderingState, StageState}};
@@ -318,39 +318,6 @@ fn group_list_overlay_snapshot_filters_to_the_selected_group() {
     assert!(snapshot.rows.iter().all(|row| row.effect_label == "scene"));
     assert!(snapshot.window_text.starts_with("scene "));
     assert_eq!(snapshot.detail.effect_label, "scene");
-}
-
-#[test]
-fn reset_selected_restores_lfo_frequency_default() {
-    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
-    let (
-        generation_config,
-        mut generation_state,
-        material_config,
-        mut material_state,
-        stage_config,
-        mut stage_state,
-    ) = default_scene_state();
-    effect_tuner.selected_index = 16;
-    effect_tuner.edit_mode = EffectEditMode::LfoFrequency;
-    effect_tuner.selected_lfo_mut().frequency_hz = 3.0;
-
-    effect_tuner.reset_selected(
-        &mut edit_context(
-            &generation_config,
-            &mut generation_state,
-            &material_config,
-            &mut material_state,
-            &stage_config,
-            &mut stage_state,
-        ),
-        1.0,
-    );
-
-    assert_eq!(
-        effect_tuner.selected_lfo().frequency_hz,
-        DEFAULT_LFO_FREQUENCY_HZ
-    );
 }
 
 #[test]
@@ -939,6 +906,7 @@ fn finalizing_numeric_entry_keeps_the_typed_value() {
     assert!(effect_tuner.has_numeric_entry());
     assert!(effect_tuner.finalize_numeric_entry(1.5));
     assert!(!effect_tuner.has_numeric_entry());
+    assert!(!effect_tuner.finalize_numeric_entry(1.6));
 
     let snapshot = effect_tuner.overlay_snapshot(
         &view_context(

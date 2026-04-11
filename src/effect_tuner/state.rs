@@ -10,7 +10,7 @@ use crate::parameters::{GenerationParameter, HoldInput, HoldRepeatState};
 use crate::scene::{GenerationState, LightingState, MaterialState, RenderingState, StageState};
 use crate::shapes::{ShapeKind, SpawnAddMode, SpawnPlacementMode};
 
-use super::lfo::{DEFAULT_LFO_FREQUENCY_HZ, LFO_FREQUENCY_STEP_HZ, LfoShape, ParameterLfo};
+use super::lfo::{LFO_FREQUENCY_STEP_HZ, LfoShape, ParameterLfo};
 use super::metadata::{EffectEditMode, EffectOverlayField};
 
 const OVERLAY_HOLD_SECS: f32 = 2.5;

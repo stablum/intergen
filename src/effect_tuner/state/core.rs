@@ -1029,31 +1029,6 @@ impl EffectTunerState {
         true
     }
 
-    pub(crate) fn reset_selected(
-        &mut self,
-        context: &mut EffectTunerEditContext<'_>,
-        now_secs: f32,
-    ) {
-        self.clear_numeric_entry();
-        let parameter = self.selected_parameter();
-        match self.displayed_edit_mode() {
-            EffectEditMode::Value => {
-                parameter.reset_value(&self.defaults, &mut self.current, context);
-            }
-            EffectEditMode::LfoAmplitude => {
-                self.selected_lfo_mut().amplitude =
-                    parameter.default_lfo_amplitude(&context.view());
-            }
-            EffectEditMode::LfoFrequency => {
-                self.selected_lfo_mut().frequency_hz = DEFAULT_LFO_FREQUENCY_HZ;
-            }
-            EffectEditMode::LfoShape => {
-                self.selected_lfo_mut().shape = LfoShape::Sine;
-            }
-        }
-        self.note_interaction(now_secs);
-    }
-
     pub(crate) fn reset_all(&mut self, context: &mut EffectTunerEditContext<'_>, now_secs: f32) {
         self.current = self.defaults.clone();
         self.lfos = default_lfos();

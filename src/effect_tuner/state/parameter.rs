@@ -256,15 +256,4 @@ impl EffectTunerParameter {
         }
     }
 
-    fn reset_value(
-        self,
-        defaults: &EffectsConfig,
-        effects: &mut EffectsConfig,
-        context: &mut EffectTunerEditContext<'_>,
-    ) {
-        match self {
-            Self::Effect(parameter) => parameter.set_value(effects, parameter.value(defaults)),
-            Self::Scene(parameter) => parameter.reset_value(context),
-        }
-    }
 }
