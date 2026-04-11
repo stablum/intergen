@@ -32,7 +32,8 @@ The current prototype focuses on a fast local development loop and a usable vert
 - selectable child shape type
 - adjustable child scale ratio
 - two-step in-app help overlay with text controls plus a hoverable neutral-mode keyboard map
-- pinned F2 control page with a compact strip plus a second-press scrolling list for shader FX toggles/LFOs and scene, stage, and material runtime parameters, including direct numeric entry for numeric fields
+- pinned F2 control pages for shader FX toggles/LFOs and scene, stage, and material runtime parameters, including group selection, scrolling lists, and direct numeric entry
+- F5 recent-changes page for monitoring interactive parameter edits without treating LFO modulation as a change
 - built-in screenshot capture for manual and scripted verification
 - scene preset save/load/free workflow with 100 slots and collision resolution
 - Blender `.blend` export with compositor reconstruction and embedded effect/LFO metadata
@@ -164,7 +165,9 @@ The in-app F2 control page starts from the values loaded from `config.toml` at l
 - `Shift + Enter` resets all F2 controls to their startup defaults.
 - Shader-effect parameters expose LFO fields, and so do the supported numeric scene/runtime parameters, including live scene updates and generation values that only take effect during future spawning. Other scene, stage, and material controls remain value-only.
 - In fill-current-level spawn mode, each successfully spawned child advances a virtual LFO sample time by `generation.fill_mode_lfo_virtual_time_step_secs`, so spawn-time generation LFOs can vary across one batch without waiting for real time to pass.
-- `Esc` closes the current F-page, including help, F2, or F3.
+- `F5` toggles a recent interactive changes page. It keeps the last changed parameter visible and also lists any other parameters changed in the last few seconds.
+- LFO modulation updates are not counted as F5 changes; only explicit interactive edits are recorded.
+- `Esc` closes the current F-page, including help, F2, F3, or F5.
 - The tuner does not write changes back to `config.toml` automatically.
 
 Live opacity controls use these `materials` settings:
@@ -269,7 +272,9 @@ cargo test-plain
 - `F1`: cycle help views between hidden, text, and keyboard-map overlays
 - `F2`: open the parameter-group F2 page, second press opens the compact page, third press opens the full list page, fourth press closes it
 - `F3`: open or close the scene preset page
-- `Esc`: close the current F-page, including help, F2, or F3
+- `F4`: export the current scene to `blend-exports/` as a Blender `.blend`
+- `F5`: open or close the recent interactive changes page
+- `Esc`: close the current F-page, including help, F2, F3, or F5
 - `Up` / `Down` in the first F2 page: select the active parameter group
 - `Enter` / `Space` in the first F2 page: open the selected group's parameter list
 - `Up` / `Down` in F2 compact or parameter-list pages: select the active F2 control, with hold-to-repeat
@@ -281,7 +286,6 @@ cargo test-plain
 - `Alt` in F2: fine adjustment modifier
 - `Enter` in F2 compact or parameter-list pages: confirm typed numeric input, or reset the active F2 field when no numeric input is active
 - `Shift + Enter` in F2: reset all F2 controls to their startup defaults
-- `F4`: export the current scene to `blend-exports/` as a Blender `.blend`
 - `F12`: save a screenshot to `screenshots/`
 - `R`: reset the scene with the currently selected shape as the new root
 - `Space`: spawn child shapes with the current placement mode, or hold to keep spawning

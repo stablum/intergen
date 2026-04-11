@@ -8,6 +8,7 @@ use crate::effect_tuner::{
     EffectTunerViewContext,
 };
 use crate::parameters::GenerationParameter;
+use crate::recent_changes::RecentChangesState;
 use crate::runtime_scene::GenerationSceneAccess;
 use crate::scene::{
     ShapeEntity, SingleSpawnSourceCursor, alpha_mode_for_opacity, material_appearance,
@@ -41,20 +42,49 @@ pub(crate) fn generation_input_system(
     time: Res<Time>,
     control_page_input_mask: Res<ControlPageInputMask>,
     mut effect_tuner: ResMut<EffectTunerState>,
+    mut recent_changes: ResMut<RecentChangesState>,
     mut scene: GenerationSceneAccess,
 ) {
     let input_mask = *control_page_input_mask;
+    let now_secs = time.elapsed_secs();
 
-    handle_shape_selection(&keys, input_mask, &mut scene.generation_state);
-    let ctrl_pressed = handle_mode_shortcuts(&keys, input_mask, &mut scene.generation_state);
+    handle_shape_selection(
+        &keys,
+        input_mask,
+        &mut scene.generation_state,
+        &mut recent_changes,
+        now_secs,
+    );
+    let ctrl_pressed = handle_mode_shortcuts(
+        &keys,
+        input_mask,
+        &mut scene.generation_state,
+        &mut recent_changes,
+        now_secs,
+    );
     handle_scale_input(
         &keys,
         input_mask,
         &scene.app_config.generation,
         &mut scene.generation_state,
+        &mut recent_changes,
+        now_secs,
     );
-    handle_single_attachment_repeat_input(&keys, input_mask, &mut scene.generation_state);
-    handle_opacity_input(&keys, input_mask, &mut effect_tuner, &mut scene);
+    handle_single_attachment_repeat_input(
+        &keys,
+        input_mask,
+        &mut scene.generation_state,
+        &mut recent_changes,
+        now_secs,
+    );
+    handle_opacity_input(
+        &keys,
+        input_mask,
+        &mut effect_tuner,
+        &mut recent_changes,
+        &mut scene,
+        now_secs,
+    );
 
     let mut transform_changed = false;
     transform_changed |= handle_generation_parameter_input(
@@ -69,6 +99,8 @@ pub(crate) fn generation_input_system(
         KeyCode::KeyT,
         twist_status_message,
         true,
+        &mut recent_changes,
+        now_secs,
     );
     transform_changed |= handle_generation_parameter_input(
         &keys,
@@ -82,6 +114,8 @@ pub(crate) fn generation_input_system(
         KeyCode::KeyC,
         vertex_offset_status_message,
         true,
+        &mut recent_changes,
+        now_secs,
     );
     let _ = handle_generation_parameter_input(
         &keys,
@@ -95,13 +129,15 @@ pub(crate) fn generation_input_system(
         KeyCode::KeyN,
         vertex_exclusion_status_message,
         false,
+        &mut recent_changes,
+        now_secs,
     );
 
     if transform_changed {
         recompute_generation_tree(&mut scene);
     }
 
-    if handle_scene_reset(&keys, input_mask, &mut scene) {
+    if handle_scene_reset(&keys, input_mask, &mut scene, &mut recent_changes, now_secs) {
         return;
     }
 
@@ -120,6 +156,8 @@ fn handle_shape_selection(
     keys: &ButtonInput<KeyCode>,
     input_mask: ControlPageInputMask,
     generation_state: &mut crate::scene::GenerationState,
+    recent_changes: &mut RecentChangesState,
+    now_secs: f32,
 ) {
     for (key_code, kind) in SHAPE_SELECTION_KEYS {
         if !just_pressed_unmasked(keys, input_mask, key_code) {
@@ -127,10 +165,9 @@ fn handle_shape_selection(
         }
 
         generation_state.selected_shape_kind = kind;
-        println!(
-            "{}",
-            selected_child_shape_status_message(generation_state.selected_shape_kind)
-        );
+        let message = selected_child_shape_status_message(generation_state.selected_shape_kind);
+        recent_changes.record_status_message(message.clone(), now_secs);
+        println!("{message}");
     }
 }
 
@@ -138,24 +175,24 @@ fn handle_mode_shortcuts(
     keys: &ButtonInput<KeyCode>,
     input_mask: ControlPageInputMask,
     generation_state: &mut crate::scene::GenerationState,
+    recent_changes: &mut RecentChangesState,
+    now_secs: f32,
 ) -> bool {
     if just_pressed_unmasked(keys, input_mask, KeyCode::KeyG) {
         generation_state.finalize_single_spawn_source_cursor();
         generation_state.spawn_placement_mode = generation_state.spawn_placement_mode.next();
-        println!(
-            "{}",
-            spawn_placement_mode_status_message(generation_state.spawn_placement_mode)
-        );
+        let message = spawn_placement_mode_status_message(generation_state.spawn_placement_mode);
+        recent_changes.record_status_message(message.clone(), now_secs);
+        println!("{message}");
     }
 
     let ctrl_pressed = control_pressed(keys);
     if ctrl_pressed && just_pressed_unmasked(keys, input_mask, KeyCode::Space) {
         generation_state.finalize_single_spawn_source_cursor();
         generation_state.spawn_add_mode = generation_state.spawn_add_mode.next();
-        println!(
-            "{}",
-            spawn_add_mode_status_message(generation_state.spawn_add_mode)
-        );
+        let message = spawn_add_mode_status_message(generation_state.spawn_add_mode);
+        recent_changes.record_status_message(message.clone(), now_secs);
+        println!("{message}");
     }
 
     ctrl_pressed
@@ -170,6 +207,8 @@ fn handle_scale_input(
     input_mask: ControlPageInputMask,
     generation_config: &crate::config::GenerationConfig,
     generation_state: &mut crate::scene::GenerationState,
+    recent_changes: &mut RecentChangesState,
+    now_secs: f32,
 ) {
     let scale_spec = generation_config.parameter_spec(GenerationParameter::ChildScaleRatio);
     if just_pressed_unmasked(keys, input_mask, KeyCode::Minus)
@@ -178,7 +217,9 @@ fn handle_scale_input(
         let scale_ratio = generation_state
             .parameter_mut(GenerationParameter::ChildScaleRatio)
             .adjust_clamped_base_value(-scale_spec.step(), scale_spec);
-        println!("Child scale ratio: {:.2}", scale_ratio);
+        let message = format!("Child scale ratio: {:.2}", scale_ratio);
+        recent_changes.record_status_message(message.clone(), now_secs);
+        println!("{message}");
     }
     if just_pressed_unmasked(keys, input_mask, KeyCode::Equal)
         || just_pressed_unmasked(keys, input_mask, KeyCode::NumpadAdd)
@@ -186,7 +227,9 @@ fn handle_scale_input(
         let scale_ratio = generation_state
             .parameter_mut(GenerationParameter::ChildScaleRatio)
             .adjust_clamped_base_value(scale_spec.step(), scale_spec);
-        println!("Child scale ratio: {:.2}", scale_ratio);
+        let message = format!("Child scale ratio: {:.2}", scale_ratio);
+        recent_changes.record_status_message(message.clone(), now_secs);
+        println!("{message}");
     }
 }
 
@@ -194,6 +237,8 @@ fn handle_single_attachment_repeat_input(
     keys: &ButtonInput<KeyCode>,
     input_mask: ControlPageInputMask,
     generation_state: &mut crate::scene::GenerationState,
+    recent_changes: &mut RecentChangesState,
+    now_secs: f32,
 ) {
     let mut next_value = None;
     if key_group_just_pressed(keys, input_mask, &SINGLE_ATTACHMENT_REPEAT_DECREASE_KEYS) {
@@ -220,19 +265,20 @@ fn handle_single_attachment_repeat_input(
 
     generation_state.finalize_single_spawn_source_cursor();
     generation_state.single_attachment_repeat_count = next_value;
-    println!(
-        "{}",
-        single_attachment_repeat_count_status_message(
-            generation_state.single_attachment_repeat_count
-        )
+    let message = single_attachment_repeat_count_status_message(
+        generation_state.single_attachment_repeat_count,
     );
+    recent_changes.record_status_message(message.clone(), now_secs);
+    println!("{message}");
 }
 
 fn handle_opacity_input(
     keys: &ButtonInput<KeyCode>,
     input_mask: ControlPageInputMask,
     effect_tuner: &mut EffectTunerState,
+    recent_changes: &mut RecentChangesState,
     scene: &mut GenerationSceneAccess<'_, '_>,
+    now_secs: f32,
 ) {
     let (min_opacity, max_opacity) = scene.app_config.materials.opacity_bounds();
     let mut opacity_changed = false;
@@ -249,7 +295,9 @@ fn handle_opacity_input(
             max_opacity,
         );
         opacity_changed = true;
-        println!("{}", opacity_status_message(scene.material_state.opacity));
+        let message = opacity_status_message(scene.material_state.opacity);
+        recent_changes.record_status_message(message.clone(), now_secs);
+        println!("{message}");
     }
     if just_pressed_unmasked(keys, input_mask, KeyCode::KeyP) {
         {
@@ -263,7 +311,9 @@ fn handle_opacity_input(
             max_opacity,
         );
         opacity_changed = true;
-        println!("{}", opacity_status_message(scene.material_state.opacity));
+        let message = opacity_status_message(scene.material_state.opacity);
+        recent_changes.record_status_message(message.clone(), now_secs);
+        println!("{message}");
     }
     if just_pressed_unmasked(keys, input_mask, KeyCode::KeyI) {
         {
@@ -272,10 +322,14 @@ fn handle_opacity_input(
         }
         scene.material_state.opacity = scene.app_config.materials.default_opacity_clamped();
         opacity_changed = true;
-        println!(
-            "Reset {}",
-            opacity_status_message(scene.material_state.opacity).to_lowercase()
-        );
+        let status = opacity_status_message(scene.material_state.opacity);
+        let value = status
+            .split_once(':')
+            .map(|(_, value)| value.trim())
+            .unwrap_or(status.as_str());
+        recent_changes.record("Global object opacity", value, now_secs);
+        let message = format!("Reset {}", status.to_lowercase());
+        println!("{message}");
     }
     if opacity_changed {
         let view = effect_tuner_view_context(scene);
@@ -338,6 +392,8 @@ fn handle_generation_parameter_input(
     reset_key: KeyCode,
     status_message: fn(f32) -> String,
     recompute_after_change: bool,
+    recent_changes: &mut RecentChangesState,
+    now_secs: f32,
 ) -> bool {
     let spec = generation_config.parameter_spec(parameter);
     let mut transform_changed = false;
@@ -357,7 +413,9 @@ fn handle_generation_parameter_input(
             .parameter_mut(parameter)
             .adjust_clamped_base_value(-spec.step(), spec);
         transform_changed = recompute_after_change;
-        println!("{}", status_message(value));
+        let message = status_message(value);
+        recent_changes.record_status_message(message.clone(), now_secs);
+        println!("{message}");
     }
 
     let increase_requested = generation_state
@@ -375,7 +433,9 @@ fn handle_generation_parameter_input(
             .parameter_mut(parameter)
             .adjust_clamped_base_value(spec.step(), spec);
         transform_changed = recompute_after_change;
-        println!("{}", status_message(value));
+        let message = status_message(value);
+        recent_changes.record_status_message(message.clone(), now_secs);
+        println!("{message}");
     }
 
     if just_pressed_unmasked(keys, input_mask, reset_key) {
@@ -387,7 +447,10 @@ fn handle_generation_parameter_input(
             .input_mut()
             .reset();
         transform_changed = recompute_after_change;
-        println!("Reset {}", status_message(value).to_lowercase());
+        let status = status_message(value);
+        recent_changes.record_status_message(status.clone(), now_secs);
+        let message = format!("Reset {}", status.to_lowercase());
+        println!("{message}");
     }
 
     transform_changed
@@ -413,6 +476,8 @@ fn handle_scene_reset(
     keys: &ButtonInput<KeyCode>,
     input_mask: ControlPageInputMask,
     scene: &mut GenerationSceneAccess<'_, '_>,
+    recent_changes: &mut RecentChangesState,
+    now_secs: f32,
 ) -> bool {
     if !just_pressed_unmasked(keys, input_mask, KeyCode::KeyR) {
         return false;
@@ -438,6 +503,11 @@ fn handle_scene_reset(
         &material_config,
         scene.material_state.opacity,
         0,
+    );
+    recent_changes.record(
+        "Scene root",
+        format!("reset to {}", format!("{:?}", root.kind).to_lowercase()),
+        now_secs,
     );
     println!("Reset scene to a {:?} root shape.", root.kind);
     true

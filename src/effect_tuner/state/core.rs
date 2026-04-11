@@ -1106,6 +1106,37 @@ impl EffectTunerState {
         }
     }
 
+    pub(crate) fn selected_change_entry(
+        &self,
+        context: &EffectTunerViewContext<'_>,
+    ) -> (String, String) {
+        let parameter = self.selected_parameter();
+        match self.displayed_edit_mode() {
+            EffectEditMode::Value => (
+                parameter.label().to_string(),
+                self.parameter_value_text(parameter, context),
+            ),
+            EffectEditMode::LfoAmplitude => {
+                let lfo = self.selected_lfo();
+                (format!("{} LFO amplitude", parameter.label()), format!("{:.3}", lfo.amplitude))
+            }
+            EffectEditMode::LfoFrequency => {
+                let lfo = self.selected_lfo();
+                (
+                    format!("{} LFO frequency", parameter.label()),
+                    format!("{:.3} Hz", lfo.frequency_hz),
+                )
+            }
+            EffectEditMode::LfoShape => {
+                let lfo = self.selected_lfo();
+                (
+                    format!("{} LFO shape", parameter.label()),
+                    lfo.shape.label().to_string(),
+                )
+            }
+        }
+    }
+
     fn note_interaction(&mut self, now_secs: f32) {
         self.visible_until_secs = now_secs + OVERLAY_HOLD_SECS;
     }

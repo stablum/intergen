@@ -9,6 +9,8 @@ const EFFECT_TUNER_NUMERIC_INPUT_CHARS: usize = 10;
 const EFFECT_TUNER_LIST_VISIBLE_ROWS: usize = 9;
 const EFFECT_TUNER_GROUP_PANEL_MAX_WIDTH: f32 = 360.0;
 const EFFECT_TUNER_LIST_PANEL_MAX_WIDTH: f32 = 1060.0;
+const RECENT_CHANGES_VISIBLE_ROWS: usize = 8;
+const RECENT_CHANGES_PANEL_MAX_WIDTH: f32 = 720.0;
 const KEYBOARD_HELP_UNUSED_TEXT: &str = "Unused in neutral mode.";
 const KEYBOARD_HELP_KEY_WIDTH: f32 = 44.0;
 const KEYBOARD_HELP_KEY_HEIGHT: f32 = 42.0;
@@ -45,7 +47,7 @@ const KEYBOARD_FUNCTION_ROW: [KeyboardHelpKeySpec; 13] = [
         true,
         "Export the current scene as a Blender .blend.",
     ),
-    keyboard_help_key("F5", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
+    keyboard_help_key("F5", 1.0, true, "Toggle recent interactive changes."),
     keyboard_help_key("F6", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("F7", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("F8", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
@@ -250,6 +252,27 @@ pub(crate) struct EffectTunerGroupRow(usize);
 
 #[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) struct EffectTunerGroupRowText(usize);
+
+#[derive(Component)]
+pub(crate) struct RecentChangesOverlay;
+
+#[derive(Component)]
+pub(crate) struct RecentChangesWindowText;
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct RecentChangesRow(usize);
+
+#[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct RecentChangesRowText {
+    slot: usize,
+    kind: RecentChangesRowTextKind,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum RecentChangesRowTextKind {
+    Label,
+    Value,
+}
 
 #[derive(Component)]
 pub(crate) struct EffectTunerListOverlay;

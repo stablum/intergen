@@ -21,11 +21,13 @@ use crate::presets::{
     AutomatedScenePresetLoad, PresetBrowserState, automated_scene_preset_load_system,
     preset_input_system,
 };
+use crate::recent_changes::RecentChangesState;
 use crate::scene::setup_scene;
 use crate::ui::{
     HelpOverlayState, toggle_help_overlay_system, update_effect_tuner_group_overlay_system,
     update_effect_tuner_list_overlay_system, update_effect_tuner_overlay_system,
     update_keyboard_help_overlay_system, update_preset_overlay_system,
+    update_recent_changes_overlay_system,
 };
 
 pub fn run() {
@@ -59,6 +61,7 @@ pub fn run() {
         .insert_resource(ControlPageState::default())
         .insert_resource(ControlPageInputMask::default())
         .insert_resource(EffectTunerState::from_config(&app_config.effects))
+        .insert_resource(RecentChangesState::default())
         .insert_resource(PresetBrowserState::load_from_disk())
         .insert_resource(ScreenshotCounter::default())
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -93,6 +96,7 @@ pub fn run() {
                 update_effect_tuner_list_overlay_system,
                 update_keyboard_help_overlay_system,
                 update_preset_overlay_system,
+                update_recent_changes_overlay_system,
             )
                 .chain(),
         )

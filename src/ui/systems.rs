@@ -593,6 +593,102 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
     }
 }
 
+pub(crate) fn update_recent_changes_overlay_system(
+    time: Res<Time>,
+    control_page: Res<ControlPageState>,
+    recent_changes: Res<RecentChangesState>,
+    view: EffectTunerUiViewAccess,
+    mut overlay_query: Query<(&mut Visibility, &mut Node), With<RecentChangesOverlay>>,
+    mut window_text_query: Query<
+        &mut Text,
+        (
+            With<RecentChangesWindowText>,
+            Without<RecentChangesRowText>,
+        ),
+    >,
+    mut row_query: Query<
+        (&RecentChangesRow, &mut Visibility, &mut BackgroundColor),
+        (Without<RecentChangesOverlay>, Without<RecentChangesWindowText>),
+    >,
+    mut row_text_query: Query<
+        (&RecentChangesRowText, &mut Text, &mut TextColor),
+        (Without<RecentChangesWindowText>, Without<RecentChangesRow>),
+    >,
+) {
+    let now_secs = time.elapsed_secs();
+    let snapshot = recent_changes.snapshot(now_secs);
+    let ui_config = &view.app_config.ui;
+    let visible = control_page.page_has_focus(ControlPage::RecentChanges);
+
+    let Ok((mut overlay_visibility, mut overlay_node)) = overlay_query.single_mut() else {
+        return;
+    };
+    *overlay_visibility = if visible {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+    overlay_node.display = if visible {
+        Display::Flex
+    } else {
+        Display::None
+    };
+
+    let Ok(mut window_text) = window_text_query.single_mut() else {
+        return;
+    };
+    *window_text = if snapshot.rows.len() <= 1 {
+        Text::new("LAST INTERACTIVE CHANGE")
+    } else {
+        Text::new(format!(
+            "RECENT INTERACTIVE CHANGES < {:.0}s",
+            snapshot.timeout_secs
+        ))
+    };
+
+    let placeholder_visible = snapshot.rows.is_empty();
+    for (row, mut visibility, mut background) in row_query.iter_mut() {
+        let has_row = snapshot.rows.get(row.0).is_some();
+        let visible_row = has_row || (placeholder_visible && row.0 == 0);
+        *visibility = if visible_row {
+            Visibility::Visible
+        } else {
+            Visibility::Hidden
+        };
+        *background = if visible_row {
+            BackgroundColor(effect_tuner_panel_fill_color())
+        } else {
+            BackgroundColor(Color::NONE)
+        };
+    }
+
+    for (text_meta, mut text, mut text_color) in row_text_query.iter_mut() {
+        if placeholder_visible && text_meta.slot == 0 {
+            *text = Text::new(match text_meta.kind {
+                RecentChangesRowTextKind::Label => "No interactive changes yet",
+                RecentChangesRowTextKind::Value => "",
+            });
+            *text_color = TextColor(srgb(ui_config.body_text));
+            continue;
+        }
+
+        let Some(row_snapshot) = snapshot.rows.get(text_meta.slot) else {
+            *text = Text::new("");
+            *text_color = TextColor(srgb(ui_config.body_text));
+            continue;
+        };
+
+        *text = Text::new(match text_meta.kind {
+            RecentChangesRowTextKind::Label => row_snapshot.label.clone(),
+            RecentChangesRowTextKind::Value => row_snapshot.value.clone(),
+        });
+        *text_color = TextColor(match text_meta.kind {
+            RecentChangesRowTextKind::Label => srgb(ui_config.title_text),
+            RecentChangesRowTextKind::Value => srgb(ui_config.body_text),
+        });
+    }
+}
+
 pub(crate) fn update_preset_overlay_system(
     app_config: Res<AppConfig>,
     control_page: Res<ControlPageState>,

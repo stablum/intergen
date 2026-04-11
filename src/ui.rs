@@ -13,6 +13,7 @@ use crate::effect_tuner::{
 use crate::help_text::overlay_controls_text as shared_overlay_controls_text;
 use crate::help_text::{HelpEntry, overlay_help_entries};
 use crate::presets::PresetBrowserState;
+use crate::recent_changes::RecentChangesState;
 use crate::scene::{GenerationState, LightingState, MaterialState, RenderingState, StageState};
 
 include!("ui/types.rs");

@@ -79,6 +79,7 @@ const PRESET_CHOOSER_BINDINGS: [KeyBindingPattern; 3] = [
 pub(crate) enum ControlPage {
     EffectTuner,
     ScenePresets,
+    RecentChanges,
 }
 
 impl ControlPage {
@@ -86,6 +87,7 @@ impl ControlPage {
         match self {
             Self::EffectTuner => "F2 control page closed.",
             Self::ScenePresets => "Scene preset page closed.",
+            Self::RecentChanges => "F5 recent changes page closed.",
         }
     }
 }
@@ -150,6 +152,7 @@ impl ControlPageInputMask {
                     || (self.preset_chooser_visible
                         && binding_captured(binding, &PRESET_CHOOSER_BINDINGS))
             }
+            Some(ControlPage::RecentChanges) => false,
             None => false,
         }
     }
@@ -352,27 +355,41 @@ pub(crate) fn control_page_input_system(
         return;
     }
 
-    if !keys.just_pressed(KeyCode::F3) {
-        return;
-    }
+    if keys.just_pressed(KeyCode::F3) {
+        help_overlay.hide();
 
-    help_overlay.hide();
-
-    if control_page.is_active(ControlPage::ScenePresets) {
-        control_page.close_active_page();
-        preset_browser.close_page();
-        println!("{}", ControlPage::ScenePresets.closed_message());
-        return;
-    }
-
-    match preset_browser.open_page() {
-        Ok(()) => {
-            if let Some(previous_page) = control_page.open_page(ControlPage::ScenePresets) {
-                close_page(previous_page, &mut effect_tuner, &mut preset_browser);
-            }
-            println!("Scene preset mode open. Type two digits to recall a slot.");
+        if control_page.is_active(ControlPage::ScenePresets) {
+            control_page.close_active_page();
+            preset_browser.close_page();
+            println!("{}", ControlPage::ScenePresets.closed_message());
+            return;
         }
-        Err(error) => eprintln!("{error}"),
+
+        match preset_browser.open_page() {
+            Ok(()) => {
+                if let Some(previous_page) = control_page.open_page(ControlPage::ScenePresets) {
+                    close_page(previous_page, &mut effect_tuner, &mut preset_browser);
+                }
+                println!("Scene preset mode open. Type two digits to recall a slot.");
+            }
+            Err(error) => eprintln!("{error}"),
+        }
+        return;
+    }
+
+    if keys.just_pressed(KeyCode::F5) {
+        help_overlay.hide();
+
+        if control_page.is_active(ControlPage::RecentChanges) {
+            control_page.close_active_page();
+            println!("{}", ControlPage::RecentChanges.closed_message());
+            return;
+        }
+
+        if let Some(previous_page) = control_page.open_page(ControlPage::RecentChanges) {
+            close_page(previous_page, &mut effect_tuner, &mut preset_browser);
+        }
+        println!("F5 recent changes page open.");
     }
 }
 
@@ -384,6 +401,7 @@ fn close_page(
     match page {
         ControlPage::EffectTuner => effect_tuner.close_page(),
         ControlPage::ScenePresets => preset_browser.close_page(),
+        ControlPage::RecentChanges => {}
     }
 }
 
@@ -488,6 +506,18 @@ mod tests {
     }
 
     #[test]
+    fn recent_changes_page_does_not_capture_neutral_bindings() {
+        let mask = ControlPageInputMask {
+            active_page: Some(ControlPage::RecentChanges),
+            preset_chooser_visible: false,
+        };
+
+        assert!(!mask.captures_binding(binding(KeyCode::ArrowUp)));
+        assert!(!mask.captures_binding(binding(KeyCode::KeyG)));
+        assert!(!mask.captures_binding(binding(KeyCode::Space)));
+    }
+
+    #[test]
     fn help_shortcut_closes_effect_tuner_before_showing_help() {
         let mut world = input_world();
         world
@@ -538,6 +568,23 @@ mod tests {
             crate::effect_tuner::EffectTunerPageMode::GroupSelect
         );
         assert!(world.resource::<EffectTunerState>().is_visible(0.0));
+    }
+
+    #[test]
+    fn recent_changes_shortcut_hides_help_overlay() {
+        let mut world = input_world();
+        world.resource_mut::<HelpOverlayState>().cycle();
+        world
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::F5);
+
+        run_control_page_input(&mut world);
+
+        assert!(!world.resource::<HelpOverlayState>().is_visible());
+        assert_eq!(
+            world.resource::<ControlPageState>().active_page(),
+            Some(ControlPage::RecentChanges)
+        );
     }
 
     #[test]

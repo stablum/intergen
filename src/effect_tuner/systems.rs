@@ -10,6 +10,7 @@ use crate::camera::{SceneCamera, sync_scene_camera_transform};
 use crate::control_page::{ControlPage, ControlPageState};
 use crate::effects::{CameraEffectsSettings, camera_effects_from_config};
 use crate::generation::{apply_live_material_state, recompute_generation_tree};
+use crate::recent_changes::RecentChangesState;
 use crate::runtime_scene::GenerationSceneAccess;
 use crate::scene::{apply_live_lighting_state, apply_live_rendering_state, sync_stage_entities};
 
@@ -28,6 +29,7 @@ pub(crate) fn effect_tuner_input_system(
     mut mouse_wheel_reader: MessageReader<MouseWheel>,
     mut mouse_wheel_selection_remainder: Local<f32>,
     mut effect_tuner: ResMut<EffectTunerState>,
+    mut recent_changes: ResMut<RecentChangesState>,
     mut scene: GenerationSceneAccess,
 ) {
     if !control_page.page_has_focus(ControlPage::EffectTuner) {
@@ -103,6 +105,11 @@ pub(crate) fn effect_tuner_input_system(
     if keys.just_pressed(KeyCode::Space) {
         if let Some(selected_effect) = effect_tuner.selected_effect_group() {
             if let Some(enabled) = effect_tuner.toggle_selected_effect(now_secs) {
+                recent_changes.record(
+                    format!("{} effect", selected_effect.label()),
+                    if enabled { "ON" } else { "OFF" },
+                    now_secs,
+                );
                 println!(
                     "{} {}.",
                     selected_effect.label(),
@@ -124,6 +131,11 @@ pub(crate) fn effect_tuner_input_system(
             &scene.stage_state,
         );
         if let Some(enabled) = effect_tuner.toggle_selected_lfo(&view, now_secs) {
+            recent_changes.record(
+                format!("{} LFO", selected_parameter.label()),
+                if enabled { "ON" } else { "OFF" },
+                now_secs,
+            );
             println!(
                 "LFO for {} {}.",
                 selected_parameter.label(),
@@ -238,6 +250,7 @@ pub(crate) fn effect_tuner_input_system(
             apply_selected_parameter_side_effects(effect_tuner.selected_parameter(), &mut scene);
             sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
         }
+        record_selected_change(&effect_tuner, &scene, &mut recent_changes, now_secs);
         println!(
             "{}",
             effect_tuner.selected_status_message(
@@ -286,6 +299,7 @@ pub(crate) fn effect_tuner_input_system(
             apply_selected_parameter_side_effects(effect_tuner.selected_parameter(), &mut scene);
             sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
         }
+        record_selected_change(&effect_tuner, &scene, &mut recent_changes, now_secs);
         println!(
             "{}",
             effect_tuner.selected_status_message(
@@ -327,8 +341,10 @@ pub(crate) fn effect_tuner_input_system(
                 &scene.stage_state,
             ));
             apply_reset_all_side_effects(&mut scene);
+            recent_changes.record("F2 controls", "defaults", now_secs);
             println!("Reset all F2 controls to defaults.");
         } else if effect_tuner.finalize_numeric_entry(now_secs) {
+            record_selected_change(&effect_tuner, &scene, &mut recent_changes, now_secs);
             println!(
                 "Set {}.",
                 effect_tuner.selected_status_message(
@@ -365,6 +381,7 @@ pub(crate) fn effect_tuner_input_system(
                 apply_selected_parameter_side_effects(selected_parameter, &mut scene);
                 sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
             }
+            record_selected_change(&effect_tuner, &scene, &mut recent_changes, now_secs);
             println!(
                 "Reset {}.",
                 effect_tuner.selected_status_message(
@@ -405,6 +422,7 @@ pub(crate) fn effect_tuner_input_system(
                 apply_selected_parameter_side_effects(selected_parameter, &mut scene);
                 sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
             }
+            record_selected_change(&effect_tuner, &scene, &mut recent_changes, now_secs);
         }
     }
 
@@ -446,6 +464,7 @@ pub(crate) fn effect_tuner_input_system(
                     apply_selected_parameter_side_effects(selected_parameter, &mut scene);
                     sync_selected_scene_parameter_base_if_needed(&mut effect_tuner, &scene);
                 }
+                record_selected_change(&effect_tuner, &scene, &mut recent_changes, now_secs);
             }
         }
     }
@@ -516,6 +535,25 @@ fn is_numeric_entry_char(character: char) -> bool {
 
 fn selected_field_edits_parameter_value(effect_tuner: &EffectTunerState) -> bool {
     effect_tuner.active_field() == EffectOverlayField::Value
+}
+
+fn record_selected_change(
+    effect_tuner: &EffectTunerState,
+    scene: &GenerationSceneAccess<'_, '_>,
+    recent_changes: &mut RecentChangesState,
+    now_secs: f32,
+) {
+    let view = effect_tuner_view_context(
+        &scene.app_config,
+        &scene.camera_rig,
+        &scene.generation_state,
+        &scene.rendering_state,
+        &scene.lighting_state,
+        &scene.material_state,
+        &scene.stage_state,
+    );
+    let (label, value) = effect_tuner.selected_change_entry(&view);
+    recent_changes.record(label, value, now_secs);
 }
 
 fn restore_selected_scene_parameter_base_if_needed(

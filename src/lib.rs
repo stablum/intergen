@@ -10,6 +10,7 @@ mod generation;
 mod help_text;
 mod parameters;
 mod presets;
+mod recent_changes;
 mod runtime_scene;
 mod scene;
 mod scene_snapshot;

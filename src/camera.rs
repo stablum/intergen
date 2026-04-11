@@ -3,6 +3,7 @@ use bevy::prelude::*;
 
 use crate::config::{AppConfig, CameraConfig};
 use crate::control_page::{ControlPageInputMask, just_pressed_unmasked, pressed_unmasked};
+use crate::recent_changes::RecentChangesState;
 
 #[derive(Resource)]
 pub(crate) struct CameraRig {
@@ -32,11 +33,13 @@ pub(crate) fn camera_input_system(
     app_config: Res<AppConfig>,
     control_page_input_mask: Res<ControlPageInputMask>,
     mut camera_rig: ResMut<CameraRig>,
+    mut recent_changes: ResMut<RecentChangesState>,
 ) {
     let input_mask = *control_page_input_mask;
 
     if just_pressed_unmasked(&keys, input_mask, KeyCode::Backspace) {
         stop_angular_momentum(&mut camera_rig);
+        recent_changes.record("Camera rotation momentum", "stopped", time.elapsed_secs());
         println!("Stopped camera rotation momentum.");
     }
 

@@ -7,7 +7,7 @@ pub(crate) struct HelpEntry {
     pub(crate) explanation: &'static str,
 }
 
-const TOP_LEVEL_HELP: [HelpEntry; 5] = [
+const TOP_LEVEL_HELP: [HelpEntry; 6] = [
     HelpEntry {
         startup: "F1 cycles help views",
         overlay: "F1: Cycle help views",
@@ -37,6 +37,12 @@ const TOP_LEVEL_HELP: [HelpEntry; 5] = [
         overlay: "F4: Export the current scene as a Blender .blend",
         binding: "F4",
         explanation: "Export the current scene as a Blender .blend.",
+    },
+    HelpEntry {
+        startup: "F5 recent interactive changes page",
+        overlay: "F5: Toggle the recent interactive changes page",
+        binding: "F5",
+        explanation: "Toggle the recent interactive changes page.",
     },
 ];
 

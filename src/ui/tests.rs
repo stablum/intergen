@@ -19,6 +19,7 @@ fn overlay_text_lists_help_and_spawn_controls() {
     assert!(text.contains("F3: Toggle the scene preset page"));
     assert!(text.contains("Esc: Close the current F-page"));
     assert!(text.contains("F4: Export the current scene as a Blender .blend"));
+    assert!(text.contains("F5: Toggle the recent interactive changes page"));
     assert!(text.contains("In first F2 page: Up / Down select parameter group"));
     assert!(text.contains(
         "In first F2 page: Enter or Space opens the selected group parameter list"
@@ -120,6 +121,7 @@ fn keyboard_help_rows_include_active_and_inactive_keys() {
         .collect::<Vec<_>>();
 
     assert!(specs.iter().any(|spec| spec.label == "F1" && spec.used));
+    assert!(specs.iter().any(|spec| spec.label == "F5" && spec.used));
     assert!(specs.iter().any(|spec| spec.label == "A" && !spec.used));
     assert!(specs.iter().any(|spec| spec.label == "H" && !spec.used));
     assert!(specs.iter().any(|spec| spec.label == "," && spec.used));
