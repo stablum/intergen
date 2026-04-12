@@ -1918,7 +1918,7 @@ fn bool_to_value(enabled: bool) -> f32 {
 
 fn format_scene_numeric_value(value: f32) -> String {
     let magnitude = value.abs();
-    if magnitude >= 10_000.0 {
+    let text = if magnitude >= 10_000.0 {
         format!("{value:.0}")
     } else if magnitude >= 1_000.0 {
         format!("{value:.1}")
@@ -1926,5 +1926,6 @@ fn format_scene_numeric_value(value: f32) -> String {
         format!("{value:.2}")
     } else {
         format!("{value:.3}")
-    }
+    };
+    trim_trailing_decimal_zeroes(text)
 }

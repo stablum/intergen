@@ -1175,7 +1175,7 @@ fn eligible_scene_numeric_parameters_expose_lfo_fields() {
 
     assert!(snapshot.supports_lfo);
     assert_eq!(snapshot.lfo_state_text, "OFF");
-    assert_eq!(snapshot.amplitude_text, "0.000");
+    assert_eq!(snapshot.amplitude_text, "0");
     assert_eq!(snapshot.active_field, EffectOverlayField::LfoShape);
 }
 

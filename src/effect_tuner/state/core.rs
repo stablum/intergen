@@ -700,6 +700,17 @@ impl EffectTunerState {
         }
     }
 
+    fn lfo_amplitude_text(
+        &self,
+        parameter: EffectTunerParameter,
+        value: f32,
+    ) -> String {
+        match parameter {
+            EffectTunerParameter::Effect(parameter) => parameter.display_lfo_amplitude(value),
+            EffectTunerParameter::Scene(_) => format_effect_tuner_decimal(value, 3),
+        }
+    }
+
     pub(crate) fn overlay_snapshot(
         &self,
         context: &EffectTunerViewContext<'_>,
@@ -723,11 +734,11 @@ impl EffectTunerState {
                     lfo.enabled,
                     self.overlay_numeric_text(
                         EffectOverlayField::LfoAmplitude,
-                        format!("{:.3}", lfo.amplitude),
+                        self.lfo_amplitude_text(parameter, lfo.amplitude),
                     ),
                     self.overlay_numeric_text(
                         EffectOverlayField::LfoFrequency,
-                        format!("{:.3}", lfo.frequency_hz),
+                        format_effect_tuner_decimal(lfo.frequency_hz, 3),
                     ),
                     lfo.shape.label(),
                 )
@@ -1064,14 +1075,18 @@ impl EffectTunerState {
             },
             EffectEditMode::LfoAmplitude => {
                 let lfo = self.selected_lfo();
-                format!("{} lfo amplitude = {:.3}", parameter.label(), lfo.amplitude)
+                format!(
+                    "{} lfo amplitude = {}",
+                    parameter.label(),
+                    self.lfo_amplitude_text(parameter, lfo.amplitude)
+                )
             }
             EffectEditMode::LfoFrequency => {
                 let lfo = self.selected_lfo();
                 format!(
-                    "{} lfo frequency = {:.3}Hz",
+                    "{} lfo frequency = {}Hz",
                     parameter.label(),
-                    lfo.frequency_hz
+                    format_effect_tuner_decimal(lfo.frequency_hz, 3)
                 )
             }
             EffectEditMode::LfoShape => {
@@ -1093,13 +1108,16 @@ impl EffectTunerState {
             ),
             EffectEditMode::LfoAmplitude => {
                 let lfo = self.selected_lfo();
-                (format!("{} LFO amplitude", parameter.label()), format!("{:.3}", lfo.amplitude))
+                (
+                    format!("{} LFO amplitude", parameter.label()),
+                    self.lfo_amplitude_text(parameter, lfo.amplitude),
+                )
             }
             EffectEditMode::LfoFrequency => {
                 let lfo = self.selected_lfo();
                 (
                     format!("{} LFO frequency", parameter.label()),
-                    format!("{:.3} Hz", lfo.frequency_hz),
+                    format!("{} Hz", format_effect_tuner_decimal(lfo.frequency_hz, 3)),
                 )
             }
             EffectEditMode::LfoShape => {
@@ -1394,5 +1412,33 @@ impl EffectTunerState {
             selected,
             active_field: selected.then_some(self.active_field()),
         }
+    }
+}
+
+fn format_effect_tuner_decimal(value: f32, precision: usize) -> String {
+    let text = match precision {
+        4 => format!("{value:.4}"),
+        3 => format!("{value:.3}"),
+        2 => format!("{value:.2}"),
+        1 => format!("{value:.1}"),
+        _ => format!("{value:.0}"),
+    };
+    trim_trailing_decimal_zeroes(text)
+}
+
+fn trim_trailing_decimal_zeroes(mut text: String) -> String {
+    if text.contains('.') {
+        while text.ends_with('0') {
+            text.pop();
+        }
+        if text.ends_with('.') {
+            text.pop();
+        }
+    }
+
+    if text == "-0" {
+        "0".to_string()
+    } else {
+        text
     }
 }

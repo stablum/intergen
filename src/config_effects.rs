@@ -439,12 +439,42 @@ impl EffectNumericParameter {
         matches!(self, Self::GaussianBlurRadius | Self::BloomRadius)
     }
 
+    fn uses_fine_lens_precision(self) -> bool {
+        matches!(
+            self,
+            Self::LensStrength
+                | Self::LensRadialK2
+                | Self::LensRadialK3
+                | Self::LensCenterX
+                | Self::LensCenterY
+                | Self::LensScaleX
+                | Self::LensScaleY
+                | Self::LensTangentialX
+                | Self::LensTangentialY
+                | Self::LensZoom
+                | Self::LensChromaticAberration
+        )
+    }
+
+    pub(crate) fn display_lfo_amplitude(self, value: f32) -> String {
+        self.display_decimal_value(value)
+    }
+
+    fn display_decimal_value(self, value: f32) -> String {
+        let text = if self.uses_fine_lens_precision() {
+            format!("{value:.4}")
+        } else {
+            format!("{value:.3}")
+        };
+        trim_trailing_decimal_zeroes(text)
+    }
+
     pub(crate) fn display_value(self, effects: &EffectsConfig) -> String {
         let value = self.value(effects);
         if self.is_integer() {
             format!("{:.0}", value.round())
         } else {
-            format!("{value:.3}")
+            self.display_decimal_value(value)
         }
     }
 
@@ -524,6 +554,19 @@ impl EffectNumericParameter {
     }
 }
 
+fn trim_trailing_decimal_zeroes(mut text: String) -> String {
+    if text.contains('.') {
+        while text.ends_with('0') {
+            text.pop();
+        }
+        if text.ends_with('.') {
+            text.pop();
+        }
+    }
+
+    if text == "-0" { "0".to_string() } else { text }
+}
+
 #[cfg(test)]
 mod tests {
     use super::{EffectNumericParameter, EffectsConfig};
@@ -556,5 +599,31 @@ mod tests {
         for (parameter, expected_step) in expected_steps {
             assert_eq!(parameter.adjustment_step(false, false), expected_step);
         }
+    }
+
+    #[test]
+    fn lens_parameters_display_fine_precision_without_trailing_zeroes() {
+        let mut effects = EffectsConfig::default();
+
+        EffectNumericParameter::LensStrength.set_value(&mut effects, 0.005);
+        EffectNumericParameter::LensChromaticAberration.set_value(&mut effects, 0.0005);
+        EffectNumericParameter::WavefolderGain.set_value(&mut effects, 0.157);
+
+        assert_eq!(
+            EffectNumericParameter::LensStrength.display_value(&effects),
+            "0.005"
+        );
+        assert_eq!(
+            EffectNumericParameter::LensChromaticAberration.display_value(&effects),
+            "0.0005"
+        );
+        assert_eq!(
+            EffectNumericParameter::LensChromaticAberration.display_lfo_amplitude(0.0005),
+            "0.0005"
+        );
+        assert_eq!(
+            EffectNumericParameter::WavefolderGain.display_value(&effects),
+            "0.157"
+        );
     }
 }
