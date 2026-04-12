@@ -415,12 +415,12 @@ impl EffectNumericParameter {
         match self {
             Self::WavefolderGain => 0.1,
             Self::WavefolderModulus => 0.05,
-            Self::LensStrength | Self::LensRadialK2 | Self::LensRadialK3 => 0.05,
-            Self::LensCenterX | Self::LensCenterY => 0.01,
-            Self::LensScaleX | Self::LensScaleY => 0.05,
-            Self::LensTangentialX | Self::LensTangentialY => 0.01,
-            Self::LensZoom => 0.02,
-            Self::LensChromaticAberration => 0.005,
+            Self::LensStrength | Self::LensRadialK2 | Self::LensRadialK3 => 0.005,
+            Self::LensCenterX | Self::LensCenterY => 0.001,
+            Self::LensScaleX | Self::LensScaleY => 0.005,
+            Self::LensTangentialX | Self::LensTangentialY => 0.001,
+            Self::LensZoom => 0.002,
+            Self::LensChromaticAberration => 0.0005,
             Self::GaussianBlurSigma => 0.05,
             Self::GaussianBlurRadius => 1.0,
             Self::BloomThreshold | Self::BloomIntensity => 0.05,
@@ -535,5 +535,26 @@ mod tests {
         EffectNumericParameter::BloomRadius.set_value(&mut effects, 7.6);
 
         assert_eq!(effects.bloom.radius_pixels, 8);
+    }
+
+    #[test]
+    fn lens_parameters_use_fine_adjustment_steps() {
+        let expected_steps = [
+            (EffectNumericParameter::LensStrength, 0.005),
+            (EffectNumericParameter::LensRadialK2, 0.005),
+            (EffectNumericParameter::LensRadialK3, 0.005),
+            (EffectNumericParameter::LensCenterX, 0.001),
+            (EffectNumericParameter::LensCenterY, 0.001),
+            (EffectNumericParameter::LensScaleX, 0.005),
+            (EffectNumericParameter::LensScaleY, 0.005),
+            (EffectNumericParameter::LensTangentialX, 0.001),
+            (EffectNumericParameter::LensTangentialY, 0.001),
+            (EffectNumericParameter::LensZoom, 0.002),
+            (EffectNumericParameter::LensChromaticAberration, 0.0005),
+        ];
+
+        for (parameter, expected_step) in expected_steps {
+            assert_eq!(parameter.adjustment_step(false, false), expected_step);
+        }
     }
 }
