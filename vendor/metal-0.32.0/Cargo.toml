@@ -1,0 +1,41 @@
+[package]
+name = "metal"
+version = "0.32.0"
+description = "Rust bindings for Metal"
+documentation = "https://docs.rs/crate/metal"
+homepage = "https://github.com/gfx-rs/metal-rs"
+repository = "https://github.com/gfx-rs/metal-rs"
+authors = ["gfx-rs developers"]
+readme = "README.md"
+keywords = ["metal", "graphics", "bindings"]
+license = "MIT OR Apache-2.0"
+edition = "2021"
+rust-version = "1.82"
+
+[package.metadata.docs.rs]
+targets = [
+  "aarch64-apple-darwin",
+  "aarch64-apple-ios",
+  "aarch64-apple-ios-sim",
+  "x86_64-apple-darwin",
+  "x86_64-apple-ios",
+]
+
+[features]
+default = ["link"]
+private = []
+mps = []
+link = ["core-graphics-types/link"]
+cargo-clippy = []
+
+[dependencies]
+core-graphics-types = { version = "0.2.0", default-features = false }
+bitflags = "2"
+log = "0.4"
+block = "0.1.6"
+foreign-types = "0.5"
+dispatch = { version = "0.2", optional = true }
+paste = { package = "pastey", version = "0.2.1" }
+
+[dependencies.objc]
+version = "0.2.4"

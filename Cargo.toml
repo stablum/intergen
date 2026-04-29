@@ -1,6 +1,6 @@
 [package]
 name = "intergen"
-version = "0.9.9"
+version = "0.9.10"
 edition = "2024"
 authors = ["Francesco Stablum"]
 license = "GPL-3.0-or-later"
@@ -23,6 +23,11 @@ bevy = { version = "0.18.1", default-features = false, features = [
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "0.8"
+
+[patch.crates-io]
+# metal 0.32.0 still depends on the unmaintained paste crate. Keep the
+# upstream metal source locally and alias pastey in its manifest.
+metal = { path = "vendor/metal-0.32.0" }
 
 [profile.dev]
 opt-level = 1
