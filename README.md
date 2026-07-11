@@ -6,6 +6,7 @@ Runtime tuning lives in `config.toml` at the repository root.
 
 ## Documentation
 
+- [`SPAWN_GEOMETRY_GUIDE.md`](SPAWN_GEOMETRY_GUIDE.md): illustrated guide to every shape-spawning key, geometry parameter, placement rule, and generation setting
 - [`DATA_MODEL.md`](DATA_MODEL.md): scene/config/preset data model, including shared vs per-shape parameters
 
 ## Gallery

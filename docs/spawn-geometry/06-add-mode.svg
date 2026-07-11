@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="390" viewBox="0 0 960 390" role="img" aria-labelledby="title desc">
+  <title id="title">Single and fill-current-level spawn modes</title><desc id="desc">A parent with one child in single mode and a parent surrounded by same-level children in fill mode.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1020"/><stop offset="1" stop-color="#17122b"/></linearGradient><linearGradient id="p" x2="0" y2="1"><stop stop-color="#6ceaff"/><stop offset="1" stop-color="#285ca0"/></linearGradient><linearGradient id="k" x2="0" y2="1"><stop stop-color="#ff83d8"/><stop offset="1" stop-color="#7b3caa"/></linearGradient></defs><rect width="960" height="390" rx="22" fill="url(#bg)"/>
+  <text x="36" y="44" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">Ctrl + Space changes how much one Space action adds</text>
+  <line x1="480" y1="86" x2="480" y2="350" stroke="#354365" stroke-width="2"/>
+  <g font-family="system-ui,sans-serif" text-anchor="middle"><text x="245" y="91" fill="#63e6ff" font-size="18" font-weight="700">SINGLE OBJECT</text><text x="715" y="91" fill="#ff8bd8" font-size="18" font-weight="700">FILL CURRENT LEVEL</text>
+    <g transform="translate(153 68)" stroke="#a5f4ff" stroke-width="2"><polygon points="40,178 104,144 164,175 100,211" fill="url(#p)"/><polygon points="40,178 100,211 100,271 40,238" fill="#234e85"/><polygon points="100,211 164,175 164,235 100,271" fill="#173863"/></g>
+    <g transform="translate(278 42) scale(.7)" stroke="#ffc7eb" stroke-width="2"><polygon points="40,178 104,144 164,175 100,211" fill="url(#k)"/><polygon points="40,178 100,211 100,271 40,238" fill="#72338f"/><polygon points="100,211 164,175 164,235 100,271" fill="#51266f"/></g><text x="245" y="333" fill="#dce6ff" font-size="14">one success → one child</text>
+    <g transform="translate(623 68)" stroke="#a5f4ff" stroke-width="2"><polygon points="40,178 104,144 164,175 100,211" fill="url(#p)"/><polygon points="40,178 100,211 100,271 40,238" fill="#234e85"/><polygon points="100,211 164,175 164,235 100,271" fill="#173863"/></g>
+    <g fill="url(#k)" stroke="#ffc7eb" stroke-width="2"><polygon points="640,142 673,124 705,141 672,160"/><polygon points="786,166 819,148 851,165 818,184"/><polygon points="786,280 819,262 851,279 818,298"/><polygon points="576,258 609,240 641,257 608,276"/><polygon points="658,333 691,315 723,332 690,351"/></g>
+    <path d="M596 142Q715 88 842 159M851 192Q875 245 840 279M774 312Q730 348 705 345M648 330Q600 314 610 279" fill="none" stroke="#ff72d0" stroke-width="2" stroke-dasharray="6 5"/>
+    <text x="715" y="372" fill="#dce6ff" font-size="14">same target level until no valid attachment remains</text>
+  </g>
+</svg>

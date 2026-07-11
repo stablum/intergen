@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="430" viewBox="0 0 960 430" role="img" aria-labelledby="title desc">
+  <title id="title">Keyboard map for spawn geometry</title><desc id="desc">Color grouped keyboard keys for shape, placement, size, twist, offsets, filtering, reset, and spawning.</desc>
+  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1020"/><stop offset="1" stop-color="#17122b"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="5" stdDeviation="4" flood-opacity=".35"/></filter></defs>
+  <rect width="960" height="430" rx="22" fill="url(#bg)"/>
+  <text x="36" y="44" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">Direct geometry controls</text>
+  <text x="36" y="70" fill="#aab5d6" font-family="system-ui,sans-serif" font-size="14">Normal scene view · holdable controls carry a ↻ symbol</text>
+  <g font-family="system-ui,sans-serif" text-anchor="middle" filter="url(#s)">
+    <g fill="#203f62" stroke="#63e6ff" stroke-width="2"><rect x="58" y="105" width="72" height="58" rx="10"/><rect x="140" y="105" width="72" height="58" rx="10"/><rect x="222" y="105" width="72" height="58" rx="10"/><rect x="304" y="105" width="72" height="58" rx="10"/></g>
+    <g fill="#e8fbff" font-size="22" font-weight="700"><text x="94" y="140">1</text><text x="176" y="140">2</text><text x="258" y="140">3</text><text x="340" y="140">4</text></g>
+    <text x="217" y="185" fill="#63e6ff" font-size="14">CHILD SHAPE</text>
+    <g fill="#432954" stroke="#ff72d0" stroke-width="2"><rect x="421" y="105" width="72" height="58" rx="10"/><rect x="503" y="105" width="72" height="58" rx="10"/><rect x="585" y="105" width="72" height="58" rx="10"/></g>
+    <g fill="#ffe1f5" font-size="21" font-weight="700"><text x="457" y="140">G</text><text x="539" y="140">,</text><text x="621" y="140">.</text></g>
+    <text x="539" y="185" fill="#ff8bd8" font-size="14">PLACEMENT / REUSE</text>
+    <g fill="#4b3c22" stroke="#ffe08a" stroke-width="2"><rect x="704" y="105" width="72" height="58" rx="10"/><rect x="786" y="105" width="116" height="58" rx="10"/></g>
+    <text x="740" y="140" fill="#fff1bc" font-size="20" font-weight="700">Ctrl</text><text x="844" y="140" fill="#fff1bc" font-size="17" font-weight="700">Space ↻</text>
+    <text x="803" y="185" fill="#ffe08a" font-size="14">ADD MODE / SPAWN</text>
+    <g fill="#203f62" stroke="#63e6ff" stroke-width="2"><rect x="58" y="224" width="72" height="58" rx="10"/><rect x="140" y="224" width="72" height="58" rx="10"/></g>
+    <text x="94" y="260" fill="#e8fbff" font-size="22" font-weight="700">−</text><text x="176" y="260" fill="#e8fbff" font-size="22" font-weight="700">+</text><text x="135" y="304" fill="#63e6ff" font-size="14">SCALE</text>
+    <g fill="#432954" stroke="#ff72d0" stroke-width="2"><rect x="258" y="224" width="72" height="58" rx="10"/><rect x="340" y="224" width="72" height="58" rx="10"/><rect x="422" y="224" width="72" height="58" rx="10"/></g>
+    <text x="294" y="260" fill="#ffe1f5" font-size="19" font-weight="700">[ ↻</text><text x="376" y="260" fill="#ffe1f5" font-size="19" font-weight="700">] ↻</text><text x="458" y="260" fill="#ffe1f5" font-size="21" font-weight="700">T</text><text x="376" y="304" fill="#ff8bd8" font-size="14">TWIST</text>
+    <g fill="#283f30" stroke="#8dffb3" stroke-width="2"><rect x="540" y="224" width="72" height="58" rx="10"/><rect x="622" y="224" width="72" height="58" rx="10"/><rect x="704" y="224" width="72" height="58" rx="10"/></g>
+    <text x="576" y="260" fill="#dcffe8" font-size="18" font-weight="700">Z ↻</text><text x="658" y="260" fill="#dcffe8" font-size="18" font-weight="700">X ↻</text><text x="740" y="260" fill="#dcffe8" font-size="21" font-weight="700">C</text><text x="658" y="304" fill="#8dffb3" font-size="14">OUTWARD OFFSET</text>
+    <g fill="#4b3c22" stroke="#ffe08a" stroke-width="2"><rect x="58" y="338" width="72" height="58" rx="10"/><rect x="140" y="338" width="72" height="58" rx="10"/><rect x="222" y="338" width="72" height="58" rx="10"/></g>
+    <text x="94" y="374" fill="#fff1bc" font-size="18" font-weight="700">V ↻</text><text x="176" y="374" fill="#fff1bc" font-size="18" font-weight="700">B ↻</text><text x="258" y="374" fill="#fff1bc" font-size="21" font-weight="700">N</text>
+    <text x="176" y="418" fill="#ffe08a" font-size="14">EXCLUSION</text>
+    <rect x="364" y="338" width="82" height="58" rx="10" fill="#432954" stroke="#ff72d0" stroke-width="2"/><text x="405" y="374" fill="#ffe1f5" font-size="21" font-weight="700">R</text><text x="405" y="418" fill="#ff8bd8" font-size="14">RESET TREE</text>
+    <rect x="530" y="338" width="372" height="58" rx="10" fill="#111a31" stroke="#37466d"/><text x="716" y="363" fill="#f7f5ff" font-size="14">F2 adds exact entry, axis scale, local position</text><text x="716" y="384" fill="#aab5d6" font-size="13">and LFO modulation for every numeric control</text>
+  </g>
+</svg>
