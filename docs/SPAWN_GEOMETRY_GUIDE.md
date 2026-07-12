@@ -12,7 +12,7 @@ scenes.
 > `[` / `]` for rotation around the attachment direction and `Z` / `X` for
 > distance away from the parent.
 
-![The complete spawn pipeline, from parent attachment to child transform](docs/spawn-geometry/01-mental-model.svg)
+![The complete spawn pipeline, from parent attachment to child transform](spawn-geometry/01-mental-model.svg)
 
 ## Contents
 
@@ -69,7 +69,7 @@ rendered child scale = child uniform scale × child axis scale (component-wise)
 
 ## Direct-key quick reference
 
-![Keyboard controls that directly affect spawned geometry](docs/spawn-geometry/02-keyboard-map.svg)
+![Keyboard controls that directly affect spawned geometry](spawn-geometry/02-keyboard-map.svg)
 
 These keys work in the normal scene view. When an `F` page is focused, its input
 mask may claim the same keys for page navigation or editing.
@@ -107,7 +107,7 @@ exclusion, and `Space` support hold-to-repeat.
 The direct keys are the fast path. The `F2` page exposes all geometry values,
 including per-axis scale and local position offset.
 
-![How to reach and edit the generation controls on the F2 page](docs/spawn-geometry/03-f2-workflow.svg)
+![How to reach and edit the generation controls on the F2 page](spawn-geometry/03-f2-workflow.svg)
 
 1. Press `F2` once to open parameter groups.
 2. Select the `scene` group with `Up` / `Down`, then press `Enter` or `Space`.
@@ -148,7 +148,7 @@ and spawn percentage—support LFOs. Shape, placement, and add mode are value-on
 
 ## Shape kind: 1, 2, 3, 4
 
-![The four available child meshes](docs/spawn-geometry/04-shape-kind.svg)
+![The four available child meshes](spawn-geometry/04-shape-kind.svg)
 
 `1`, `2`, `3`, and `4` choose the mesh for **future child spawns**:
 
@@ -167,7 +167,7 @@ The selected shape also determines what `R` makes into the new root.
 
 ## Placement mode: G
 
-![Vertex, edge, and face attachment anchors and normals](docs/spawn-geometry/05-placement-mode.svg)
+![Vertex, edge, and face attachment anchors and normals](spawn-geometry/05-placement-mode.svg)
 
 `G` cycles `vertex → edge → face → vertex`. The mode chooses attachment anchors
 on every potential parent:
@@ -187,7 +187,7 @@ mode and index from which they were created.
 
 ## Add mode and spawning: Ctrl+Space and Space
 
-![Single and fill-current-level add modes](docs/spawn-geometry/06-add-mode.svg)
+![Single and fill-current-level add modes](spawn-geometry/06-add-mode.svg)
 
 `Ctrl` + `Space` cycles between:
 
@@ -205,7 +205,7 @@ variation inside one batch.
 
 ## Single-source repeat count: comma and period
 
-![How single-source repeat count reuses one attachment](docs/spawn-geometry/07-repeat-count.svg)
+![How single-source repeat count reuses one attachment](spawn-geometry/07-repeat-count.svg)
 
 This control applies only in **single object** add mode:
 
@@ -227,7 +227,7 @@ LFO values or their child mesh transform.
 
 ## Uniform child scale ratio: minus and plus
 
-![Uniform scale ratio inherited through the shape tree](docs/spawn-geometry/08-scale-ratio.svg)
+![Uniform scale ratio inherited through the shape tree](spawn-geometry/08-scale-ratio.svg)
 
 `-` and `+` change the child scale ratio by `scale_adjust_step` within
 `min_scale_ratio..max_scale_ratio`.
@@ -248,7 +248,7 @@ Important distinctions:
 
 ## Per-axis child scale: F2 only
 
-![Independent X, Y, and Z scaling of a spawned child](docs/spawn-geometry/09-axis-scale.svg)
+![Independent X, Y, and Z scaling of a spawned child](spawn-geometry/09-axis-scale.svg)
 
 The F2 rows `axis x`, `axis y`, and `axis z` set a non-uniform scale copied into
 each newly spawned node. `[1, 1, 1]` preserves the mesh proportions; increasing
@@ -267,7 +267,7 @@ X/Y/Z; they are not the radial/tangent/bitangent axes of position offset.
 
 ## Twist: brackets and T
 
-![Attachment-index twist around the outward axis](docs/spawn-geometry/10-twist.svg)
+![Attachment-index twist around the outward axis](spawn-geometry/10-twist.svg)
 
 - `[` decreases twist by `twist_adjust_step`;
 - `]` increases it;
@@ -292,7 +292,7 @@ so the tree is re-laid-out rather than regenerated.
 
 ## Outward offset: Z, X, and C
 
-![Outward offset measured in child-radius units](docs/spawn-geometry/11-outward-offset.svg)
+![Outward offset measured in child-radius units](spawn-geometry/11-outward-offset.svg)
 
 - `Z` decreases the ratio;
 - `X` increases it;
@@ -318,7 +318,7 @@ Like twist, changing outward offset **recomputes all existing descendants**.
 
 ## Local position offset: F2 only
 
-![Radial, tangent, and bitangent position-offset axes](docs/spawn-geometry/12-position-offset.svg)
+![Radial, tangent, and bitangent position-offset axes](spawn-geometry/12-position-offset.svg)
 
 The F2 rows `pos x`, `pos y`, and `pos z` move future children in a local spawn
 frame:
@@ -339,7 +339,7 @@ existing node's copied vector.
 
 ## Spawn exclusion: V, B, and N
 
-![Deterministic attachment exclusion probability](docs/spawn-geometry/13-exclusion.svg)
+![Deterministic attachment exclusion probability](spawn-geometry/13-exclusion.svg)
 
 - `V` decreases the probability;
 - `B` increases it;
@@ -361,7 +361,7 @@ This means:
 
 ## Resetting the scene: R
 
-![Reset replaces the tree with the selected shape as a new root](docs/spawn-geometry/14-reset-and-scope.svg)
+![Reset replaces the tree with the selected shape as a new root](spawn-geometry/14-reset-and-scope.svg)
 
 `R` despawns every rendered shape and replaces the model with a single root:
 
@@ -378,7 +378,7 @@ reset. The attachment cursor and held-spawn state are cleared.
 
 ## Traversal, occupied attachments, and rejected spawns
 
-![Breadth-first traversal, attachment occupancy, and containment rejection](docs/spawn-geometry/15-search-and-rejection.svg)
+![Breadth-first traversal, attachment occupancy, and containment rejection](spawn-geometry/15-search-and-rejection.svg)
 
 For an ordinary single spawn without an active repeat cursor, Intergen searches:
 
@@ -403,7 +403,7 @@ number of successful spawns has been reached.
 
 ## What changes existing shapes?
 
-![Live reflow parameters compared with future-spawn-only parameters](docs/spawn-geometry/16-existing-vs-future.svg)
+![Live reflow parameters compared with future-spawn-only parameters](spawn-geometry/16-existing-vs-future.svg)
 
 | Setting | Existing nodes | Future nodes |
 | --- | --- | --- |
@@ -425,7 +425,7 @@ local position values are materialized into each node when it is created.
 
 ## Generation LFOs
 
-![Base value plus LFO modulation sampled at spawn time](docs/spawn-geometry/17-generation-lfo.svg)
+![Base value plus LFO modulation sampled at spawn time](spawn-geometry/17-generation-lfo.svg)
 
 Every numeric generation row supports an LFO. The evaluated value is:
 
@@ -452,11 +452,11 @@ children even though the batch is created in a single frame.
 
 ## Configuration reference
 
-The app loads `[generation]` from [`config.toml`](config.toml) at startup. F2
+The app loads `[generation]` from [`config.toml`](../config.toml) at startup. F2
 edits are runtime-only and are not written back automatically. Values omitted
 from the file use built-in defaults.
 
-![How configuration values become runtime controls and node transforms](docs/spawn-geometry/18-configuration.svg)
+![How configuration values become runtime controls and node transforms](spawn-geometry/18-configuration.svg)
 
 ### Geometry defaults and bounds
 

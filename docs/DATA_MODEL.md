@@ -6,11 +6,11 @@ This document describes the current scene data model in the codebase: what is st
 
 The scene state is split across a few layers:
 
-1. `config.toml` and [`src/config.rs`](src/config.rs): startup defaults, clamp ranges, and UI/control tuning.
-2. Runtime scene resources in [`src/scene/state.rs`](src/scene/state.rs): the live scene-wide state used by the app.
-3. Per-shape nodes in [`src/polyhedra/spawn.rs`](src/polyhedra/spawn.rs): the actual recursive shape tree.
-4. Snapshot and preset structs in [`src/scene_snapshot.rs`](src/scene_snapshot.rs) and [`src/presets/storage.rs`](src/presets/storage.rs): the serialized form used by scene presets and Blender export metadata.
-5. Effect/LFO runtime state in [`src/effect_tuner/state`](src/effect_tuner/state): live post-process values plus scene-parameter modulation.
+1. `config.toml` and [`src/config.rs`](../src/config.rs): startup defaults, clamp ranges, and UI/control tuning.
+2. Runtime scene resources in [`src/scene/state.rs`](../src/scene/state.rs): the live scene-wide state used by the app.
+3. Per-shape nodes in [`src/polyhedra/spawn.rs`](../src/polyhedra/spawn.rs): the actual recursive shape tree.
+4. Snapshot and preset structs in [`src/scene_snapshot.rs`](../src/scene_snapshot.rs) and [`src/presets/storage.rs`](../src/presets/storage.rs): the serialized form used by scene presets and Blender export metadata.
+5. Effect/LFO runtime state in [`src/effect_tuner/state`](../src/effect_tuner/state): live post-process values plus scene-parameter modulation.
 
 The main rule is:
 
@@ -337,7 +337,7 @@ Generated shapes do not store their own material/color block. Appearance is deri
 - shared `MaterialState`
 - shared opacity
 
-In [`src/scene/materials.rs`](src/scene/materials.rs), the current material appearance is computed roughly like this:
+In [`src/scene/materials.rs`](../src/scene/materials.rs), the current material appearance is computed roughly like this:
 
 - hue comes from `level * hue_step_per_level + hue_bias(kind)`
 - surface family comes from the shared surface-mode rules and the node level
