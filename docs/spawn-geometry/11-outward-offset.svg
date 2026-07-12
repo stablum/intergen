@@ -1,9 +1,25 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="390" viewBox="0 0 960 390" role="img" aria-labelledby="title desc">
-  <title id="title">Child outward offset ratio</title><desc id="desc">A child moves away from an attachment by zero, one, and two child radii.</desc>
-  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1020"/><stop offset="1" stop-color="#17122b"/></linearGradient><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#ffe08a"/></marker></defs><rect width="960" height="390" rx="22" fill="url(#bg)"/><text x="36" y="44" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">Z / X / C — extra separation is measured in child radii</text>
-  <g font-family="system-ui,sans-serif"><circle cx="180" cy="221" r="98" fill="#203f62" stroke="#63e6ff" stroke-width="3"/><circle cx="278" cy="221" r="36" fill="#432954" stroke="#ff72d0" stroke-width="3"/><circle cx="479" cy="221" r="36" fill="#432954" stroke="#ff72d0" stroke-width="3"/><circle cx="752" cy="221" r="36" fill="#432954" stroke="#ff72d0" stroke-width="3"/>
-  <circle cx="278" cy="221" r="4" fill="#ffe08a"/><path d="M314 221H443" stroke="#ffe08a" stroke-width="5" marker-end="url(#a)"/><path d="M515 221H716" stroke="#ffe08a" stroke-width="5" marker-end="url(#a)"/>
-  <path d="M278 284H479M479 300H752" stroke="#6f7da2" stroke-width="2" stroke-dasharray="6 5"/>
-  <text x="278" y="116" text-anchor="middle" fill="#63e6ff" font-size="15" font-weight="700">ANCHOR</text><text x="278" y="340" text-anchor="middle" fill="#dce6ff" font-size="15">ratio 0</text><text x="479" y="340" text-anchor="middle" fill="#dce6ff" font-size="15">ratio 1</text><text x="752" y="340" text-anchor="middle" fill="#dce6ff" font-size="15">ratio 2</text>
-  <text x="378" y="204" text-anchor="middle" fill="#ffe08a" font-size="13">+ 1 × radius</text><text x="616" y="204" text-anchor="middle" fill="#ffe08a" font-size="13">+ 1 × radius</text><text x="180" y="226" text-anchor="middle" fill="#e8fbff" font-size="16" font-weight="700">PARENT</text></g>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="410" viewBox="0 0 960 410" role="img" aria-labelledby="title desc">
+  <title id="title">Child outward offset ratio</title>
+  <desc id="desc">Three radial cross-sections accurately show child-center displacement of zero, one, and two child radii from the attachment anchor.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1020"/><stop offset="1" stop-color="#17122b"/></linearGradient>
+    <marker id="left" markerWidth="9" markerHeight="9" refX="1" refY="3" orient="auto"><path d="M9 0L0 3 9 6Z" fill="#ffe08a"/></marker>
+    <marker id="right" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#ffe08a"/></marker>
+  </defs>
+  <rect width="960" height="410" rx="22" fill="url(#bg)"/>
+  <text x="36" y="43" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">Z / X / C — center displacement in child-radius units</text>
+  <text x="36" y="69" fill="#aab5d6" font-family="system-ui,sans-serif" font-size="14">Radial cross-section · all three panels use the same scale · child radius = r</text>
+
+  <g fill="#111a31" stroke="#37466d"><rect x="30" y="92" width="286" height="270" rx="16"/><rect x="337" y="92" width="286" height="270" rx="16"/><rect x="644" y="92" width="286" height="270" rx="16"/></g>
+  <g font-family="system-ui,sans-serif" text-anchor="middle">
+    <text x="173" y="125" fill="#63e6ff" font-size="17" font-weight="700">RATIO 0</text><text x="480" y="125" fill="#8dffb3" font-size="17" font-weight="700">RATIO 1</text><text x="787" y="125" fill="#ff8bd8" font-size="17" font-weight="700">RATIO 2</text>
+
+    <circle cx="120" cy="240" r="64" fill="#203f62" stroke="#63e6ff" stroke-width="3"/><circle cx="184" cy="240" r="26" fill="#432954" fill-opacity=".9" stroke="#ff8bd8" stroke-width="3"/><circle cx="184" cy="240" r="5" fill="#ffe08a"/><line x1="184" y1="240" x2="184" y2="214" stroke="#ffe08a" stroke-width="2"/><text x="193" y="218" fill="#ffe08a" font-size="12" text-anchor="start">r</text><text x="120" y="245" fill="#e8fbff" font-size="13" font-weight="700">PARENT</text><text x="173" y="316" fill="#dce6ff" font-size="13">child center = anchor</text><text x="173" y="337" fill="#aab5d6" font-size="12">displacement 0 × r</text>
+
+    <circle cx="427" cy="240" r="64" fill="#203f62" stroke="#63e6ff" stroke-width="3"/><circle cx="517" cy="240" r="26" fill="#432954" fill-opacity=".9" stroke="#ff8bd8" stroke-width="3"/><circle cx="491" cy="240" r="5" fill="#ffe08a"/><circle cx="517" cy="240" r="4" fill="#fff1bc"/><line x1="491" y1="205" x2="517" y2="205" stroke="#ffe08a" stroke-width="3" marker-start="url(#left)" marker-end="url(#right)"/><text x="504" y="194" fill="#ffe08a" font-size="12">1r</text><line x1="517" y1="240" x2="517" y2="214" stroke="#ffe08a" stroke-width="2"/><text x="526" y="218" fill="#ffe08a" font-size="12" text-anchor="start">r</text><text x="427" y="245" fill="#e8fbff" font-size="13" font-weight="700">PARENT</text><text x="480" y="316" fill="#dce6ff" font-size="13">child just clears the anchor</text><text x="480" y="337" fill="#aab5d6" font-size="12">displacement 1 × r</text>
+
+    <circle cx="734" cy="240" r="64" fill="#203f62" stroke="#63e6ff" stroke-width="3"/><circle cx="850" cy="240" r="26" fill="#432954" fill-opacity=".9" stroke="#ff8bd8" stroke-width="3"/><circle cx="798" cy="240" r="5" fill="#ffe08a"/><circle cx="850" cy="240" r="4" fill="#fff1bc"/><line x1="798" y1="205" x2="850" y2="205" stroke="#ffe08a" stroke-width="3" marker-start="url(#left)" marker-end="url(#right)"/><text x="824" y="194" fill="#ffe08a" font-size="12">2r</text><line x1="850" y1="240" x2="850" y2="214" stroke="#ffe08a" stroke-width="2"/><text x="859" y="218" fill="#ffe08a" font-size="12" text-anchor="start">r</text><text x="734" y="245" fill="#e8fbff" font-size="13" font-weight="700">PARENT</text><text x="787" y="316" fill="#dce6ff" font-size="13">one-radius gap beyond contact</text><text x="787" y="337" fill="#aab5d6" font-size="12">displacement 2 × r</text>
+  </g>
+  <rect x="246" y="377" width="468" height="25" rx="7" fill="#111a31" stroke="#37466d"/>
+  <text x="480" y="394" text-anchor="middle" fill="#dce6ff" font-family="ui-monospace,monospace" font-size="13">child center = anchor + outward × (ratio × r)</text>
 </svg>

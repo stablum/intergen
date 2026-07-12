@@ -1,44 +1,51 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
-  <title id="title">Intergen spawn transform mental model</title>
-  <desc id="desc">A parent cube, selected attachment, local frame, twist, position offset, outward offset, and final child.</desc>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="430" viewBox="0 0 960 430" role="img" aria-labelledby="title desc">
+  <title id="title">Four-step child transform mental model</title>
+  <desc id="desc">Four separate panels show attachment selection, twist around the outward axis, local position offset, and final outward displacement. Each arrow begins and ends on the quantity it represents.</desc>
   <defs>
     <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1020"/><stop offset="1" stop-color="#17122b"/></linearGradient>
-    <linearGradient id="cube" x2="0" y2="1"><stop stop-color="#69e8ff"/><stop offset="1" stop-color="#2976b8"/></linearGradient>
-    <linearGradient id="child" x2="0" y2="1"><stop stop-color="#ff80d5"/><stop offset="1" stop-color="#8f3ec2"/></linearGradient>
-    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6Z" fill="#ffe08a"/></marker>
-    <marker id="cyan" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6Z" fill="#62e6ff"/></marker>
-    <marker id="pink" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L9,3 L0,6Z" fill="#ff6fcf"/></marker>
+    <linearGradient id="parent" x2="0" y2="1"><stop stop-color="#72ecff"/><stop offset="1" stop-color="#3477bb"/></linearGradient>
+    <linearGradient id="child" x2="0" y2="1"><stop stop-color="#ff8bd8"/><stop offset="1" stop-color="#8b3eb2"/></linearGradient>
+    <marker id="yellow" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#ffe08a"/></marker>
+    <marker id="cyan" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#63e6ff"/></marker>
+    <marker id="pink" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#ff72d0"/></marker>
+    <marker id="green" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#8dffb3"/></marker>
   </defs>
-  <rect width="960" height="420" rx="22" fill="url(#bg)"/>
-  <text x="36" y="42" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">How one child transform is built</text>
-  <text x="36" y="70" fill="#aab5d6" font-family="system-ui,sans-serif" font-size="14">attachment anchor → indexed twist → local position offset → child-radius outward offset</text>
-  <g stroke="#9ff0ff" stroke-width="2">
-    <polygon points="92,205 190,153 282,202 183,257" fill="url(#cube)"/>
-    <polygon points="92,205 183,257 183,351 92,298" fill="#245a91"/>
-    <polygon points="183,257 282,202 282,296 183,351" fill="#183f72"/>
+  <rect width="960" height="430" rx="22" fill="url(#bg)"/>
+  <text x="36" y="43" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">How one child transform is built</text>
+  <text x="36" y="69" fill="#aab5d6" font-family="system-ui,sans-serif" font-size="14">Each panel isolates one operation; arrows are not decorative</text>
+
+  <g fill="#111a31" stroke="#37466d"><rect x="22" y="91" width="214" height="270" rx="15"/><rect x="256" y="91" width="214" height="270" rx="15"/><rect x="490" y="91" width="214" height="270" rx="15"/><rect x="724" y="91" width="214" height="270" rx="15"/></g>
+  <g font-family="system-ui,sans-serif">
+    <g><circle cx="46" cy="116" r="14" fill="#203f62"/><text x="46" y="121" text-anchor="middle" fill="#e8fbff" font-size="13" font-weight="700">1</text><text x="68" y="121" fill="#63e6ff" font-size="14" font-weight="700">ATTACHMENT</text></g>
+    <g stroke="#a5f4ff" stroke-width="2"><polygon points="54,227 126,189 197,225 124,265" fill="url(#parent)"/><polygon points="54,227 124,265 124,326 54,288" fill="#234e85"/><polygon points="124,265 197,225 197,286 124,326" fill="#173863"/></g>
+    <circle cx="197" cy="225" r="7" fill="#ffe08a"/><text x="126" y="344" text-anchor="middle" fill="#aab5d6" font-size="12">anchor + outward direction</text><line x1="197" y1="225" x2="224" y2="198" stroke="#ffe08a" stroke-width="3" marker-end="url(#yellow)"/>
+
+    <g><circle cx="280" cy="116" r="14" fill="#432954"/><text x="280" y="121" text-anchor="middle" fill="#ffe1f5" font-size="13" font-weight="700">2</text><text x="302" y="121" fill="#ff8bd8" font-size="14" font-weight="700">INDEXED TWIST</text></g>
+    <circle cx="363" cy="240" r="72" fill="#0d1427" stroke="#526183" stroke-width="2"/>
+    <rect x="325" y="202" width="76" height="76" fill="none" stroke="#7180a8" stroke-width="2" stroke-dasharray="6 5"/>
+    <rect x="325" y="202" width="76" height="76" fill="#432954" stroke="#ff8bd8" stroke-width="2.5" transform="rotate(32 363 240)"/>
+    <circle cx="363" cy="240" r="6" fill="#63e6ff"/>
+    <path d="M313 282A66 66 0 0 1 317 194" fill="none" stroke="#ffe08a" stroke-width="4" marker-end="url(#yellow)"/>
+    <text x="363" y="334" text-anchor="middle" fill="#aab5d6" font-size="12">looking along outward axis</text>
+
+    <g><circle cx="514" cy="116" r="14" fill="#283f30"/><text x="514" y="121" text-anchor="middle" fill="#dcffe8" font-size="13" font-weight="700">3</text><text x="536" y="121" fill="#8dffb3" font-size="14" font-weight="700">LOCAL OFFSET</text></g>
+    <circle cx="566" cy="254" r="5" fill="#f7f5ff"/>
+    <line x1="566" y1="254" x2="627" y2="220" stroke="#63e6ff" stroke-width="3" marker-end="url(#cyan)"/><line x1="566" y1="254" x2="620" y2="282" stroke="#ff72d0" stroke-width="3" marker-end="url(#pink)"/><line x1="566" y1="254" x2="566" y2="190" stroke="#8dffb3" stroke-width="3" marker-end="url(#green)"/>
+    <text x="632" y="221" fill="#63e6ff" font-size="12">X</text><text x="625" y="292" fill="#ff8bd8" font-size="12">Y</text><text x="574" y="189" fill="#8dffb3" font-size="12">Z</text>
+    <polygon points="617,242 646,227 674,241 645,257" fill="#432954" stroke="#ff8bd8" stroke-width="2"/><polygon points="617,242 645,257 645,282 617,267" fill="#73338e" stroke="#ffb8e7"/><polygon points="645,257 674,241 674,266 645,282" fill="#51266f" stroke="#ffb8e7"/>
+    <line x1="566" y1="254" x2="645" y2="254" stroke="#ffe08a" stroke-width="3" marker-end="url(#yellow)"/>
+    <circle cx="645" cy="254" r="4" fill="#ffe08a"/>
+    <text x="597" y="334" text-anchor="middle" fill="#aab5d6" font-size="12">move in radial / tangent frame</text>
+
+    <g><circle cx="748" cy="116" r="14" fill="#4b3c22"/><text x="748" y="121" text-anchor="middle" fill="#fff1bc" font-size="13" font-weight="700">4</text><text x="770" y="121" fill="#ffe08a" font-size="14" font-weight="700">OUTWARD MOVE</text></g>
+    <circle cx="770" cy="273" r="7" fill="#ffe08a"/>
+    <line x1="770" y1="273" x2="870" y2="223" stroke="#ffe08a" stroke-width="4" marker-end="url(#yellow)"/>
+    <text x="802" y="238" text-anchor="middle" fill="#ffe08a" font-size="12">r × ratio</text>
+    <g stroke="#ffc7eb" stroke-width="2"><polygon points="827,203 871,180 914,202 870,226" fill="url(#child)"/><polygon points="827,203 870,226 870,265 827,242" fill="#73338e"/><polygon points="870,226 914,202 914,241 870,265" fill="#51266f"/></g>
+    <circle cx="870" cy="223" r="4" fill="#ffe08a"/>
+    <text x="831" y="334" text-anchor="middle" fill="#aab5d6" font-size="12">final child center</text>
   </g>
-  <circle cx="282" cy="202" r="8" fill="#ffe08a" stroke="#fff3c2" stroke-width="3"/>
-  <text x="88" y="382" fill="#dce6ff" font-family="system-ui,sans-serif" font-size="16" font-weight="700">PARENT</text>
-  <text x="248" y="181" fill="#ffe08a" font-family="system-ui,sans-serif" font-size="13">anchor</text>
-  <line x1="282" y1="202" x2="418" y2="130" stroke="#62e6ff" stroke-width="4" marker-end="url(#cyan)"/>
-  <text x="334" y="130" fill="#62e6ff" font-family="system-ui,sans-serif" font-size="14" font-weight="700">X radial / outward</text>
-  <line x1="282" y1="202" x2="374" y2="248" stroke="#ff6fcf" stroke-width="4" marker-end="url(#pink)"/>
-  <text x="336" y="270" fill="#ff9ade" font-family="system-ui,sans-serif" font-size="14">Y tangent</text>
-  <line x1="282" y1="202" x2="277" y2="104" stroke="#8dffb3" stroke-width="4" marker-end="url(#cyan)"/>
-  <text x="208" y="102" fill="#8dffb3" font-family="system-ui,sans-serif" font-size="14">Z bitangent</text>
-  <path d="M325 183 C350 188 360 207 351 229" fill="none" stroke="#ffe08a" stroke-width="4" marker-end="url(#arrow)"/>
-  <text x="350" y="188" fill="#ffe08a" font-family="system-ui,sans-serif" font-size="13">twist</text>
-  <path d="M398 164 L523 106" stroke="#ff6fcf" stroke-width="4" stroke-dasharray="8 6" marker-end="url(#pink)"/>
-  <text x="418" y="94" fill="#ff9ade" font-family="system-ui,sans-serif" font-size="13">local position offset</text>
-  <path d="M523 106 L690 42" stroke="#ffe08a" stroke-width="5" marker-end="url(#arrow)"/>
-  <text x="568" y="120" fill="#ffe08a" font-family="system-ui,sans-serif" font-size="13">outward = radius × ratio</text>
-  <g transform="translate(676 66) rotate(-8)" stroke="#ffc6eb" stroke-width="2">
-    <polygon points="0,86 75,45 145,80 70,123" fill="url(#child)"/>
-    <polygon points="0,86 70,123 70,192 0,154" fill="#783598"/>
-    <polygon points="70,123 145,80 145,149 70,192" fill="#55257c"/>
-  </g>
-  <text x="723" y="285" fill="#ffd7f1" font-family="system-ui,sans-serif" font-size="16" font-weight="700">FINAL CHILD</text>
-  <rect x="520" y="312" width="400" height="72" rx="12" fill="#111a31" stroke="#37466d"/>
-  <text x="540" y="338" fill="#f7f5ff" font-family="ui-monospace,monospace" font-size="14">child scale = parent scale × scale ratio</text>
-  <text x="540" y="364" fill="#aab5d6" font-family="ui-monospace,monospace" font-size="14">mesh scale  = child scale × [axis x, y, z]</text>
+
+  <rect x="125" y="382" width="710" height="31" rx="8" fill="#111a31" stroke="#37466d"/>
+  <text x="480" y="402" text-anchor="middle" fill="#dce6ff" font-family="ui-monospace,monospace" font-size="13">child scale = parent scale × ratio  ·  mesh scale = child scale × axis scale</text>
 </svg>

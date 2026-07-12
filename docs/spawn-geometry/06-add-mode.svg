@@ -1,14 +1,56 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="390" viewBox="0 0 960 390" role="img" aria-labelledby="title desc">
-  <title id="title">Single and fill-current-level spawn modes</title><desc id="desc">A parent with one child in single mode and a parent surrounded by same-level children in fill mode.</desc>
-  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1020"/><stop offset="1" stop-color="#17122b"/></linearGradient><linearGradient id="p" x2="0" y2="1"><stop stop-color="#6ceaff"/><stop offset="1" stop-color="#285ca0"/></linearGradient><linearGradient id="k" x2="0" y2="1"><stop stop-color="#ff83d8"/><stop offset="1" stop-color="#7b3caa"/></linearGradient></defs><rect width="960" height="390" rx="22" fill="url(#bg)"/>
-  <text x="36" y="44" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">Ctrl + Space changes how much one Space action adds</text>
-  <line x1="480" y1="86" x2="480" y2="350" stroke="#354365" stroke-width="2"/>
-  <g font-family="system-ui,sans-serif" text-anchor="middle"><text x="245" y="91" fill="#63e6ff" font-size="18" font-weight="700">SINGLE OBJECT</text><text x="715" y="91" fill="#ff8bd8" font-size="18" font-weight="700">FILL CURRENT LEVEL</text>
-    <g transform="translate(153 68)" stroke="#a5f4ff" stroke-width="2"><polygon points="40,178 104,144 164,175 100,211" fill="url(#p)"/><polygon points="40,178 100,211 100,271 40,238" fill="#234e85"/><polygon points="100,211 164,175 164,235 100,271" fill="#173863"/></g>
-    <g transform="translate(278 42) scale(.7)" stroke="#ffc7eb" stroke-width="2"><polygon points="40,178 104,144 164,175 100,211" fill="url(#k)"/><polygon points="40,178 100,211 100,271 40,238" fill="#72338f"/><polygon points="100,211 164,175 164,235 100,271" fill="#51266f"/></g><text x="245" y="333" fill="#dce6ff" font-size="14">one success → one child</text>
-    <g transform="translate(623 68)" stroke="#a5f4ff" stroke-width="2"><polygon points="40,178 104,144 164,175 100,211" fill="url(#p)"/><polygon points="40,178 100,211 100,271 40,238" fill="#234e85"/><polygon points="100,211 164,175 164,235 100,271" fill="#173863"/></g>
-    <g fill="url(#k)" stroke="#ffc7eb" stroke-width="2"><polygon points="640,142 673,124 705,141 672,160"/><polygon points="786,166 819,148 851,165 818,184"/><polygon points="786,280 819,262 851,279 818,298"/><polygon points="576,258 609,240 641,257 608,276"/><polygon points="658,333 691,315 723,332 690,351"/></g>
-    <path d="M596 142Q715 88 842 159M851 192Q875 245 840 279M774 312Q730 348 705 345M648 330Q600 314 610 279" fill="none" stroke="#ff72d0" stroke-width="2" stroke-dasharray="6 5"/>
-    <text x="715" y="372" fill="#dce6ff" font-size="14">same target level until no valid attachment remains</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="420" viewBox="0 0 960 420" role="img" aria-labelledby="title desc">
+  <title id="title">Single and fill-current-level spawn modes</title>
+  <desc id="desc">Single mode adds one complete 3D child cube. Fill-current-level mode adds complete 3D child cubes at every valid attachment on one target level.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1020"/><stop offset="1" stop-color="#17122b"/></linearGradient>
+    <linearGradient id="parent" x2="0" y2="1"><stop stop-color="#72ecff"/><stop offset="1" stop-color="#3477bb"/></linearGradient>
+    <linearGradient id="child" x2="0" y2="1"><stop stop-color="#ff8bd8"/><stop offset="1" stop-color="#8b3eb2"/></linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#ffe08a"/></marker>
+  </defs>
+  <rect width="960" height="420" rx="22" fill="url(#bg)"/>
+  <text x="36" y="43" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">Ctrl + Space changes the result of one Space action</text>
+  <line x1="480" y1="82" x2="480" y2="385" stroke="#354365" stroke-width="2"/>
+
+  <g font-family="system-ui,sans-serif" text-anchor="middle">
+    <text x="240" y="93" fill="#63e6ff" font-size="18" font-weight="700">SINGLE OBJECT</text>
+    <text x="720" y="93" fill="#ff8bd8" font-size="18" font-weight="700">FILL CURRENT LEVEL</text>
+
+    <g stroke="#a5f4ff" stroke-width="2">
+      <polygon points="89,239 181,191 270,236 177,287" fill="url(#parent)"/>
+      <polygon points="89,239 177,287 177,365 89,317" fill="#234e85"/>
+      <polygon points="177,287 270,236 270,314 177,365" fill="#173863"/>
+    </g>
+    <circle cx="270" cy="236" r="6" fill="#ffe08a"/>
+    <line x1="270" y1="236" x2="347" y2="195" stroke="#ffe08a" stroke-width="3" marker-end="url(#arrow)"/>
+    <g stroke="#ffc7eb" stroke-width="2">
+      <polygon points="302,171 348,147 393,170 347,195" fill="url(#child)"/>
+      <polygon points="302,171 347,195 347,236 302,212" fill="#73338e"/>
+      <polygon points="347,195 393,170 393,211 347,236" fill="#51266f"/>
+    </g>
+    <circle cx="347" cy="195" r="4" fill="#ffe08a"/>
+    <rect x="153" y="116" width="174" height="38" rx="10" fill="#111a31" stroke="#37466d"/>
+    <text x="240" y="140" fill="#dce6ff" font-size="14">Space × 1 → one child</text>
+
+    <g stroke="#a5f4ff" stroke-width="2">
+      <polygon points="635,239 720,194 803,236 717,283" fill="url(#parent)"/>
+      <polygon points="635,239 717,283 717,355 635,311" fill="#234e85"/>
+      <polygon points="717,283 803,236 803,308 717,355" fill="#173863"/>
+    </g>
+
+    <g stroke="#ffc7eb" stroke-width="1.8">
+      <g><polygon points="548,180 579,164 609,179 578,196" fill="url(#child)"/><polygon points="548,180 578,196 578,224 548,208" fill="#73338e"/><polygon points="578,196 609,179 609,207 578,224" fill="#51266f"/></g>
+      <g><polygon points="678,137 709,121 739,136 708,153" fill="url(#child)"/><polygon points="678,137 708,153 708,181 678,165" fill="#73338e"/><polygon points="708,153 739,136 739,164 708,181" fill="#51266f"/></g>
+      <g><polygon points="824,181 855,165 885,180 854,197" fill="url(#child)"/><polygon points="824,181 854,197 854,225 824,209" fill="#73338e"/><polygon points="854,197 885,180 885,208 854,225" fill="#51266f"/></g>
+      <g><polygon points="824,302 855,286 885,301 854,318" fill="url(#child)"/><polygon points="824,302 854,318 854,346 824,330" fill="#73338e"/><polygon points="854,318 885,301 885,329 854,346" fill="#51266f"/></g>
+      <g><polygon points="548,302 579,286 609,301 578,318" fill="url(#child)"/><polygon points="548,302 578,318 578,346 548,330" fill="#73338e"/><polygon points="578,318 609,301 609,329 578,346" fill="#51266f"/></g>
+    </g>
+    <g stroke="#ffe08a" stroke-width="2" opacity=".75">
+      <line x1="651" y1="226" x2="602" y2="207"/><line x1="695" y1="203" x2="710" y2="181"/><line x1="792" y1="229" x2="838" y2="208"/><line x1="797" y1="302" x2="825" y2="314"/><line x1="649" y1="312" x2="609" y2="317"/>
+    </g>
+    <rect x="610" y="105" width="220" height="38" rx="10" fill="#111a31" stroke="#37466d"/>
+    <text x="720" y="129" fill="#dce6ff" font-size="14">Space × 1 → all valid children</text>
+    <path d="M560 374H880" stroke="#8dffb3" stroke-width="2"/>
+    <path d="M560 366V382M880 366V382" stroke="#8dffb3" stroke-width="2"/>
+    <text x="720" y="404" fill="#8dffb3" font-size="13">every new cube is on the same target level L + 1</text>
   </g>
 </svg>

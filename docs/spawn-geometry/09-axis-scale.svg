@@ -1,9 +1,64 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="390" viewBox="0 0 960 390" role="img" aria-labelledby="title desc">
-  <title id="title">Per-axis child scale</title><desc id="desc">Four isometric cubes show neutral and independently stretched X, Y, and Z local mesh axes.</desc>
-  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1020"/><stop offset="1" stop-color="#17122b"/></linearGradient></defs><rect width="960" height="390" rx="22" fill="url(#bg)"/><text x="36" y="44" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">F2 axis x / y / z — stretch the child mesh locally</text><text x="36" y="70" fill="#aab5d6" font-family="system-ui,sans-serif" font-size="14">These values are copied into new nodes; [1, 1, 1] is neutral</text>
-  <g font-family="system-ui,sans-serif" text-anchor="middle" stroke-width="2"><g transform="translate(45 10)" stroke="#a5f4ff"><polygon points="28,189 95,153 160,186 92,224" fill="#3d9bd0"/><polygon points="28,189 92,224 92,286 28,251" fill="#234e85"/><polygon points="92,224 160,186 160,248 92,286" fill="#173863"/></g><text x="137" y="330" fill="#dce6ff" font-size="15">[1, 1, 1]</text><text x="137" y="352" fill="#aab5d6" font-size="13">neutral</text>
-    <g transform="translate(253 10)" stroke="#ffc7eb"><polygon points="10,189 95,143 180,186 92,235" fill="#c552b5"/><polygon points="10,189 92,235 92,286 10,241" fill="#73338e"/><polygon points="92,235 180,186 180,237 92,286" fill="#51266f"/></g><text x="345" y="330" fill="#ff8bd8" font-size="15">axis X ↑</text><text x="345" y="352" fill="#aab5d6" font-size="13">local width</text>
-    <g transform="translate(478 10)" stroke="#d4ffe2"><polygon points="28,189 95,153 160,186 92,224" fill="#4ec48c"/><polygon points="28,189 92,224 92,306 28,271" fill="#28725d"/><polygon points="92,224 160,186 160,268 92,306" fill="#18594f"/></g><text x="570" y="330" fill="#8dffb3" font-size="15">axis Y ↑</text><text x="570" y="352" fill="#aab5d6" font-size="13">local height</text>
-    <g transform="translate(703 10)" stroke="#fff0ba"><polygon points="18,189 95,148 173,187 92,232" fill="#d3a34a"/><polygon points="18,189 92,232 92,286 18,245" fill="#8d632e"/><polygon points="92,232 173,187 173,241 92,286" fill="#664522"/></g><path d="M762 170L835 131" stroke="#ffe08a" stroke-width="5"/><text x="795" y="330" fill="#ffe08a" font-size="15">axis Z ↑</text><text x="795" y="352" fill="#aab5d6" font-size="13">local depth</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="430" viewBox="0 0 960 430" role="img" aria-labelledby="title desc">
+  <title id="title">Per-axis child scale</title>
+  <desc id="desc">Four isometric cuboids use one consistent local coordinate frame. The neutral cube is followed by correct stretches along local X, local Y, and local Z.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1020"/><stop offset="1" stop-color="#17122b"/></linearGradient>
+    <linearGradient id="top" x2="0" y2="1"><stop stop-color="#72ecff"/><stop offset="1" stop-color="#3477bb"/></linearGradient>
+    <marker id="cyan" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#63e6ff"/></marker>
+    <marker id="green" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#8dffb3"/></marker>
+    <marker id="pink" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#ff72d0"/></marker>
+  </defs>
+  <rect width="960" height="430" rx="22" fill="url(#bg)"/>
+  <text x="36" y="43" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">F2 axis x / y / z — one shared local frame</text>
+  <text x="36" y="69" fill="#aab5d6" font-family="system-ui,sans-serif" font-size="14">Only the named basis vector changes length; the other two stay fixed</text>
+
+  <g font-family="system-ui,sans-serif">
+    <circle cx="480" cy="94" r="4" fill="#f7f5ff"/>
+    <line x1="480" y1="94" x2="522" y2="115" stroke="#63e6ff" stroke-width="3" marker-end="url(#cyan)"/>
+    <line x1="480" y1="94" x2="480" y2="139" stroke="#8dffb3" stroke-width="3" marker-end="url(#green)"/>
+    <line x1="480" y1="94" x2="438" y2="115" stroke="#ff72d0" stroke-width="3" marker-end="url(#pink)"/>
+    <text x="529" y="121" fill="#63e6ff" font-size="13" font-weight="700">X</text>
+    <text x="489" y="143" fill="#8dffb3" font-size="13" font-weight="700">Y</text>
+    <text x="420" y="121" fill="#ff8bd8" font-size="13" font-weight="700">Z</text>
   </g>
+
+  <g font-family="system-ui,sans-serif" text-anchor="middle" stroke-width="2">
+    <g stroke="#a5f4ff">
+      <polygon points="130,176 178,200 130,224 82,200" fill="url(#top)"/>
+      <polygon points="82,200 130,224 130,284 82,260" fill="#234e85"/>
+      <polygon points="130,224 178,200 178,260 130,284" fill="#173863"/>
+    </g>
+    <text x="130" y="330" fill="#dce6ff" font-size="16" font-weight="700">[1, 1, 1]</text>
+    <text x="130" y="352" fill="#aab5d6" font-size="13">neutral cube</text>
+
+    <g stroke="#ffc7eb">
+      <polygon points="360,166 438,205 390,229 312,190" fill="#c552b5"/>
+      <polygon points="312,190 390,229 390,289 312,250" fill="#73338e"/>
+      <polygon points="390,229 438,205 438,265 390,289" fill="#51266f"/>
+    </g>
+    <line x1="360" y1="166" x2="432" y2="202" stroke="#63e6ff" stroke-width="4" marker-end="url(#cyan)"/>
+    <text x="375" y="330" fill="#63e6ff" font-size="16" font-weight="700">axis X = 1.6</text>
+    <text x="375" y="352" fill="#aab5d6" font-size="13">stretches down-right</text>
+
+    <g stroke="#d4ffe2">
+      <polygon points="600,151 648,175 600,199 552,175" fill="#4ec48c"/>
+      <polygon points="552,175 600,199 600,304 552,280" fill="#28725d"/>
+      <polygon points="600,199 648,175 648,280 600,304" fill="#18594f"/>
+    </g>
+    <line x1="600" y1="201" x2="600" y2="296" stroke="#8dffb3" stroke-width="4" marker-end="url(#green)"/>
+    <text x="600" y="330" fill="#8dffb3" font-size="16" font-weight="700">axis Y = 1.75</text>
+    <text x="600" y="352" fill="#aab5d6" font-size="13">stretches vertically</text>
+
+    <g stroke="#fff0ba">
+      <polygon points="830,166 878,190 800,229 752,205" fill="#d3a34a"/>
+      <polygon points="752,205 800,229 800,289 752,265" fill="#8d632e"/>
+      <polygon points="800,229 878,190 878,250 800,289" fill="#664522"/>
+    </g>
+    <line x1="830" y1="166" x2="758" y2="202" stroke="#ff72d0" stroke-width="4" marker-end="url(#pink)"/>
+    <text x="815" y="330" fill="#ff8bd8" font-size="16" font-weight="700">axis Z = 1.6</text>
+    <text x="815" y="352" fill="#aab5d6" font-size="13">stretches down-left</text>
+  </g>
+
+  <rect x="225" y="382" width="510" height="30" rx="8" fill="#111a31" stroke="#37466d"/>
+  <text x="480" y="402" text-anchor="middle" fill="#dce6ff" font-family="system-ui,sans-serif" font-size="13">Rendered scale = uniform child scale × [axis X, axis Y, axis Z]</text>
 </svg>

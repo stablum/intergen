@@ -1,9 +1,45 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="960" height="400" viewBox="0 0 960 400" role="img" aria-labelledby="title desc">
-  <title id="title">Indexed twist around attachment outward axis</title><desc id="desc">Four children at attachment indices zero through three rotate by multiples of a 36 degree step.</desc>
-  <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1020"/><stop offset="1" stop-color="#17122b"/></linearGradient><marker id="a" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#ffe08a"/></marker></defs><rect width="960" height="400" rx="22" fill="url(#bg)"/><text x="36" y="44" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">[ / ] / T — indexed twist around the outward axis</text><text x="36" y="70" fill="#aab5d6" font-family="system-ui,sans-serif" font-size="14">Example step = 36° · actual angle = attachment index × step</text>
-  <g font-family="system-ui,sans-serif" text-anchor="middle"><g fill="#111a31" stroke="#37466d"><rect x="34" y="96" width="210" height="254" rx="15"/><rect x="261" y="96" width="210" height="254" rx="15"/><rect x="488" y="96" width="210" height="254" rx="15"/><rect x="715" y="96" width="210" height="254" rx="15"/></g>
-  <g fill="#63e6ff" font-size="14" font-weight="700"><text x="139" y="126">INDEX 0</text><text x="366" y="126">INDEX 1</text><text x="593" y="126">INDEX 2</text><text x="820" y="126">INDEX 3</text></g>
-  <g fill="#432954" stroke="#ffb8e7" stroke-width="3"><rect x="92" y="184" width="94" height="94" transform="rotate(0 139 231)"/><rect x="319" y="184" width="94" height="94" transform="rotate(36 366 231)"/><rect x="546" y="184" width="94" height="94" transform="rotate(72 593 231)"/><rect x="773" y="184" width="94" height="94" transform="rotate(108 820 231)"/></g>
-  <g fill="none" stroke="#ffe08a" stroke-width="4" marker-end="url(#a)"><path d="M99 292A62 62 0 0 1 185 292"/><path d="M326 292A62 62 0 0 1 412 292"/><path d="M553 292A62 62 0 0 1 639 292"/><path d="M780 292A62 62 0 0 1 866 292"/></g>
-  <g fill="#dce6ff" font-size="16" font-weight="700"><text x="139" y="329">0°</text><text x="366" y="329">36°</text><text x="593" y="329">72°</text><text x="820" y="329">108°</text></g></g>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="430" viewBox="0 0 960 430" role="img" aria-labelledby="title desc">
+  <title id="title">Indexed twist around the attachment outward axis</title>
+  <desc id="desc">A 3D parent and child establish the outward axis. A separate view looking directly along that axis shows a centered circular twist arrow and the child rotating from a ghost orientation to a solid orientation.</desc>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1020"/><stop offset="1" stop-color="#17122b"/></linearGradient>
+    <linearGradient id="parent" x2="0" y2="1"><stop stop-color="#72ecff"/><stop offset="1" stop-color="#3477bb"/></linearGradient>
+    <linearGradient id="child" x2="0" y2="1"><stop stop-color="#ff8bd8"/><stop offset="1" stop-color="#8b3eb2"/></linearGradient>
+    <marker id="axis-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#63e6ff"/></marker>
+    <marker id="twist-arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0 0L9 3 0 6Z" fill="#ffe08a"/></marker>
+  </defs>
+  <rect width="960" height="430" rx="22" fill="url(#bg)"/>
+  <text x="36" y="43" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">[ / ] / T — rotate around the attachment's outward axis</text>
+  <text x="36" y="69" fill="#aab5d6" font-family="system-ui,sans-serif" font-size="14">The yellow rotation is centered on the cyan axis; it is not a movement around the parent</text>
+
+  <g font-family="system-ui,sans-serif">
+    <text x="270" y="105" text-anchor="middle" fill="#63e6ff" font-size="16" font-weight="700">3D PLACEMENT VIEW</text>
+    <g stroke="#a5f4ff" stroke-width="2">
+      <polygon points="60,239 165,184 265,235 159,293" fill="url(#parent)"/>
+      <polygon points="60,239 159,293 159,377 60,323" fill="#234e85"/>
+      <polygon points="159,293 265,235 265,319 159,377" fill="#173863"/>
+    </g>
+    <circle cx="212" cy="306" r="8" fill="#ffe08a" stroke="#fff3c2" stroke-width="2"/>
+    <line x1="212" y1="306" x2="520" y2="202" stroke="#63e6ff" stroke-width="4" marker-end="url(#axis-arrow)"/>
+    <text x="279" y="150" fill="#63e6ff" font-size="13" font-weight="700">outward axis</text>
+    <g stroke="#ffc7eb" stroke-width="2">
+      <polygon points="351,211 414,178 475,209 411,244" fill="url(#child)"/>
+      <polygon points="351,211 411,244 411,299 351,266" fill="#73338e"/>
+      <polygon points="411,244 475,209 475,264 411,299" fill="#51266f"/>
+    </g>
+    <circle cx="411" cy="239" r="5" fill="#63e6ff"/>
+
+    <rect x="560" y="92" width="360" height="265" rx="18" fill="#111a31" stroke="#37466d"/>
+    <text x="740" y="121" text-anchor="middle" fill="#ff8bd8" font-size="16" font-weight="700">VIEW ALONG THE CYAN AXIS</text>
+    <circle cx="740" cy="231" r="92" fill="#0d1427" stroke="#526183" stroke-width="2"/>
+    <rect x="688" y="179" width="104" height="104" fill="none" stroke="#7180a8" stroke-width="2" stroke-dasharray="7 5"/>
+    <rect x="688" y="179" width="104" height="104" fill="#432954" fill-opacity=".78" stroke="#ff8bd8" stroke-width="3" transform="rotate(36 740 231)"/>
+    <circle cx="740" cy="231" r="7" fill="#63e6ff" stroke="#e8fbff" stroke-width="2"/>
+    <path d="M678 278A80 80 0 0 1 683 176" fill="none" stroke="#ffe08a" stroke-width="5" marker-end="url(#twist-arrow)"/>
+    <text x="652" y="235" text-anchor="middle" fill="#ffe08a" font-size="14" font-weight="700">36°</text>
+    <text x="740" y="329" text-anchor="middle" fill="#aab5d6" font-size="13">ghost = inherited orientation · solid = twisted</text>
+  </g>
+
+  <rect x="126" y="382" width="708" height="31" rx="8" fill="#111a31" stroke="#37466d"/>
+  <text x="480" y="402" text-anchor="middle" fill="#dce6ff" font-family="system-ui,sans-serif" font-size="13">angle = attachment index × step  ·  at 36°: index 0 = 0°, 1 = 36°, 2 = 72°, 3 = 108°</text>
 </svg>
