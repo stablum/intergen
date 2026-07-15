@@ -266,6 +266,36 @@ Without dynamic linking:
 cargo test-plain
 ```
 
+### Efficient local verification
+
+Cargo is configured to keep all build artifacts in one persistent, ignored
+cache at `.target-verification-runs/cargo-cache`, including when commands are
+run directly. Use the verification wrapper for the standard verification
+levels:
+
+```powershell
+# Formatting only; does not compile Rust code
+.\scripts\verify.ps1 -Mode format
+
+# One focused test or test-name substring
+.\scripts\verify.ps1 -Mode targeted -TestFilter reset_confirmation
+
+# Complete test suite
+.\scripts\verify.ps1 -Mode full
+
+# Automated render-and-exit smoke run
+.\scripts\verify.ps1 -Mode smoke
+
+# Full tests followed by the smoke run
+.\scripts\verify.ps1 -Mode all
+```
+
+Reuse this cache and wrapper across tasks instead of creating per-task target directories.
+Run targeted tests while iterating and the full suite only once after the change
+is final. Do not run `cargo check` before `cargo test` or `cargo run`; those
+commands already perform compilation checks. Use `cargo check` only when no
+test or runnable build will follow.
+
 ## Controls
 
 - `Arrow Up` / `Arrow Down`: pitch camera
@@ -324,6 +354,7 @@ cargo test-plain
 - Editing Rust source files should usually rebuild only `intergen`.
 - Changing `Cargo.toml`, enabled features, toolchain, or profile settings can trigger a larger one-time rebuild.
 - `cargo check` is the fastest command for type-checking without launching the app.
+- `.\scripts\verify.ps1` reuses one Cargo target directory for formatting, tests, and smoke runs.
 
 ## Current Scope
 

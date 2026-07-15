@@ -1,3 +1,6 @@
+[build]
+target-dir = ".target-verification-runs/cargo-cache"
+
 [alias]
 check-plain = "check --no-default-features"
 run-plain = "run --no-default-features"
