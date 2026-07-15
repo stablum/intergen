@@ -4,8 +4,7 @@ use crate::effect_tuner::{EffectTunerPageMode, EffectTunerState};
 use crate::presets::PresetBrowserState;
 use crate::ui::HelpOverlayState;
 
-const EFFECT_TUNER_BINDINGS: [KeyBindingPattern; 10] = [
-    KeyBindingPattern::any_modifiers(KeyCode::Space),
+const EFFECT_TUNER_BINDINGS: [KeyBindingPattern; 9] = [
     KeyBindingPattern::any_modifiers(KeyCode::KeyL),
     KeyBindingPattern::any_modifiers(KeyCode::Tab),
     KeyBindingPattern::any_modifiers(KeyCode::ArrowLeft),
@@ -477,7 +476,8 @@ mod tests {
             preset_chooser_visible: false,
         };
 
-        assert!(mask.captures_binding(binding(KeyCode::Space)));
+        assert!(!mask.captures_binding(binding(KeyCode::Space)));
+        assert!(!mask.captures_binding(ctrl_binding(KeyCode::Space)));
         assert!(mask.captures_binding(binding(KeyCode::ArrowUp)));
         assert!(mask.captures_binding(binding(KeyCode::Digit1)));
         assert!(mask.captures_binding(shifted_binding(KeyCode::Digit1)));
@@ -666,6 +666,16 @@ mod tests {
             key_code,
             modifiers: KeyModifiers {
                 shift: true,
+                ..KeyModifiers::default()
+            },
+        }
+    }
+
+    fn ctrl_binding(key_code: KeyCode) -> KeyBinding {
+        KeyBinding {
+            key_code,
+            modifiers: KeyModifiers {
+                control: true,
                 ..KeyModifiers::default()
             },
         }

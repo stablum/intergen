@@ -110,7 +110,7 @@ including per-axis scale and local position offset.
 ![How to reach and edit the generation controls on the F2 page](spawn-geometry/03-f2-workflow.svg)
 
 1. Press `F2` once to open parameter groups.
-2. Select the `scene` group with `Up` / `Down`, then press `Enter` or `Space`.
+2. Select the `scene` group with `Up` / `Down`, then press `Enter`.
    Alternatively, a second `F2` opens compact controls and a third opens the
    complete list.
 3. Use `Up` / `Down` to select a row.

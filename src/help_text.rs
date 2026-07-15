@@ -46,7 +46,7 @@ const TOP_LEVEL_HELP: [HelpEntry; 6] = [
     },
 ];
 
-const FX_HELP: [HelpEntry; 14] = [
+const FX_HELP: [HelpEntry; 13] = [
     HelpEntry {
         startup: "Up/Down selects a parameter group on the first F2 page",
         overlay: "In first F2 page: Up / Down select parameter group",
@@ -54,9 +54,9 @@ const FX_HELP: [HelpEntry; 14] = [
         explanation: "In the first F2 page, select a parameter group.",
     },
     HelpEntry {
-        startup: "Enter or Space opens the selected parameter group",
-        overlay: "In first F2 page: Enter or Space opens the selected group parameter list",
-        binding: "Enter / Space",
+        startup: "Enter opens the selected parameter group",
+        overlay: "In first F2 page: Enter opens the selected group parameter list",
+        binding: "Enter",
         explanation: "In the first F2 page, open the selected group parameter list.",
     },
     HelpEntry {
@@ -82,12 +82,6 @@ const FX_HELP: [HelpEntry; 14] = [
         overlay: "In F2 compact or list page: Ctrl + Up / Down adjust the active field",
         binding: "Ctrl + Up / Down",
         explanation: "In the F2 compact or list page, adjust the active field.",
-    },
-    HelpEntry {
-        startup: "Space toggles the selected shader effect",
-        overlay: "In F2 compact or list page: Space toggles the selected shader effect",
-        binding: "Space",
-        explanation: "In the F2 compact or list page, toggle the selected shader effect.",
     },
     HelpEntry {
         startup: "L toggles the selected parameter LFO when supported",
@@ -120,10 +114,10 @@ const FX_HELP: [HelpEntry; 14] = [
         explanation: "In the F2 compact or list page, use fine adjustment.",
     },
     HelpEntry {
-        startup: "Enter confirms typed F2 input",
-        overlay: "In F2 compact or list page: Enter confirms typed numeric input",
+        startup: "Enter confirms typed F2 input or toggles the selected shader effect",
+        overlay: "In F2 compact or list page: Enter confirms numeric input or toggles the selected shader effect",
         binding: "Enter",
-        explanation: "In the F2 compact or list page, confirm typed numeric input.",
+        explanation: "In the F2 compact or list page, confirm typed numeric input or toggle the selected shader effect when no numeric input is pending.",
     },
     HelpEntry {
         startup: "Shift+Enter opens the F2 reset confirmation",

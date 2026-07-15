@@ -137,30 +137,13 @@ pub(crate) fn effect_tuner_input_system(
             println!("Selected group: {}", effect_tuner.selected_group_label());
         }
 
-        if !modifiers.shift_pressed && (enter_pressed || keys.just_pressed(KeyCode::Space)) {
+        if enter_pressed {
             let selected_group = effect_tuner.selected_group_label();
             effect_tuner.show_selected_group_list_page(now_secs);
             println!("F2 {} parameter list page pinned open.", selected_group);
         }
 
         return;
-    }
-
-    if keys.just_pressed(KeyCode::Space) {
-        if let Some(selected_effect) = effect_tuner.selected_effect_group() {
-            if let Some(enabled) = effect_tuner.toggle_selected_effect(now_secs) {
-                recent_changes.record(
-                    format!("{} effect", selected_effect.label()),
-                    if enabled { "ON" } else { "OFF" },
-                    now_secs,
-                );
-                println!(
-                    "{} {}.",
-                    selected_effect.label(),
-                    if enabled { "enabled" } else { "disabled" }
-                );
-            }
-        }
     }
 
     if keys.just_pressed(KeyCode::KeyL) {
@@ -379,6 +362,19 @@ pub(crate) fn effect_tuner_input_system(
                     now_secs,
                 )
             );
+        } else if let Some(selected_effect) = effect_tuner.selected_effect_group() {
+            if let Some(enabled) = effect_tuner.toggle_selected_effect(now_secs) {
+                recent_changes.record(
+                    format!("{} effect", selected_effect.label()),
+                    if enabled { "ON" } else { "OFF" },
+                    now_secs,
+                );
+                println!(
+                    "{} {}.",
+                    selected_effect.label(),
+                    if enabled { "enabled" } else { "disabled" }
+                );
+            }
         }
     }
 

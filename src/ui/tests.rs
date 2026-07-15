@@ -22,9 +22,7 @@ fn overlay_text_lists_help_and_spawn_controls() {
     assert!(text.contains("F4: Export the current scene as a Blender .blend"));
     assert!(text.contains("F5: Toggle the recent interactive changes page"));
     assert!(text.contains("In first F2 page: Up / Down select parameter group"));
-    assert!(text.contains(
-        "In first F2 page: Enter or Space opens the selected group parameter list"
-    ));
+    assert!(text.contains("In first F2 page: Enter opens the selected group parameter list"));
     assert!(text.contains("In F2 compact or list page: Up / Down select control"));
     assert!(text.contains(
         "In F2 page: Second F2 press opens compact controls, third press opens the full list"
@@ -38,7 +36,7 @@ fn overlay_text_lists_help_and_spawn_controls() {
         "In F2 compact or list page: Ctrl + Up / Down adjust the active field"
     ));
     assert!(text.contains(
-        "In F2 compact or list page: Space toggles the selected shader effect"
+        "In F2 compact or list page: Enter confirms numeric input or toggles the selected shader effect"
     ));
     assert!(text.contains(
         "In F2 compact or list page: L toggles the selected parameter LFO when supported"

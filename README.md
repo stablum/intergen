@@ -154,15 +154,15 @@ The in-app F2 control page starts from the values loaded from `config.toml` at l
 - Live edits affect the running app only.
 - The F2 control list covers shader effects plus scene, stage, and material runtime controls, including enum-like fields such as child shape, spawn placement mode, add mode, stage toggles, and procedural surface families.
 - The first `F2` press opens a parameter-group page, the second `F2` press opens the compact strip, the third `F2` press opens the full scrolling parameter list with an LFO detail panel beside the selected row, and the fourth `F2` press closes the page.
-- On the first F2 page, `Up` / `Down` choose a parameter group and `Enter` or `Space` opens that group's parameter list.
+- On the first F2 page, `Up` / `Down` choose a parameter group and `Enter` opens that group's parameter list.
 - `Up` / `Down` select the active F2 control in the compact page, the full list page, or a group-specific parameter list, with hold-to-repeat.
 - `Left` / `Right` or `Tab` / `Shift + Tab` switch the active F2 field between value, LFO amplitude, LFO frequency, and LFO shape when the selected parameter supports LFOs.
 - `Ctrl + Up` / `Ctrl + Down` adjust the active F2 field in the compact or parameter-list pages. `Shift` makes the step coarser and `Alt` makes it finer.
-- `Space` toggles the selected shader effect on or off in the compact or parameter-list pages.
 - `L` toggles the selected parameter LFO on or off when the selected parameter supports LFOs.
 - Type digits, `.`, `,`, `-`, or `+` to set the active numeric field directly. `Backspace` erases the typed numeric input in the compact or parameter-list pages.
 - LFO shapes currently available are `sine`, `triangle`, `saw`, `square`, `stepped random`, and `brownian motion`.
-- `Enter` confirms typed numeric F2 input. With no numeric input active, it has no effect in compact or parameter-list pages.
+- `Enter` confirms typed numeric F2 input. With no numeric input active, it toggles the selected shader effect on or off; it has no effect on non-shader rows.
+- F2 does not capture `Space` or `Ctrl + Space`, so spawning and add-mode cycling remain available while an F2 page is open.
 - `Shift + Enter` opens a confirmation chooser in any F2 page. Choose `Cancel`, `config.toml`, or `Last loaded preset` with `Up` / `Down` and `Enter`; `Esc` also cancels. The preset option is unavailable until a preset has been loaded.
 - Resetting restores all F2-controlled values and LFOs from the chosen source while preserving the current generated tree structure; existing geometry is recomputed with the restored controls.
 - Shader-effect parameters expose LFO fields, and so do the supported numeric scene/runtime parameters, including live scene updates and generation values that only take effect during future spawning. Other scene, stage, and material controls remain value-only.
@@ -310,15 +310,14 @@ test or runnable build will follow.
 - `F5`: open or close the recent interactive changes page
 - `Esc`: close the current F-page, including help, F2, F3, or F5
 - `Up` / `Down` in the first F2 page: select the active parameter group
-- `Enter` / `Space` in the first F2 page: open the selected group's parameter list
+- `Enter` in the first F2 page: open the selected group's parameter list
 - `Up` / `Down` in F2 compact or parameter-list pages: select the active F2 control, with hold-to-repeat
 - `Left` / `Right` or `Tab` / `Shift + Tab` in F2: switch the active F2 field
 - `Ctrl + Up` / `Ctrl + Down` in F2 compact or parameter-list pages: adjust the active F2 field
-- `Space` in F2 compact or parameter-list pages: toggle the selected shader effect on or off
 - `L` in F2: toggle the selected parameter LFO on or off when supported
 - `Shift` in F2: coarse adjustment modifier
 - `Alt` in F2: fine adjustment modifier
-- `Enter` in F2 compact or parameter-list pages: confirm typed numeric input
+- `Enter` in F2 compact or parameter-list pages: confirm typed numeric input, or toggle the selected shader effect when no numeric input is pending
 - `Shift + Enter` in F2: open the reset confirmation chooser (`Cancel`, `config.toml`, or `Last loaded preset`)
 - `F12`: save a screenshot to `screenshots/`
 - `R`: reset the scene with the currently selected shape as the new root
