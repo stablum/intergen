@@ -9,7 +9,7 @@ use super::storage::{
 use crate::camera::{CameraRig, sync_scene_camera_transform};
 use crate::config::AppConfig;
 use crate::control_page::{ControlPage, ControlPageState};
-use crate::effect_tuner::EffectTunerState;
+use crate::effect_tuner::{EffectTunerResetBaseline, EffectTunerResetBaselines, EffectTunerState};
 use crate::recent_changes::RecentChangesState;
 use crate::runtime_scene::SceneMutationAccess;
 use crate::scene::{
@@ -20,6 +20,7 @@ use crate::scene_snapshot::SceneStateSnapshot;
 
 pub(crate) fn automated_scene_preset_load_system(
     preset_load: Option<Res<AutomatedScenePresetLoad>>,
+    mut reset_baselines: ResMut<EffectTunerResetBaselines>,
     mut scene: SceneMutationAccess,
     mut app_exit: MessageWriter<AppExit>,
 ) {
@@ -31,6 +32,7 @@ pub(crate) fn automated_scene_preset_load_system(
         .and_then(|file| {
             let summary = file.summary.clone();
             apply_scene_preset(&file.scene, &mut scene)?;
+            remember_loaded_preset(&mut reset_baselines, &summary, &scene);
             Ok(summary)
         })
         .map(|summary| {
@@ -56,6 +58,7 @@ pub(crate) fn preset_input_system(
     control_page: Res<ControlPageState>,
     mut preset_browser: ResMut<PresetBrowserState>,
     mut recent_changes: ResMut<RecentChangesState>,
+    mut reset_baselines: ResMut<EffectTunerResetBaselines>,
     mut scene: SceneMutationAccess,
 ) {
     if !control_page.is_active(ControlPage::ScenePresets) {
@@ -76,6 +79,7 @@ pub(crate) fn preset_input_system(
             match resolve_collision(
                 &mut preset_browser,
                 &mut recent_changes,
+                &mut reset_baselines,
                 &mut scene,
                 now_secs,
             ) {
@@ -109,6 +113,7 @@ pub(crate) fn preset_input_system(
             &mut preset_browser,
             index,
             &mut recent_changes,
+            &mut reset_baselines,
             &mut scene,
             now_secs,
         ),
@@ -138,6 +143,7 @@ fn load_assigned_preset(
     preset_browser: &mut PresetBrowserState,
     index: PresetIndex,
     recent_changes: &mut RecentChangesState,
+    reset_baselines: &mut EffectTunerResetBaselines,
     scene: &mut SceneMutationAccess<'_, '_>,
     now_secs: f32,
 ) -> Result<Option<String>, String> {
@@ -158,6 +164,7 @@ fn load_assigned_preset(
 
     let record = &records[0];
     apply_scene_preset(&record.file.scene, scene)?;
+    remember_loaded_preset(reset_baselines, &record.file.summary, scene);
     preset_browser.highlight_index(index);
     record_scene_preset_load(recent_changes, index, now_secs);
     Ok(finish_with_status(
@@ -244,6 +251,7 @@ fn free_assigned_slot(
 fn resolve_collision(
     preset_browser: &mut PresetBrowserState,
     recent_changes: &mut RecentChangesState,
+    reset_baselines: &mut EffectTunerResetBaselines,
     scene: &mut SceneMutationAccess<'_, '_>,
     now_secs: f32,
 ) -> Result<Option<String>, String> {
@@ -272,6 +280,7 @@ fn resolve_collision(
 
     if chooser.load_after_resolution {
         apply_scene_preset(&chosen.file.scene, scene)?;
+        remember_loaded_preset(reset_baselines, &chosen.file.summary, scene);
         preset_browser.highlight_index(chooser.index);
         record_scene_preset_load(recent_changes, chooser.index, now_secs);
     }
@@ -284,6 +293,26 @@ fn resolve_collision(
             chosen.file.summary
         ),
     ))
+}
+
+fn remember_loaded_preset(
+    reset_baselines: &mut EffectTunerResetBaselines,
+    label: &str,
+    scene: &SceneMutationAccess<'_, '_>,
+) {
+    reset_baselines.set_last_loaded_preset(
+        EffectTunerResetBaseline::capture(
+            &scene.app_config,
+            &scene.camera_rig,
+            &scene.generation_state,
+            &scene.rendering_state,
+            &scene.lighting_state,
+            &scene.material_state,
+            &scene.stage_state,
+            &scene.effect_tuner,
+        ),
+        label,
+    );
 }
 
 fn record_scene_preset_load(

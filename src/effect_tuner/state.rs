@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::camera::CameraRig;
 use crate::config::{
-    CameraConfig, EffectGroup, EffectNumericParameter, EffectsConfig, GenerationConfig,
+    AppConfig, CameraConfig, EffectGroup, EffectNumericParameter, EffectsConfig, GenerationConfig,
     LightingConfig, MaterialConfig, MaterialSurfaceFamily, MaterialSurfaceMode, RenderingConfig,
 };
 use crate::parameters::{GenerationParameter, HoldInput, HoldRepeatState};

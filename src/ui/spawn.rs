@@ -1093,6 +1093,53 @@ fn spawn_recent_changes_overlay(
         });
 }
 
+fn spawn_effect_tuner_reset_overlay(
+    commands: &mut Commands,
+    ui_theme: &UiTheme,
+    scene_camera: Entity,
+    ui_config: &UiConfig,
+) {
+    let font_size = ui_config.body_font_size.max(14.0);
+    commands
+        .spawn((
+            Node {
+                display: Display::None,
+                position_type: PositionType::Absolute,
+                left: px(ui_config.hint_left),
+                right: px(ui_config.hint_left),
+                bottom: px(control_page_bottom(ui_config)),
+                justify_content: JustifyContent::Center,
+                ..default()
+            },
+            GlobalZIndex(30),
+            Visibility::Hidden,
+            EffectTunerResetOverlay,
+            UiTargetCamera(scene_camera),
+        ))
+        .with_children(|parent| {
+            parent
+                .spawn((
+                    Node {
+                        width: percent(100),
+                        max_width: px(540.0_f32.min(ui_config.panel_max_width)),
+                        padding: UiRect::all(px(ui_config.panel_padding)),
+                        border_radius: effect_tuner_corner_radius(),
+                        ..default()
+                    },
+                    BackgroundColor(effect_tuner_panel_fill_color()),
+                ))
+                .with_children(|panel| {
+                    panel.spawn((
+                        Text::new(""),
+                        ui_theme.text_font(font_size),
+                        TextColor(srgb(ui_config.title_text)),
+                        effect_tuner_text_layout(Justify::Left),
+                        EffectTunerResetText,
+                    ));
+                });
+        });
+}
+
 fn spawn_preset_ui(
     commands: &mut Commands,
     ui_theme: &UiTheme,
@@ -1264,6 +1311,7 @@ pub(crate) fn spawn_help_ui(
     spawn_preset_ui(commands, ui_theme, scene_camera, ui_config, strip_font_size);
     spawn_keyboard_help_overlay(commands, ui_theme, scene_camera, ui_config);
     spawn_effect_tuner_group_overlay(commands, ui_theme, scene_camera, ui_config);
+    spawn_effect_tuner_reset_overlay(commands, ui_theme, scene_camera, ui_config);
     spawn_effect_tuner_list_overlay(commands, ui_theme, scene_camera, ui_config);
     spawn_recent_changes_overlay(commands, ui_theme, scene_camera, ui_config);
 

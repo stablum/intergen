@@ -371,9 +371,9 @@ mod tests {
             let contents = fs::read_to_string(&path)
                 .unwrap_or_else(|error| panic!("{} should read: {error}", path.display()));
             let stored_lfos = raw_effect_lfo_entries(&contents);
+            let uses_legacy_lfo_layout = stored_lfos.len() == checked_in_scene_presets_raw_lfo_len;
             assert!(
-                stored_lfos.len() == checked_in_scene_presets_raw_lfo_len
-                    || stored_lfos.len() == current_lfo_layout_len,
+                uses_legacy_lfo_layout || stored_lfos.len() == current_lfo_layout_len,
                 "{} should store either the checked-in raw layout or the current keyed LFO layout",
                 path.display()
             );
@@ -417,14 +417,16 @@ mod tests {
                 assert_eq!(restored_lfo.frequency_hz, expected_lfo.frequency_hz);
             }
 
-            for parameter in latent_generation_parameters {
-                assert_eq!(
-                    lfo_entry_by_parameter(&restored_lfos, parameter),
-                    lfo_entry_by_parameter(&default_lfos, parameter),
-                    "{} should default the checked-in missing generation LFO slot '{}'",
-                    path.display(),
-                    parameter
-                );
+            if uses_legacy_lfo_layout {
+                for parameter in latent_generation_parameters {
+                    assert_eq!(
+                        lfo_entry_by_parameter(&restored_lfos, parameter),
+                        lfo_entry_by_parameter(&default_lfos, parameter),
+                        "{} should default the checked-in missing generation LFO slot '{}'",
+                        path.display(),
+                        parameter
+                    );
+                }
             }
         }
     }

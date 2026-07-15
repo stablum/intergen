@@ -122,8 +122,12 @@ including per-axis scale and local position offset.
    `Shift` + `Tab` to move among value, amplitude, frequency, and shape. Press
    `L` to toggle modulation.
 
-With no typed number pending, `Enter` resets the selected field. `Shift` +
-`Enter` resets **all** F2 controls to their startup values.
+With no typed number pending, `Enter` has no effect. `Shift` + `Enter` opens a
+confirmation chooser for resetting **all** F2 controls. Choose `Cancel`,
+`config.toml`, or `Last loaded preset` with `Up` / `Down` and `Enter`; `Esc`
+also cancels. The preset option is unavailable until a preset has been loaded.
+Resetting preserves the generated tree structure and recomputes its geometry
+with the restored controls.
 
 ### F2 scene-generation rows
 

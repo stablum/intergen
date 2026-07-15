@@ -11,13 +11,14 @@ use crate::control_page::{ControlPage, ControlPageState};
 use crate::effects::{CameraEffectsSettings, camera_effects_from_config};
 use crate::generation::{apply_live_material_state, recompute_generation_tree};
 use crate::recent_changes::RecentChangesState;
-use crate::runtime_scene::GenerationSceneAccess;
+use crate::runtime_scene::{GenerationSceneAccess, SceneSnapshotAccess};
 use crate::scene::{apply_live_lighting_state, apply_live_rendering_state, sync_stage_entities};
 
 use super::EffectOverlayField;
 use super::state::{
-    AdjustmentModifiers, EffectTunerEditContext, EffectTunerParameter, EffectTunerState,
-    EffectTunerViewContext, SceneChangeTarget, SceneLfoApplicationResult,
+    AdjustmentModifiers, EffectTunerEditContext, EffectTunerParameter, EffectTunerResetBaseline,
+    EffectTunerResetBaselines, EffectTunerResetChoice, EffectTunerState, EffectTunerViewContext,
+    SceneChangeTarget, SceneLfoApplicationResult,
 };
 use crate::parameters::HoldInput;
 
@@ -29,6 +30,7 @@ pub(crate) fn effect_tuner_input_system(
     mut mouse_wheel_reader: MessageReader<MouseWheel>,
     mut mouse_wheel_selection_remainder: Local<f32>,
     mut effect_tuner: ResMut<EffectTunerState>,
+    reset_baselines: Res<EffectTunerResetBaselines>,
     mut recent_changes: ResMut<RecentChangesState>,
     mut scene: GenerationSceneAccess,
 ) {
@@ -46,6 +48,48 @@ pub(crate) fn effect_tuner_input_system(
     let delta_secs = time.delta_secs();
     let enter_pressed =
         keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::NumpadEnter);
+
+    if effect_tuner.reset_confirmation_is_open() {
+        if keys.just_pressed(KeyCode::ArrowUp) {
+            effect_tuner.step_reset_confirmation(-1, now_secs);
+        }
+        if keys.just_pressed(KeyCode::ArrowDown) {
+            effect_tuner.step_reset_confirmation(1, now_secs);
+        }
+        if enter_pressed {
+            match effect_tuner.selected_reset_choice() {
+                Some(EffectTunerResetChoice::Cancel) => {
+                    effect_tuner.close_reset_confirmation();
+                    println!("F2 reset cancelled.");
+                }
+                Some(choice) => {
+                    if let Some(baseline) = reset_baselines.baseline(choice).cloned() {
+                        apply_reset_baseline(&baseline, &mut effect_tuner, &mut scene, now_secs);
+                        let label = match choice {
+                            EffectTunerResetChoice::ConfigToml => "config.toml".to_string(),
+                            EffectTunerResetChoice::LastLoadedPreset => reset_baselines
+                                .last_loaded_preset_label()
+                                .map(|label| format!("last loaded preset ({label})"))
+                                .unwrap_or_else(|| "last loaded preset".to_string()),
+                            EffectTunerResetChoice::Cancel => unreachable!(),
+                        };
+                        recent_changes.record("F2 controls", label.clone(), now_secs);
+                        println!("Reset all F2 controls from {label}.");
+                    } else {
+                        println!("No scene preset has been loaded yet.");
+                    }
+                }
+                None => {}
+            }
+        }
+        return;
+    }
+
+    if enter_pressed && modifiers.shift_pressed {
+        effect_tuner.open_reset_confirmation(now_secs);
+        println!("Choose an F2 reset source.");
+        return;
+    }
 
     if effect_tuner.page_mode() == super::state::EffectTunerPageMode::GroupSelect {
         if effect_tuner.step_selection(
@@ -318,32 +362,7 @@ pub(crate) fn effect_tuner_input_system(
     }
 
     if enter_pressed {
-        if modifiers.shift_pressed {
-            {
-                let mut context = effect_tuner_edit_context(
-                    &scene.app_config,
-                    &mut scene.camera_rig,
-                    &mut scene.generation_state,
-                    &mut scene.rendering_state,
-                    &mut scene.lighting_state,
-                    &mut scene.material_state,
-                    &mut scene.stage_state,
-                );
-                effect_tuner.reset_all(&mut context, now_secs);
-            }
-            effect_tuner.sync_scene_lfo_bases(&effect_tuner_view_context(
-                &scene.app_config,
-                &scene.camera_rig,
-                &scene.generation_state,
-                &scene.rendering_state,
-                &scene.lighting_state,
-                &scene.material_state,
-                &scene.stage_state,
-            ));
-            apply_reset_all_side_effects(&mut scene);
-            recent_changes.record("F2 controls", "defaults", now_secs);
-            println!("Reset all F2 controls to defaults.");
-        } else if effect_tuner.finalize_numeric_entry(now_secs) {
+        if effect_tuner.finalize_numeric_entry(now_secs) {
             record_selected_change(&effect_tuner, &scene, &mut recent_changes, now_secs);
             println!(
                 "Set {}.",
@@ -431,6 +450,22 @@ pub(crate) fn effect_tuner_input_system(
             }
         }
     }
+}
+
+pub(crate) fn capture_config_toml_reset_baseline_system(
+    scene: SceneSnapshotAccess,
+    mut reset_baselines: ResMut<EffectTunerResetBaselines>,
+) {
+    reset_baselines.set_config_toml(EffectTunerResetBaseline::capture(
+        &scene.app_config,
+        &scene.camera_rig,
+        &scene.generation_state,
+        &scene.rendering_state,
+        &scene.lighting_state,
+        &scene.material_state,
+        &scene.stage_state,
+        &scene.effect_tuner,
+    ));
 }
 
 pub(crate) fn apply_effect_tuner_system(
@@ -695,6 +730,39 @@ fn apply_reset_all_side_effects(scene: &mut GenerationSceneAccess<'_, '_>) {
         &mut scene.accent_lights,
     );
     sync_scene_camera_transform(&scene.camera_rig, &mut scene.camera_transforms);
+}
+
+fn apply_reset_baseline(
+    baseline: &EffectTunerResetBaseline,
+    effect_tuner: &mut EffectTunerState,
+    scene: &mut GenerationSceneAccess<'_, '_>,
+    now_secs: f32,
+) {
+    *scene.app_config = baseline.app_config.clone();
+    effect_tuner.apply_reset_snapshot(&baseline.effects);
+    scene.camera_rig.distance = baseline.camera_distance;
+    scene.camera_rig.angular_velocity = baseline.camera_angular_velocity;
+    scene.camera_rig.zoom_velocity = baseline.camera_zoom_velocity;
+    scene.generation_state.parameters = baseline.generation_parameters.clone();
+    scene.generation_state.selected_shape_kind = baseline.selected_shape_kind;
+    scene.generation_state.spawn_placement_mode = baseline.spawn_placement_mode;
+    scene.generation_state.spawn_add_mode = baseline.spawn_add_mode;
+    *scene.rendering_state = baseline.rendering_state.clone();
+    *scene.lighting_state = baseline.lighting_state.clone();
+    *scene.material_state = baseline.material_state.clone();
+    *scene.stage_state = baseline.stage_state.clone();
+    effect_tuner.sync_scene_lfo_bases(&effect_tuner_view_context(
+        &scene.app_config,
+        &scene.camera_rig,
+        &scene.generation_state,
+        &scene.rendering_state,
+        &scene.lighting_state,
+        &scene.material_state,
+        &scene.stage_state,
+    ));
+    effect_tuner.close_reset_confirmation();
+    effect_tuner.note_interaction(now_secs);
+    apply_reset_all_side_effects(scene);
 }
 
 fn apply_scene_lfo_side_effects(

@@ -24,6 +24,112 @@ pub(crate) enum EffectTunerPageMode {
     List,
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum EffectTunerResetChoice {
+    Cancel,
+    ConfigToml,
+    LastLoadedPreset,
+}
+
+impl EffectTunerResetChoice {
+    const ALL: [Self; 3] = [Self::Cancel, Self::ConfigToml, Self::LastLoadedPreset];
+
+    pub(crate) fn label(self) -> &'static str {
+        match self {
+            Self::Cancel => "Cancel",
+            Self::ConfigToml => "config.toml",
+            Self::LastLoadedPreset => "Last loaded preset",
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct EffectTunerResetBaseline {
+    pub(crate) app_config: AppConfig,
+    pub(crate) effects: EffectRuntimeSnapshot,
+    pub(crate) camera_distance: f32,
+    pub(crate) camera_angular_velocity: Vec3,
+    pub(crate) camera_zoom_velocity: f32,
+    pub(crate) generation_parameters: crate::scene::GenerationParameters,
+    pub(crate) selected_shape_kind: ShapeKind,
+    pub(crate) spawn_placement_mode: SpawnPlacementMode,
+    pub(crate) spawn_add_mode: SpawnAddMode,
+    pub(crate) rendering_state: RenderingState,
+    pub(crate) lighting_state: LightingState,
+    pub(crate) material_state: MaterialState,
+    pub(crate) stage_state: StageState,
+}
+
+impl EffectTunerResetBaseline {
+    pub(crate) fn capture(
+        app_config: &AppConfig,
+        camera_rig: &CameraRig,
+        generation_state: &GenerationState,
+        rendering_state: &RenderingState,
+        lighting_state: &LightingState,
+        material_state: &MaterialState,
+        stage_state: &StageState,
+        effect_tuner: &EffectTunerState,
+    ) -> Self {
+        Self {
+            app_config: app_config.clone(),
+            effects: effect_tuner.runtime_snapshot(),
+            camera_distance: camera_rig.distance,
+            camera_angular_velocity: camera_rig.angular_velocity,
+            camera_zoom_velocity: camera_rig.zoom_velocity,
+            generation_parameters: generation_state.parameters.clone(),
+            selected_shape_kind: generation_state.selected_shape_kind,
+            spawn_placement_mode: generation_state.spawn_placement_mode,
+            spawn_add_mode: generation_state.spawn_add_mode,
+            rendering_state: rendering_state.clone(),
+            lighting_state: lighting_state.clone(),
+            material_state: material_state.clone(),
+            stage_state: stage_state.clone(),
+        }
+    }
+}
+
+#[derive(Default, Resource)]
+pub(crate) struct EffectTunerResetBaselines {
+    config_toml: Option<EffectTunerResetBaseline>,
+    last_loaded_preset: Option<EffectTunerResetBaseline>,
+    last_loaded_preset_label: Option<String>,
+}
+
+impl EffectTunerResetBaselines {
+    pub(crate) fn set_config_toml(&mut self, baseline: EffectTunerResetBaseline) {
+        self.config_toml = Some(baseline);
+    }
+
+    pub(crate) fn set_last_loaded_preset(
+        &mut self,
+        baseline: EffectTunerResetBaseline,
+        label: impl Into<String>,
+    ) {
+        self.last_loaded_preset = Some(baseline);
+        self.last_loaded_preset_label = Some(label.into());
+    }
+
+    pub(crate) fn baseline(
+        &self,
+        choice: EffectTunerResetChoice,
+    ) -> Option<&EffectTunerResetBaseline> {
+        match choice {
+            EffectTunerResetChoice::Cancel => None,
+            EffectTunerResetChoice::ConfigToml => self.config_toml.as_ref(),
+            EffectTunerResetChoice::LastLoadedPreset => self.last_loaded_preset.as_ref(),
+        }
+    }
+
+    pub(crate) fn has_last_loaded_preset(&self) -> bool {
+        self.last_loaded_preset.is_some()
+    }
+
+    pub(crate) fn last_loaded_preset_label(&self) -> Option<&str> {
+        self.last_loaded_preset_label.as_deref()
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct EffectTunerGroupRowSnapshot {
     pub(crate) group_label: &'static str,
@@ -182,12 +288,15 @@ pub(crate) struct AdjustmentModifiers {
 }
 
 pub(crate) struct EffectTunerViewContext<'a> {
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) camera_config: &'a CameraConfig,
     pub(crate) camera_rig: &'a CameraRig,
     pub(crate) generation_config: &'a GenerationConfig,
     pub(crate) generation_state: &'a GenerationState,
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) rendering_config: &'a RenderingConfig,
     pub(crate) rendering_state: &'a RenderingState,
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) lighting_config: &'a LightingConfig,
     pub(crate) lighting_state: &'a LightingState,
     pub(crate) material_config: &'a MaterialConfig,
@@ -266,6 +375,7 @@ pub(crate) struct SceneLfoApplicationResult {
 
 #[derive(Resource, Clone)]
 pub(crate) struct EffectTunerState {
+    #[cfg_attr(not(test), allow(dead_code))]
     defaults: EffectsConfig,
     current: EffectsConfig,
     lfos: Vec<ParameterLfo>,
@@ -285,6 +395,7 @@ pub(crate) struct EffectTunerState {
     select_next_hold: HoldRepeatState,
     decrease_hold: HoldRepeatState,
     increase_hold: HoldRepeatState,
+    reset_confirmation_selection: Option<usize>,
 }
 
 impl EffectTunerState {
@@ -309,6 +420,7 @@ impl EffectTunerState {
             select_next_hold: HoldRepeatState::default(),
             decrease_hold: HoldRepeatState::default(),
             increase_hold: HoldRepeatState::default(),
+            reset_confirmation_selection: None,
         }
     }
 
@@ -369,6 +481,19 @@ impl EffectTunerState {
     }
 
     pub(crate) fn apply_runtime_snapshot(&mut self, snapshot: &EffectRuntimeSnapshot) {
+        self.apply_snapshot_values(snapshot);
+        self.selected_index = 0;
+        self.selected_group_index = 0;
+        self.page_mode = EffectTunerPageMode::GroupSelect;
+        self.edit_mode = EffectEditMode::Value;
+        self.sync_selected_group_to_parameter();
+    }
+
+    pub(crate) fn apply_reset_snapshot(&mut self, snapshot: &EffectRuntimeSnapshot) {
+        self.apply_snapshot_values(snapshot);
+    }
+
+    fn apply_snapshot_values(&mut self, snapshot: &EffectRuntimeSnapshot) {
         self.current = snapshot.current.clone();
         self.lfos = default_lfos();
         self.scene_lfo_bases = default_scene_lfo_bases();
@@ -378,13 +503,8 @@ impl EffectTunerState {
         for (target, source) in self.lfos.iter_mut().zip(snapshot.lfos.iter().copied()) {
             *target = source;
         }
-        self.selected_index = 0;
-        self.selected_group_index = 0;
-        self.page_mode = EffectTunerPageMode::GroupSelect;
-        self.edit_mode = EffectEditMode::Value;
         self.clear_numeric_entry();
         self.reset_hold_states();
-        self.sync_selected_group_to_parameter();
     }
 
     pub(crate) fn sync_scene_lfo_bases(&mut self, context: &EffectTunerViewContext<'_>) {
@@ -883,6 +1003,37 @@ impl EffectTunerState {
         self.visible_until_secs = 0.0;
         self.clear_numeric_entry();
         self.reset_hold_states();
+        self.reset_confirmation_selection = None;
+    }
+
+    pub(crate) fn open_reset_confirmation(&mut self, now_secs: f32) {
+        self.reset_confirmation_selection = Some(0);
+        self.clear_numeric_entry();
+        self.reset_hold_states();
+        self.note_interaction(now_secs);
+    }
+
+    pub(crate) fn close_reset_confirmation(&mut self) {
+        self.reset_confirmation_selection = None;
+    }
+
+    pub(crate) fn reset_confirmation_is_open(&self) -> bool {
+        self.reset_confirmation_selection.is_some()
+    }
+
+    pub(crate) fn selected_reset_choice(&self) -> Option<EffectTunerResetChoice> {
+        self.reset_confirmation_selection
+            .and_then(|index| EffectTunerResetChoice::ALL.get(index).copied())
+    }
+
+    pub(crate) fn step_reset_confirmation(&mut self, direction: isize, now_secs: f32) {
+        let Some(selected) = self.reset_confirmation_selection else {
+            return;
+        };
+        let last = EffectTunerResetChoice::ALL.len().saturating_sub(1) as isize;
+        self.reset_confirmation_selection =
+            Some((selected as isize + direction).clamp(0, last) as usize);
+        self.note_interaction(now_secs);
     }
 
     pub(crate) fn toggle_selected_effect(&mut self, now_secs: f32) -> Option<bool> {
@@ -1040,6 +1191,7 @@ impl EffectTunerState {
         true
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn reset_all(&mut self, context: &mut EffectTunerEditContext<'_>, now_secs: f32) {
         self.current = self.defaults.clone();
         self.lfos = default_lfos();
@@ -1130,7 +1282,7 @@ impl EffectTunerState {
         }
     }
 
-    fn note_interaction(&mut self, now_secs: f32) {
+    pub(crate) fn note_interaction(&mut self, now_secs: f32) {
         self.visible_until_secs = now_secs + OVERLAY_HOLD_SECS;
     }
 

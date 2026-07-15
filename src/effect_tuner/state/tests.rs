@@ -11,8 +11,9 @@ use crate::{camera::CameraRig, scene::{GenerationState, LightingState, MaterialS
 
 use super::{
     EffectNumericParameter, EffectRuntimeSnapshot, EffectTunerEditContext, EffectTunerPageMode,
-    EffectTunerParameter, EffectTunerSceneParameter, EffectTunerState, EffectTunerViewContext,
-    HoldInput, effect_tuner_group_index, effect_tuner_group_labels, lfo_index_for_parameter,
+    EffectTunerParameter, EffectTunerResetChoice, EffectTunerSceneParameter, EffectTunerState,
+    EffectTunerViewContext, HoldInput, effect_tuner_group_index, effect_tuner_group_labels,
+    lfo_index_for_parameter,
 };
 
 fn default_scene_state() -> (
@@ -375,6 +376,32 @@ fn runtime_snapshot_round_trips_lfo_state() {
     );
     assert!(restored_snapshot.lfos[0].enabled);
     assert_eq!(restored_snapshot.lfos[0].shape, LfoShape::Triangle);
+}
+
+#[test]
+fn reset_confirmation_defaults_to_cancel_and_clamps_selection() {
+    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+
+    effect_tuner.open_reset_confirmation(1.0);
+    assert!(effect_tuner.reset_confirmation_is_open());
+    assert_eq!(
+        effect_tuner.selected_reset_choice(),
+        Some(EffectTunerResetChoice::Cancel)
+    );
+
+    effect_tuner.step_reset_confirmation(1, 1.1);
+    assert_eq!(
+        effect_tuner.selected_reset_choice(),
+        Some(EffectTunerResetChoice::ConfigToml)
+    );
+    effect_tuner.step_reset_confirmation(5, 1.2);
+    assert_eq!(
+        effect_tuner.selected_reset_choice(),
+        Some(EffectTunerResetChoice::LastLoadedPreset)
+    );
+
+    effect_tuner.close_reset_confirmation();
+    assert!(!effect_tuner.reset_confirmation_is_open());
 }
 
 #[test]

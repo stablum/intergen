@@ -162,8 +162,9 @@ The in-app F2 control page starts from the values loaded from `config.toml` at l
 - `L` toggles the selected parameter LFO on or off when the selected parameter supports LFOs.
 - Type digits, `.`, `,`, `-`, or `+` to set the active numeric field directly. `Backspace` erases the typed numeric input in the compact or parameter-list pages.
 - LFO shapes currently available are `sine`, `triangle`, `saw`, `square`, `stepped random`, and `brownian motion`.
-- `Enter` confirms typed numeric F2 input, or resets the selected F2 field when no numeric input is active.
-- `Shift + Enter` resets all F2 controls to their startup defaults.
+- `Enter` confirms typed numeric F2 input. With no numeric input active, it has no effect in compact or parameter-list pages.
+- `Shift + Enter` opens a confirmation chooser in any F2 page. Choose `Cancel`, `config.toml`, or `Last loaded preset` with `Up` / `Down` and `Enter`; `Esc` also cancels. The preset option is unavailable until a preset has been loaded.
+- Resetting restores all F2-controlled values and LFOs from the chosen source while preserving the current generated tree structure; existing geometry is recomputed with the restored controls.
 - Shader-effect parameters expose LFO fields, and so do the supported numeric scene/runtime parameters, including live scene updates and generation values that only take effect during future spawning. Other scene, stage, and material controls remain value-only.
 - In fill-current-level spawn mode, each successfully spawned child advances a virtual LFO sample time by `generation.fill_mode_lfo_virtual_time_step_secs`, so spawn-time generation LFOs can vary across one batch without waiting for real time to pass.
 - `F5` toggles a recent interactive changes page. It keeps the last changed parameter visible and also lists any other parameters changed in the last few seconds.
@@ -288,7 +289,7 @@ cargo test-plain
 - `Shift` in F2: coarse adjustment modifier
 - `Alt` in F2: fine adjustment modifier
 - `Enter` in F2 compact or parameter-list pages: confirm typed numeric input
-- `Shift + Enter` in F2: reset all F2 controls to their startup defaults
+- `Shift + Enter` in F2: open the reset confirmation chooser (`Cancel`, `config.toml`, or `Last loaded preset`)
 - `F12`: save a screenshot to `screenshots/`
 - `R`: reset the scene with the currently selected shape as the new root
 - `Space`: spawn child shapes with the current placement mode, or hold to keep spawning

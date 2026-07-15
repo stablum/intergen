@@ -1462,6 +1462,7 @@ impl EffectTunerSceneParameter {
         })
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     fn default_value(self, context: &EffectTunerViewContext<'_>) -> f32 {
         match self.generation_parameter() {
             Some(parameter) => context
@@ -1869,6 +1870,7 @@ impl EffectTunerSceneParameter {
         }
     }
 
+    #[cfg_attr(not(test), allow(dead_code))]
     fn reset_value(self, context: &mut EffectTunerEditContext<'_>) {
         match self {
             Self::ChildKind => {

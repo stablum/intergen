@@ -126,10 +126,10 @@ const FX_HELP: [HelpEntry; 14] = [
         explanation: "In the F2 compact or list page, confirm typed numeric input.",
     },
     HelpEntry {
-        startup: "Shift+Enter resets all F2 controls",
-        overlay: "Shift + Enter: Reset all F2 controls",
+        startup: "Shift+Enter opens the F2 reset confirmation",
+        overlay: "Shift + Enter: Choose reset source (cancel / config.toml / last loaded preset)",
         binding: "Shift + Enter",
-        explanation: "In the F2 compact or list page, reset all F2 controls.",
+        explanation: "In any F2 page, confirm whether to cancel or reset all F2 controls from config.toml or the last loaded preset.",
     },
 ];
 

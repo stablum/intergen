@@ -123,6 +123,7 @@ pub(crate) fn update_effect_tuner_overlay_system(
     };
     let compact_visible = control_page.page_has_focus(ControlPage::EffectTuner)
         && effect_tuner.page_mode() == EffectTunerPageMode::Compact
+        && !effect_tuner.reset_confirmation_is_open()
         && effect_tuner.is_visible(now_secs);
     *overlay_visibility = if compact_visible {
         Visibility::Visible
@@ -257,6 +258,7 @@ pub(crate) fn update_effect_tuner_group_overlay_system(
     let ui_config = &view.app_config.ui;
     let visible = control_page.page_has_focus(ControlPage::EffectTuner)
         && effect_tuner.page_mode() == EffectTunerPageMode::GroupSelect
+        && !effect_tuner.reset_confirmation_is_open()
         && effect_tuner.is_visible(now_secs);
 
     let Ok((mut overlay_visibility, mut overlay_node)) = overlay_query.single_mut() else {
@@ -407,6 +409,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
             effect_tuner.page_mode(),
             EffectTunerPageMode::List | EffectTunerPageMode::GroupList
         )
+        && !effect_tuner.reset_confirmation_is_open()
         && effect_tuner.is_visible(now_secs);
 
     let Ok((mut overlay_visibility, mut overlay_node)) = overlay_query.single_mut() else {
@@ -591,6 +594,57 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
         };
         *text_color = TextColor(color);
     }
+}
+
+pub(crate) fn update_effect_tuner_reset_overlay_system(
+    control_page: Res<ControlPageState>,
+    effect_tuner: Res<EffectTunerState>,
+    reset_baselines: Res<crate::effect_tuner::EffectTunerResetBaselines>,
+    mut overlay_query: Query<(&mut Visibility, &mut Node), With<EffectTunerResetOverlay>>,
+    mut text_query: Query<
+        &mut Text,
+        (With<EffectTunerResetText>, Without<EffectTunerResetOverlay>),
+    >,
+) {
+    let visible = control_page.page_has_focus(ControlPage::EffectTuner)
+        && effect_tuner.reset_confirmation_is_open();
+    let Ok((mut visibility, mut node)) = overlay_query.single_mut() else {
+        return;
+    };
+    *visibility = if visible {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+    node.display = if visible { Display::Flex } else { Display::None };
+
+    let Ok(mut text) = text_query.single_mut() else {
+        return;
+    };
+    let selected = effect_tuner.selected_reset_choice();
+    let options = [
+        crate::effect_tuner::EffectTunerResetChoice::Cancel,
+        crate::effect_tuner::EffectTunerResetChoice::ConfigToml,
+        crate::effect_tuner::EffectTunerResetChoice::LastLoadedPreset,
+    ]
+    .into_iter()
+    .map(|choice| {
+        let marker = if selected == Some(choice) { ">" } else { " " };
+        let unavailable = if choice
+            == crate::effect_tuner::EffectTunerResetChoice::LastLoadedPreset
+            && !reset_baselines.has_last_loaded_preset()
+        {
+            " (unavailable)"
+        } else {
+            ""
+        };
+        format!("{marker} {}{unavailable}", choice.label())
+    })
+    .collect::<Vec<_>>()
+    .join("\n");
+    *text = Text::new(format!(
+        "RESET ALL F2 CONTROLS?\n\n{options}\n\nUp / Down select  ·  Enter confirm  ·  Esc cancel"
+    ));
 }
 
 pub(crate) fn update_recent_changes_overlay_system(

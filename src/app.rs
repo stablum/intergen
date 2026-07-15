@@ -14,7 +14,10 @@ use crate::control_page::{
     ControlPageInputMask, ControlPageState, control_page_input_system,
     sync_control_page_input_mask_system,
 };
-use crate::effect_tuner::{EffectTunerState, apply_effect_tuner_system, effect_tuner_input_system};
+use crate::effect_tuner::{
+    EffectTunerResetBaselines, EffectTunerState, apply_effect_tuner_system,
+    capture_config_toml_reset_baseline_system, effect_tuner_input_system,
+};
 use crate::effects::EffectsPlugin;
 use crate::generation::generation_input_system;
 use crate::presets::{
@@ -26,8 +29,8 @@ use crate::scene::setup_scene;
 use crate::ui::{
     HelpOverlayState, toggle_help_overlay_system, update_effect_tuner_group_overlay_system,
     update_effect_tuner_list_overlay_system, update_effect_tuner_overlay_system,
-    update_keyboard_help_overlay_system, update_preset_overlay_system,
-    update_recent_changes_overlay_system,
+    update_effect_tuner_reset_overlay_system, update_keyboard_help_overlay_system,
+    update_preset_overlay_system, update_recent_changes_overlay_system,
 };
 
 pub fn run() {
@@ -61,6 +64,7 @@ pub fn run() {
         .insert_resource(ControlPageState::default())
         .insert_resource(ControlPageInputMask::default())
         .insert_resource(EffectTunerState::from_config(&app_config.effects))
+        .insert_resource(EffectTunerResetBaselines::default())
         .insert_resource(RecentChangesState::default())
         .insert_resource(PresetBrowserState::load_from_disk())
         .insert_resource(ScreenshotCounter::default())
@@ -76,7 +80,12 @@ pub fn run() {
         .add_plugins(EffectsPlugin)
         .add_systems(
             Startup,
-            (setup_scene, automated_scene_preset_load_system).chain(),
+            (
+                setup_scene,
+                capture_config_toml_reset_baseline_system,
+                automated_scene_preset_load_system,
+            )
+                .chain(),
         )
         .add_systems(
             Update,
@@ -94,6 +103,7 @@ pub fn run() {
                 update_effect_tuner_overlay_system,
                 update_effect_tuner_group_overlay_system,
                 update_effect_tuner_list_overlay_system,
+                update_effect_tuner_reset_overlay_system,
                 update_keyboard_help_overlay_system,
                 update_preset_overlay_system,
                 update_recent_changes_overlay_system,

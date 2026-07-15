@@ -302,6 +302,14 @@ pub(crate) fn control_page_input_system(
     mut effect_tuner: ResMut<EffectTunerState>,
     mut preset_browser: ResMut<PresetBrowserState>,
 ) {
+    if effect_tuner.reset_confirmation_is_open() {
+        if keys.just_pressed(KeyCode::Escape) {
+            effect_tuner.close_reset_confirmation();
+            println!("F2 reset cancelled.");
+        }
+        return;
+    }
+
     if keys.just_pressed(KeyCode::Escape) {
         if let Some(page) = control_page.close_active_page() {
             close_page(page, &mut effect_tuner, &mut preset_browser);
@@ -618,6 +626,32 @@ mod tests {
 
         assert!(!world.resource::<HelpOverlayState>().is_visible());
         assert_eq!(world.resource::<ControlPageState>().active_page(), None);
+    }
+
+    #[test]
+    fn escape_cancels_f2_reset_without_closing_the_page() {
+        let mut world = input_world();
+        world
+            .resource_mut::<ControlPageState>()
+            .open_page(ControlPage::EffectTuner);
+        world
+            .resource_mut::<EffectTunerState>()
+            .open_reset_confirmation(0.0);
+        world
+            .resource_mut::<ButtonInput<KeyCode>>()
+            .press(KeyCode::Escape);
+
+        run_control_page_input(&mut world);
+
+        assert_eq!(
+            world.resource::<ControlPageState>().active_page(),
+            Some(ControlPage::EffectTuner)
+        );
+        assert!(
+            !world
+                .resource::<EffectTunerState>()
+                .reset_confirmation_is_open()
+        );
     }
 
     fn binding(key_code: KeyCode) -> KeyBinding {

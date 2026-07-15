@@ -47,7 +47,9 @@ fn overlay_text_lists_help_and_spawn_controls() {
     assert!(text.contains(
         "In F2 compact or list page: Backspace erases the typed numeric input"
     ));
-    assert!(text.contains("Shift + Enter: Reset all F2 controls"));
+    assert!(text.contains(
+        "Shift + Enter: Choose reset source (cancel / config.toml / last loaded preset)"
+    ));
     assert!(text.contains(
         "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions"
     ));

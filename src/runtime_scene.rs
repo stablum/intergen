@@ -49,7 +49,7 @@ pub(crate) struct SceneMutationAccess<'w, 's> {
 #[derive(SystemParam)]
 pub(crate) struct GenerationSceneAccess<'w, 's> {
     pub(crate) commands: Commands<'w, 's>,
-    pub(crate) app_config: Res<'w, AppConfig>,
+    pub(crate) app_config: ResMut<'w, AppConfig>,
     pub(crate) clear_color: ResMut<'w, ClearColor>,
     pub(crate) ambient_light: ResMut<'w, GlobalAmbientLight>,
     pub(crate) camera_rig: ResMut<'w, CameraRig>,

@@ -242,6 +242,12 @@ pub(crate) struct EffectTunerPinnedBadge;
 pub(crate) struct EffectTunerGroupOverlay;
 
 #[derive(Component)]
+pub(crate) struct EffectTunerResetOverlay;
+
+#[derive(Component)]
+pub(crate) struct EffectTunerResetText;
+
+#[derive(Component)]
 pub(crate) struct EffectTunerGroupPinnedBadge;
 
 #[derive(Component)]
