@@ -754,6 +754,77 @@ pub(crate) fn update_recent_changes_overlay_system(
     }
 }
 
+pub(crate) fn update_parameter_change_notification_system(
+    time: Res<Time>,
+    control_page: Res<ControlPageState>,
+    help_overlay: Res<HelpOverlayState>,
+    recent_changes: Res<RecentChangesState>,
+    mut ui_state: Local<ParameterChangeNotificationUiState>,
+    mut notification_query: Query<
+        (&mut Visibility, &mut Node),
+        With<ParameterChangeNotification>,
+    >,
+    mut label_query: Query<
+        &mut Text,
+        (
+            With<ParameterChangeNotificationLabel>,
+            Without<ParameterChangeNotificationValue>,
+        ),
+    >,
+    mut value_query: Query<
+        &mut Text,
+        (
+            With<ParameterChangeNotificationValue>,
+            Without<ParameterChangeNotificationLabel>,
+        ),
+    >,
+) {
+    let Ok((mut visibility, mut node)) = notification_query.single_mut() else {
+        return;
+    };
+
+    let latest_revision = recent_changes.latest_revision();
+    if !ui_state.initialized {
+        ui_state.initialized = true;
+        ui_state.last_seen_revision = latest_revision;
+    }
+
+    let neutral_mode = control_page.active_page().is_none() && !help_overlay.is_visible();
+    if !neutral_mode {
+        ui_state.last_seen_revision = latest_revision;
+        ui_state.visible_revision = None;
+    } else if latest_revision > ui_state.last_seen_revision {
+        ui_state.last_seen_revision = latest_revision;
+        ui_state.visible_revision = Some(latest_revision);
+    }
+
+    let latest = recent_changes.latest_recent_change(time.elapsed_secs());
+    let displayed_change = latest.filter(|(revision, _)| {
+        neutral_mode && ui_state.visible_revision == Some(*revision)
+    });
+    let visible = displayed_change.is_some();
+    *visibility = if visible {
+        Visibility::Visible
+    } else {
+        Visibility::Hidden
+    };
+    node.display = if visible {
+        Display::Flex
+    } else {
+        Display::None
+    };
+
+    let Some((_, change)) = displayed_change else {
+        return;
+    };
+    if let Ok(mut text) = label_query.single_mut() {
+        *text = Text::new(change.label);
+    }
+    if let Ok(mut text) = value_query.single_mut() {
+        *text = Text::new(change.value);
+    }
+}
+
 fn recent_changes_display_rows(
     snapshot: &crate::recent_changes::RecentChangesSnapshot,
 ) -> Vec<crate::recent_changes::RecentChangeSnapshotRow> {

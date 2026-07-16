@@ -30,7 +30,8 @@ use crate::ui::{
     HelpOverlayState, toggle_help_overlay_system, update_effect_tuner_group_overlay_system,
     update_effect_tuner_list_overlay_system, update_effect_tuner_overlay_system,
     update_effect_tuner_reset_overlay_system, update_keyboard_help_overlay_system,
-    update_preset_overlay_system, update_recent_changes_overlay_system,
+    update_parameter_change_notification_system, update_preset_overlay_system,
+    update_recent_changes_overlay_system,
 };
 
 pub fn run() {
@@ -107,6 +108,7 @@ pub fn run() {
                 update_keyboard_help_overlay_system,
                 update_preset_overlay_system,
                 update_recent_changes_overlay_system,
+                update_parameter_change_notification_system,
             )
                 .chain(),
         )

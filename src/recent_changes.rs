@@ -25,6 +25,7 @@ struct RecentChangeEntry {
 #[derive(Resource, Clone, Debug, Default)]
 pub(crate) struct RecentChangesState {
     entries: Vec<RecentChangeEntry>,
+    revision: u64,
 }
 
 impl RecentChangesState {
@@ -94,6 +95,28 @@ impl RecentChangesState {
         }
     }
 
+    pub(crate) fn latest_revision(&self) -> u64 {
+        self.revision
+    }
+
+    pub(crate) fn latest_recent_change(
+        &self,
+        now_secs: f32,
+    ) -> Option<(u64, RecentChangeSnapshotRow)> {
+        let entry = self.entries.first()?;
+        if now_secs - entry.changed_at_secs > RECENT_CHANGE_TIMEOUT_SECS {
+            return None;
+        }
+
+        Some((
+            self.revision,
+            RecentChangeSnapshotRow {
+                label: entry.label.clone(),
+                value: entry.value.clone(),
+            },
+        ))
+    }
+
     fn is_throttled(&self, label: &str, now_secs: f32, min_interval_secs: f32) -> bool {
         if min_interval_secs <= 0.0 {
             return false;
@@ -120,6 +143,7 @@ impl RecentChangesState {
             },
         );
         self.entries.truncate(MAX_RECENT_CHANGES);
+        self.revision = self.revision.saturating_add(1);
     }
 }
 
@@ -211,5 +235,27 @@ mod tests {
         assert_eq!(snapshot.rows.len(), 1);
         assert_eq!(snapshot.rows[0].label, "camera.zoom_velocity");
         assert_eq!(snapshot.rows[0].value, "-0.40");
+    }
+
+    #[test]
+    fn latest_recent_change_expires_after_the_timeout() {
+        let mut changes = RecentChangesState::default();
+        changes.record("Child scale ratio", "0.62", 1.0);
+
+        let (revision, row) = changes.latest_recent_change(2.0).unwrap();
+        assert_eq!(revision, 1);
+        assert_eq!(row.label, "Child scale ratio");
+        assert_eq!(row.value, "0.62");
+        assert!(changes.latest_recent_change(20.0).is_none());
+    }
+
+    #[test]
+    fn latest_revision_advances_when_a_change_is_updated() {
+        let mut changes = RecentChangesState::default();
+        changes.record("Child scale ratio", "0.62", 1.0);
+        changes.record("Child scale ratio", "0.67", 2.0);
+
+        assert_eq!(changes.latest_revision(), 2);
+        assert_eq!(changes.latest_recent_change(2.0).unwrap().1.value, "0.67");
     }
 }

@@ -1093,6 +1093,68 @@ fn spawn_recent_changes_overlay(
         });
 }
 
+fn spawn_parameter_change_notification(
+    commands: &mut Commands,
+    ui_theme: &UiTheme,
+    scene_camera: Entity,
+    ui_config: &UiConfig,
+) {
+    let label_font_size = (ui_config.hint_font_size - 1.0).max(12.0);
+    let value_font_size = (ui_config.body_font_size - 1.0).max(14.0);
+
+    commands
+        .spawn((
+            Node {
+                display: Display::None,
+                position_type: PositionType::Absolute,
+                right: px(ui_config.hint_left),
+                top: px(ui_config.hint_top),
+                justify_content: JustifyContent::FlexEnd,
+                ..default()
+            },
+            GlobalZIndex(25),
+            Visibility::Hidden,
+            ParameterChangeNotification,
+            UiTargetCamera(scene_camera),
+        ))
+        .with_children(|parent| {
+            parent
+                .spawn((
+                    Node {
+                        max_width: px(460.0),
+                        flex_direction: FlexDirection::Column,
+                        align_items: AlignItems::FlexEnd,
+                        row_gap: px(4.0),
+                        padding: UiRect::axes(
+                            px(ui_config.hint_padding_x),
+                            px(ui_config.hint_padding_y),
+                        ),
+                        border: UiRect::all(px(1.0)),
+                        border_radius: effect_tuner_corner_radius(),
+                        ..default()
+                    },
+                    BackgroundColor(srgba(ui_config.panel_background)),
+                    BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.28)),
+                ))
+                .with_children(|panel| {
+                    panel.spawn((
+                        Text::new(""),
+                        ui_theme.text_font(label_font_size),
+                        TextColor(srgb(ui_config.title_text)),
+                        effect_tuner_text_layout(Justify::Right),
+                        ParameterChangeNotificationLabel,
+                    ));
+                    panel.spawn((
+                        Text::new(""),
+                        ui_theme.text_font(value_font_size),
+                        TextColor(srgb(ui_config.body_text)),
+                        effect_tuner_text_layout(Justify::Right),
+                        ParameterChangeNotificationValue,
+                    ));
+                });
+        });
+}
+
 fn spawn_effect_tuner_reset_overlay(
     commands: &mut Commands,
     ui_theme: &UiTheme,
@@ -1314,6 +1376,7 @@ pub(crate) fn spawn_help_ui(
     spawn_effect_tuner_reset_overlay(commands, ui_theme, scene_camera, ui_config);
     spawn_effect_tuner_list_overlay(commands, ui_theme, scene_camera, ui_config);
     spawn_recent_changes_overlay(commands, ui_theme, scene_camera, ui_config);
+    spawn_parameter_change_notification(commands, ui_theme, scene_camera, ui_config);
 
     commands
         .spawn((

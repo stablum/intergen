@@ -263,6 +263,22 @@ pub(crate) struct EffectTunerGroupRowText(usize);
 pub(crate) struct RecentChangesOverlay;
 
 #[derive(Component)]
+pub(crate) struct ParameterChangeNotification;
+
+#[derive(Component)]
+pub(crate) struct ParameterChangeNotificationLabel;
+
+#[derive(Component)]
+pub(crate) struct ParameterChangeNotificationValue;
+
+#[derive(Default)]
+pub(crate) struct ParameterChangeNotificationUiState {
+    initialized: bool,
+    last_seen_revision: u64,
+    visible_revision: Option<u64>,
+}
+
+#[derive(Component)]
 pub(crate) struct RecentChangesWindowText;
 
 #[derive(Component, Clone, Copy, Debug, Eq, PartialEq)]
