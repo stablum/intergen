@@ -155,6 +155,10 @@ pub(crate) struct EffectTunerListRowSnapshot {
     pub(crate) supports_lfo: bool,
     pub(crate) lfo_state_text: &'static str,
     pub(crate) lfo_state_emphasized: bool,
+    pub(crate) lfo_detail_visible: bool,
+    pub(crate) lfo_amplitude_text: String,
+    pub(crate) lfo_frequency_text: String,
+    pub(crate) lfo_shape_text: &'static str,
     pub(crate) selected: bool,
     pub(crate) active_field: Option<EffectOverlayField>,
 }
@@ -1535,13 +1539,44 @@ impl EffectTunerState {
             }
             None => ("VAL", false),
         };
-        let (lfo_state_text, lfo_state_emphasized) = if supports_lfo {
+        let (
+            lfo_state_text,
+            lfo_state_emphasized,
+            lfo_detail_visible,
+            lfo_amplitude_text,
+            lfo_frequency_text,
+            lfo_shape_text,
+        ) = if supports_lfo {
             let lfo = self
                 .lfo_for_parameter(parameter)
                 .expect("LFO-capable parameter should have an LFO slot");
-            (if lfo.enabled { "ON" } else { "OFF" }, lfo.enabled)
+            let amplitude_text = self.lfo_amplitude_text(parameter, lfo.amplitude);
+            let frequency_text = format_effect_tuner_decimal(lfo.frequency_hz, 3);
+            (
+                if lfo.enabled { "ON" } else { "OFF" },
+                lfo.enabled,
+                selected || lfo.enabled,
+                if selected {
+                    self.overlay_numeric_text(EffectOverlayField::LfoAmplitude, amplitude_text)
+                } else {
+                    amplitude_text
+                },
+                if selected {
+                    self.overlay_numeric_text(EffectOverlayField::LfoFrequency, frequency_text)
+                } else {
+                    frequency_text
+                },
+                lfo.shape.label(),
+            )
         } else {
-            ("--", false)
+            (
+                "--",
+                false,
+                false,
+                "--".to_string(),
+                "--".to_string(),
+                "--",
+            )
         };
 
         EffectTunerListRowSnapshot {
@@ -1561,6 +1596,10 @@ impl EffectTunerState {
             supports_lfo,
             lfo_state_text,
             lfo_state_emphasized,
+            lfo_detail_visible,
+            lfo_amplitude_text,
+            lfo_frequency_text,
+            lfo_shape_text,
             selected,
             active_field: selected.then_some(self.active_field()),
         }

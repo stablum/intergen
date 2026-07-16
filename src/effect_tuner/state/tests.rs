@@ -288,6 +288,51 @@ fn list_overlay_snapshot_scrolls_to_keep_selection_visible() {
 }
 
 #[test]
+fn list_overlay_snapshot_shows_details_for_selected_and_enabled_lfos() {
+    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+    let (
+        generation_config,
+        generation_state,
+        material_config,
+        material_state,
+        stage_config,
+        stage_state,
+    ) = default_scene_state();
+    effect_tuner.selected_index = 0;
+    effect_tuner.lfos[1].enabled = true;
+    effect_tuner.lfos[1].amplitude = 1.25;
+    effect_tuner.lfos[1].frequency_hz = 0.75;
+    effect_tuner.lfos[1].shape = LfoShape::Triangle;
+    effect_tuner.show_list_page(1.0);
+
+    let snapshot = effect_tuner.list_overlay_snapshot(
+        &view_context(
+            &generation_config,
+            &generation_state,
+            &material_config,
+            &material_state,
+            &stage_config,
+            &stage_state,
+        ),
+        1.0,
+        3,
+    );
+
+    assert!(snapshot.rows[0].selected);
+    assert!(snapshot.rows[0].lfo_detail_visible);
+    assert!(!snapshot.rows[0].lfo_state_emphasized);
+    assert!(!snapshot.rows[1].selected);
+    assert!(snapshot.rows[1].lfo_detail_visible);
+    assert!(snapshot.rows[1].lfo_state_emphasized);
+    assert_eq!(snapshot.rows[1].lfo_amplitude_text, "1.25");
+    assert_eq!(snapshot.rows[1].lfo_frequency_text, "0.75");
+    assert_eq!(snapshot.rows[1].lfo_shape_text, "triangle");
+    assert!(!snapshot.rows[2].selected);
+    assert!(!snapshot.rows[2].lfo_detail_visible);
+    assert!(!snapshot.rows[2].lfo_state_emphasized);
+}
+
+#[test]
 fn group_list_overlay_snapshot_filters_to_the_selected_group() {
     let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
     let (

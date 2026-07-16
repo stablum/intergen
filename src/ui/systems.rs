@@ -523,7 +523,7 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
         let lfo_detail_visible = snapshot
             .rows
             .get(panel.0)
-            .is_some_and(|row| row.selected && row.supports_lfo);
+            .is_some_and(|row| row.lfo_detail_visible);
         *visibility = if lfo_detail_visible {
             Visibility::Visible
         } else {
@@ -550,42 +550,42 @@ pub(crate) fn update_effect_tuner_list_overlay_system(
     }
 
     for (text_meta, mut text, mut text_color) in detail_text_query.iter_mut() {
-        let selected_slot = snapshot
+        let Some(row) = snapshot
             .rows
             .get(text_meta.slot)
-            .is_some_and(|row| row.selected && row.supports_lfo);
-        if !selected_slot {
+            .filter(|row| row.lfo_detail_visible)
+        else {
             *text = Text::new("");
             *text_color = TextColor(srgb(ui_config.body_text));
             continue;
-        }
+        };
 
         let value = match text_meta.kind {
             EffectTunerListDetailTextKind::State => String::new(),
-            EffectTunerListDetailTextKind::Amplitude => snapshot.detail.amplitude_text.clone(),
-            EffectTunerListDetailTextKind::Frequency => snapshot.detail.frequency_text.clone(),
-            EffectTunerListDetailTextKind::Shape => snapshot.detail.shape_text.to_string(),
+            EffectTunerListDetailTextKind::Amplitude => row.lfo_amplitude_text.clone(),
+            EffectTunerListDetailTextKind::Frequency => row.lfo_frequency_text.clone(),
+            EffectTunerListDetailTextKind::Shape => row.lfo_shape_text.to_string(),
         };
         *text = Text::new(value);
 
         let color = match text_meta.kind {
             EffectTunerListDetailTextKind::State => srgb(ui_config.body_text),
             EffectTunerListDetailTextKind::Amplitude => {
-                if snapshot.detail.active_field == EffectOverlayField::LfoAmplitude {
+                if row.active_field == Some(EffectOverlayField::LfoAmplitude) {
                     srgb(ui_config.focus_text)
                 } else {
                     srgb(ui_config.body_text)
                 }
             }
             EffectTunerListDetailTextKind::Frequency => {
-                if snapshot.detail.active_field == EffectOverlayField::LfoFrequency {
+                if row.active_field == Some(EffectOverlayField::LfoFrequency) {
                     srgb(ui_config.focus_text)
                 } else {
                     srgb(ui_config.body_text)
                 }
             }
             EffectTunerListDetailTextKind::Shape => {
-                if snapshot.detail.active_field == EffectOverlayField::LfoShape {
+                if row.active_field == Some(EffectOverlayField::LfoShape) {
                     srgb(ui_config.focus_text)
                 } else {
                     srgb(ui_config.body_text)

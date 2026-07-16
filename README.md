@@ -153,7 +153,7 @@ Camera-output edge detection uses these `effects.edge_detection` settings:
 The in-app F2 control page starts from the values loaded from `config.toml` at launch.
 - Live edits affect the running app only.
 - The F2 control list covers shader effects plus scene, stage, and material runtime controls, including enum-like fields such as child shape, spawn placement mode, add mode, stage toggles, and procedural surface families.
-- The first `F2` press opens a parameter-group page, the second `F2` press opens the compact strip, the third `F2` press opens the full scrolling parameter list with an LFO detail panel beside the selected row, and the fourth `F2` press closes the page.
+- The first `F2` press opens a parameter-group page, the second `F2` press opens the compact strip, the third `F2` press opens the full scrolling parameter list with an LFO detail panel beside the selected row and every non-selected row whose LFO is on, and the fourth `F2` press closes the page.
 - On the first F2 page, `Up` / `Down` choose a parameter group and `Enter` opens that group's parameter list.
 - `Up` / `Down` select the active F2 control in the compact page, the full list page, or a group-specific parameter list, with hold-to-repeat.
 - `Left` / `Right` or `Tab` / `Shift + Tab` switch the active F2 field between value, LFO amplitude, LFO frequency, and LFO shape when the selected parameter supports LFOs.
