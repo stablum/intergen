@@ -102,6 +102,84 @@ fn edit_context<'a>(
     }
 }
 
+struct FullTestScene {
+    camera_config: CameraConfig,
+    camera_rig: CameraRig,
+    generation_config: GenerationConfig,
+    generation_state: GenerationState,
+    rendering_config: RenderingConfig,
+    rendering_state: RenderingState,
+    lighting_config: LightingConfig,
+    lighting_state: LightingState,
+    material_config: MaterialConfig,
+    material_state: MaterialState,
+    stage_state: StageState,
+}
+
+impl Default for FullTestScene {
+    fn default() -> Self {
+        let camera_config = CameraConfig::default();
+        let camera_rig = CameraRig::from_config(&camera_config);
+        let generation_config = GenerationConfig::default();
+        let generation_state = GenerationState::from_config(&generation_config);
+        let rendering_config = RenderingConfig::default();
+        let rendering_state = RenderingState::from_config(&rendering_config);
+        let lighting_config = LightingConfig::default();
+        let lighting_state = LightingState::from_config(&lighting_config);
+        let material_config = MaterialConfig::default();
+        let material_state = MaterialState::from_config(&material_config);
+        let stage_state = StageState::from_config(&rendering_config.stage);
+
+        Self {
+            camera_config,
+            camera_rig,
+            generation_config,
+            generation_state,
+            rendering_config,
+            rendering_state,
+            lighting_config,
+            lighting_state,
+            material_config,
+            material_state,
+            stage_state,
+        }
+    }
+}
+
+impl FullTestScene {
+    fn view(&self) -> EffectTunerViewContext<'_> {
+        EffectTunerViewContext {
+            camera_config: &self.camera_config,
+            camera_rig: &self.camera_rig,
+            generation_config: &self.generation_config,
+            generation_state: &self.generation_state,
+            rendering_config: &self.rendering_config,
+            rendering_state: &self.rendering_state,
+            lighting_config: &self.lighting_config,
+            lighting_state: &self.lighting_state,
+            material_config: &self.material_config,
+            material_state: &self.material_state,
+            stage_state: &self.stage_state,
+        }
+    }
+
+    fn edit(&mut self) -> EffectTunerEditContext<'_> {
+        EffectTunerEditContext {
+            camera_config: &self.camera_config,
+            camera_rig: &mut self.camera_rig,
+            generation_config: &self.generation_config,
+            generation_state: &mut self.generation_state,
+            rendering_config: &self.rendering_config,
+            rendering_state: &mut self.rendering_state,
+            lighting_config: &self.lighting_config,
+            lighting_state: &mut self.lighting_state,
+            material_config: &self.material_config,
+            material_state: &mut self.material_state,
+            stage_state: &mut self.stage_state,
+        }
+    }
+}
+
 fn select_parameter(effect_tuner: &mut EffectTunerState, parameter: EffectTunerParameter) {
     effect_tuner.selected_index = EffectTunerParameter::all()
         .iter()
@@ -163,6 +241,68 @@ fn evaluated_effects_apply_lfo_offset() {
     let evaluated = effect_tuner.evaluated_effects(0.25);
 
     assert!((evaluated.color_wavefolder.gain - 2.5).abs() < 1e-6);
+}
+
+#[test]
+fn unrelated_generation_lfo_leaves_numeric_scene_values_untouched() {
+    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+    let mut scene = FullTestScene::default();
+    effect_tuner.sync_scene_lfo_bases(&scene.view());
+
+    scene.camera_rig.angular_velocity = Vec3::new(0.25, -0.5, 0.75);
+    scene.material_state.opacity = 0.37;
+    scene.rendering_state.ambient_light_brightness = 1_234.0;
+    scene.lighting_state.point.range = 12.5;
+    scene.stage_state.floor.thickness = 0.9;
+
+    let axis_scale_lfo = lfo_index_for_parameter(EffectTunerParameter::Scene(
+        EffectTunerSceneParameter::ChildAxisScaleX,
+    ))
+    .expect("child axis scale should have an LFO slot");
+    effect_tuner.lfos[axis_scale_lfo].enabled = true;
+    effect_tuner.lfos[axis_scale_lfo].amplitude = 0.2;
+
+    effect_tuner.apply_scene_lfos(0.25, &mut scene.edit());
+
+    assert_eq!(
+        scene.camera_rig.angular_velocity,
+        Vec3::new(0.25, -0.5, 0.75)
+    );
+    assert_eq!(scene.material_state.opacity, 0.37);
+    assert_eq!(scene.rendering_state.ambient_light_brightness, 1_234.0);
+    assert_eq!(scene.lighting_state.point.range, 12.5);
+    assert_eq!(scene.stage_state.floor.thickness, 0.9);
+}
+
+#[test]
+fn numeric_scene_lfo_composes_with_external_changes_and_restores_only_its_offset() {
+    let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
+    let mut scene = FullTestScene::default();
+    effect_tuner.sync_scene_lfo_bases(&scene.view());
+
+    let velocity_lfo = lfo_index_for_parameter(EffectTunerParameter::Scene(
+        EffectTunerSceneParameter::CameraAngularVelocityX,
+    ))
+    .expect("camera angular velocity should have an LFO slot");
+    effect_tuner.lfos[velocity_lfo].enabled = true;
+    effect_tuner.lfos[velocity_lfo].shape = LfoShape::Sine;
+    effect_tuner.lfos[velocity_lfo].amplitude = 0.5;
+    effect_tuner.lfos[velocity_lfo].frequency_hz = 1.0;
+
+    effect_tuner.apply_scene_lfos(0.25, &mut scene.edit());
+    assert!((scene.camera_rig.angular_velocity.x - 0.5).abs() < 1.0e-6);
+
+    scene.camera_rig.angular_velocity.x += 0.2;
+    effect_tuner.apply_scene_lfos(0.0, &mut scene.edit());
+    assert!((scene.camera_rig.angular_velocity.x - 0.2).abs() < 1.0e-6);
+
+    effect_tuner.apply_scene_lfos(0.25, &mut scene.edit());
+    assert!((scene.camera_rig.angular_velocity.x - 0.7).abs() < 1.0e-6);
+
+    scene.camera_rig.angular_velocity.x += 0.1;
+    effect_tuner.lfos[velocity_lfo].enabled = false;
+    effect_tuner.apply_scene_lfos(0.25, &mut scene.edit());
+    assert!((scene.camera_rig.angular_velocity.x - 0.3).abs() < 1.0e-6);
 }
 
 #[test]

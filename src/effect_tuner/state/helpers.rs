@@ -115,7 +115,7 @@ fn default_lfos() -> Vec<ParameterLfo> {
         .collect()
 }
 
-fn default_scene_lfo_bases() -> Vec<f32> {
+fn default_scene_lfo_values() -> Vec<SceneLfoValueState> {
     let camera_config = CameraConfig::default();
     let camera_rig = CameraRig::from_config(&camera_config);
     let generation_config = GenerationConfig::default();
@@ -142,7 +142,7 @@ fn default_scene_lfo_bases() -> Vec<f32> {
     };
     EffectTunerSceneParameter::lfo_capable()
         .iter()
-        .map(|parameter| parameter.value(&context))
+        .map(|parameter| SceneLfoValueState::new(parameter.value(&context)))
         .collect()
 }
 

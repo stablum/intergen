@@ -377,16 +377,61 @@ pub(crate) struct SceneLfoApplicationResult {
     pub(crate) camera_changed: bool,
 }
 
+/// Tracks the authoritative value separately from the last live value owned by an LFO.
+///
+/// Scene parameters are shared with input and simulation systems, so a live-value delta that was
+/// not produced by the LFO must be folded into the base before the next modulation sample.
+#[derive(Clone, Copy, Debug)]
+struct SceneLfoValueState {
+    base_value: f32,
+    applied_output: Option<f32>,
+}
+
+impl SceneLfoValueState {
+    fn new(base_value: f32) -> Self {
+        Self {
+            base_value,
+            applied_output: None,
+        }
+    }
+
+    fn sync_base(&mut self, live_value: f32) {
+        self.base_value = live_value;
+        self.applied_output = None;
+    }
+
+    fn observe_live_value(&mut self, live_value: f32) {
+        if let Some(applied_output) = self.applied_output {
+            // Preserve changes made after our previous write, then replace only our modulation.
+            self.base_value += live_value - applied_output;
+        } else {
+            self.base_value = live_value;
+        }
+    }
+
+    fn record_modulated_output(&mut self, applied_output: f32) {
+        self.applied_output = Some(applied_output);
+    }
+
+    fn clear_modulated_output(&mut self, live_value: f32) {
+        self.applied_output = None;
+        self.base_value = live_value;
+    }
+
+    fn has_applied_modulation(self) -> bool {
+        self.applied_output.is_some()
+    }
+}
+
 #[derive(Resource, Clone)]
 pub(crate) struct EffectTunerState {
     #[cfg_attr(not(test), allow(dead_code))]
     defaults: EffectsConfig,
     current: EffectsConfig,
     lfos: Vec<ParameterLfo>,
-    scene_lfo_bases: Vec<f32>,
+    scene_lfo_values: Vec<SceneLfoValueState>,
     generation_lfo_applied: bool,
     generation_recompute_lfo_applied: bool,
-    scene_numeric_lfo_applied: bool,
     selected_index: usize,
     selected_group_index: usize,
     page_mode: EffectTunerPageMode,
@@ -408,10 +453,9 @@ impl EffectTunerState {
             defaults: effects_config.clone(),
             current: effects_config.clone(),
             lfos: default_lfos(),
-            scene_lfo_bases: default_scene_lfo_bases(),
+            scene_lfo_values: default_scene_lfo_values(),
             generation_lfo_applied: false,
             generation_recompute_lfo_applied: false,
-            scene_numeric_lfo_applied: false,
             selected_index: 0,
             selected_group_index: 0,
             page_mode: EffectTunerPageMode::GroupSelect,
@@ -474,7 +518,11 @@ impl EffectTunerState {
     pub(crate) fn needs_scene_lfo_application(&self) -> bool {
         self.has_active_scene_lfos()
             || self.generation_lfo_applied
-            || self.scene_numeric_lfo_applied
+            || self
+                .scene_lfo_values
+                .iter()
+                .copied()
+                .any(SceneLfoValueState::has_applied_modulation)
     }
 
     pub(crate) fn runtime_snapshot(&self) -> EffectRuntimeSnapshot {
@@ -500,10 +548,9 @@ impl EffectTunerState {
     fn apply_snapshot_values(&mut self, snapshot: &EffectRuntimeSnapshot) {
         self.current = snapshot.current.clone();
         self.lfos = default_lfos();
-        self.scene_lfo_bases = default_scene_lfo_bases();
+        self.scene_lfo_values = default_scene_lfo_values();
         self.generation_lfo_applied = false;
         self.generation_recompute_lfo_applied = false;
-        self.scene_numeric_lfo_applied = false;
         for (target, source) in self.lfos.iter_mut().zip(snapshot.lfos.iter().copied()) {
             *target = source;
         }
@@ -531,12 +578,15 @@ impl EffectTunerState {
         let Some(base_index) = parameter.lfo_scene_index() else {
             return false;
         };
-        let base_value = self.scene_lfo_bases[base_index];
         let current_value = parameter.value(&context.view());
+        self.scene_lfo_values[base_index].observe_live_value(current_value);
+        let base_value = self.scene_lfo_values[base_index].base_value;
         if (current_value - base_value).abs() <= 1.0e-6 {
+            self.scene_lfo_values[base_index].clear_modulated_output(current_value);
             return false;
         }
         let applied_value = parameter.set_value(context, base_value);
+        self.scene_lfo_values[base_index].clear_modulated_output(applied_value);
         (applied_value - current_value).abs() > 1.0e-6
     }
 
@@ -552,7 +602,7 @@ impl EffectTunerState {
             return;
         };
         if parameter.is_numeric() {
-            self.scene_lfo_bases[base_index] = parameter.value(context);
+            self.scene_lfo_values[base_index].sync_base(parameter.value(context));
         }
     }
 
@@ -569,7 +619,7 @@ impl EffectTunerState {
             parameter.apply_material_numeric_value(
                 material_config,
                 &mut base_state,
-                self.scene_lfo_bases[base_index],
+                self.scene_lfo_values[base_index].base_value,
             );
         }
         base_state
@@ -581,7 +631,10 @@ impl EffectTunerState {
             let Some(base_index) = parameter.lfo_scene_index() else {
                 continue;
             };
-            let _ = parameter.apply_stage_numeric_value(&mut base_state, self.scene_lfo_bases[base_index]);
+            let _ = parameter.apply_stage_numeric_value(
+                &mut base_state,
+                self.scene_lfo_values[base_index].base_value,
+            );
         }
         base_state
     }
@@ -592,7 +645,10 @@ impl EffectTunerState {
             let Some(base_index) = parameter.lfo_scene_index() else {
                 continue;
             };
-            let _ = parameter.apply_rendering_numeric_value(&mut base_state, self.scene_lfo_bases[base_index]);
+            let _ = parameter.apply_rendering_numeric_value(
+                &mut base_state,
+                self.scene_lfo_values[base_index].base_value,
+            );
         }
         base_state
     }
@@ -603,7 +659,10 @@ impl EffectTunerState {
             let Some(base_index) = parameter.lfo_scene_index() else {
                 continue;
             };
-            let _ = parameter.apply_lighting_numeric_value(&mut base_state, self.scene_lfo_bases[base_index]);
+            let _ = parameter.apply_lighting_numeric_value(
+                &mut base_state,
+                self.scene_lfo_values[base_index].base_value,
+            );
         }
         base_state
     }
@@ -626,7 +685,7 @@ impl EffectTunerState {
             let _ = parameter.apply_camera_numeric_value(
                 camera_config,
                 &mut base_state,
-                self.scene_lfo_bases[base_index],
+                self.scene_lfo_values[base_index].base_value,
             );
         }
         base_state
@@ -668,6 +727,9 @@ impl EffectTunerState {
         let mut generation_recompute_lfo_active = false;
         for parameter in EffectTunerSceneParameter::generation_lfo_capable() {
             let parameter = *parameter;
+            if let Some(base_index) = parameter.lfo_scene_index() {
+                self.scene_lfo_values[base_index].sync_base(parameter.value(&context.view()));
+            }
             let Some(lfo_index) = lfo_index_for_parameter(EffectTunerParameter::Scene(parameter)) else {
                 continue;
             };
@@ -698,7 +760,6 @@ impl EffectTunerState {
         self.generation_lfo_applied = generation_lfo_active;
         self.generation_recompute_lfo_applied = generation_recompute_lfo_active;
 
-        let mut scene_numeric_lfo_active = false;
         for parameter in EffectTunerSceneParameter::lfo_capable() {
             if parameter.is_generation_lfo_parameter() {
                 continue;
@@ -710,25 +771,33 @@ impl EffectTunerState {
             let Some(base_index) = parameter.lfo_scene_index() else {
                 continue;
             };
-            let base_value = self.scene_lfo_bases[base_index];
             let lfo = self.lfos[lfo_index];
-            let next_value = if lfo.is_active() {
-                scene_numeric_lfo_active = true;
-                base_value
-                    + lfo.amplitude
-                        * lfo
-                            .shape
-                            .sample(now_secs * lfo.frequency_hz, lfo_seed_for_index(lfo_index))
-            } else {
-                base_value
-            };
             let previous_value = parameter.value(&context.view());
-            let applied_value = parameter.set_value(context, next_value);
+            let value_state = &mut self.scene_lfo_values[base_index];
+            let had_applied_modulation = value_state.has_applied_modulation();
+            value_state.observe_live_value(previous_value);
+
+            let applied_value = if lfo.is_active() {
+                let lfo_offset = lfo.amplitude
+                    * lfo
+                        .shape
+                        .sample(now_secs * lfo.frequency_hz, lfo_seed_for_index(lfo_index));
+                let applied_value =
+                    parameter.set_value(context, value_state.base_value + lfo_offset);
+                value_state.record_modulated_output(applied_value);
+                applied_value
+            } else if had_applied_modulation {
+                let applied_value = parameter.set_value(context, value_state.base_value);
+                value_state.clear_modulated_output(applied_value);
+                applied_value
+            } else {
+                previous_value
+            };
+
             if (previous_value - applied_value).abs() > 1.0e-6 {
                 mark_scene_lfo_change(&mut result, *parameter);
             }
         }
-        self.scene_numeric_lfo_applied = scene_numeric_lfo_active;
 
         result
     }
@@ -790,7 +859,10 @@ impl EffectTunerState {
         context: &EffectTunerViewContext<'_>,
     ) -> Option<f32> {
         if let Some(base_index) = parameter.lfo_scene_index() {
-            return self.scene_lfo_bases.get(base_index).copied();
+            return self
+                .scene_lfo_values
+                .get(base_index)
+                .map(|value_state| value_state.base_value);
         }
         parameter.is_numeric().then(|| parameter.value(context))
     }
