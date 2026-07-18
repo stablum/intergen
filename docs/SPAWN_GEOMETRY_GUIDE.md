@@ -83,10 +83,10 @@ mask may claim the same keys for page navigation or editing.
 | `G` | Cycle attachment placement | vertex → edge → face → vertex | No |
 | `Ctrl` + `Space` | Cycle add mode | single → fill current level → single | No |
 | `Space` | Spawn using the current settings | tap once; hold to repeat | Adds shapes |
-| `,` | Decrease single-source repeat count | minimum `0` | No |
-| `.` | Increase single-source repeat count | unbounded integer | No |
-| `-` | Decrease child uniform scale ratio | configured bounds | No |
-| `+` | Increase child uniform scale ratio | configured bounds | No |
+| `,` | Decrease single-source repeat count | minimum `0`; hold repeats | No |
+| `.` | Increase single-source repeat count | unbounded integer; hold repeats | No |
+| `-` | Decrease child uniform scale ratio | configured bounds; hold repeats | No |
+| `+` | Increase child uniform scale ratio | configured bounds; hold repeats | No |
 | `[` | Decrease twist | configured bounds; hold repeats | **Yes—reflows** |
 | `]` | Increase twist | configured bounds; hold repeats | **Yes—reflows** |
 | `T` | Reset twist | configured startup default | **Yes—reflows** |
@@ -213,8 +213,8 @@ variation inside one batch.
 
 This control applies only in **single object** add mode:
 
-- `,` decreases the count, stopping at `0`;
-- `.` increases it;
+- `,` decreases the count, stopping at `0`, and holding repeats;
+- `.` increases it, and holding repeats;
 - `0` means keep using one source attachment indefinitely;
 - `1` means advance after every successful spawn—the traditional one-child-per-
   attachment behavior;
@@ -234,7 +234,7 @@ LFO values or their child mesh transform.
 ![Uniform scale ratio inherited through the shape tree](spawn-geometry/08-scale-ratio.svg)
 
 `-` and `+` change the child scale ratio by `scale_adjust_step` within
-`min_scale_ratio..max_scale_ratio`.
+`min_scale_ratio..max_scale_ratio`. Holding either key repeats the adjustment.
 
 For a parent with uniform scale `2.0` and ratio `0.5`, the child stores scale
 `1.0`. Its child stores `0.5`, and so on. This produces geometric size decay

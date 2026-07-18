@@ -68,8 +68,8 @@ const KEYBOARD_NUMBER_ROW: [KeyboardHelpKeySpec; 13] = [
     keyboard_help_key("8", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("9", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("0", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
-    keyboard_help_key("-", 1.0, true, "Decrease the child scale ratio."),
-    keyboard_help_key("+", 1.0, true, "Increase the child scale ratio."),
+    keyboard_help_key("-", 1.0, true, "Decrease the child scale ratio; hold to repeat."),
+    keyboard_help_key("+", 1.0, true, "Increase the child scale ratio; hold to repeat."),
     keyboard_help_key("Backspace", 2.2, true, "Stop camera rotation momentum."),
 ];
 
@@ -83,8 +83,8 @@ const KEYBOARD_TOP_LETTER_ROW: [KeyboardHelpKeySpec; 14] = [
     keyboard_help_key("Y", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("U", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("I", 1.0, true, "Reset global opacity."),
-    keyboard_help_key("O", 1.0, true, "Decrease global opacity."),
-    keyboard_help_key("P", 1.0, true, "Increase global opacity."),
+    keyboard_help_key("O", 1.0, true, "Decrease global opacity by 1%; hold to repeat."),
+    keyboard_help_key("P", 1.0, true, "Increase global opacity by 1%; hold to repeat."),
     keyboard_help_key("[", 1.0, true, "Decrease the child twist angle."),
     keyboard_help_key("]", 1.0, true, "Increase the child twist angle."),
     keyboard_help_key("\\", 1.5, false, KEYBOARD_HELP_UNUSED_TEXT),
@@ -115,8 +115,8 @@ const KEYBOARD_BOTTOM_LETTER_ROW: [KeyboardHelpKeySpec; 12] = [
     keyboard_help_key("B", 1.0, true, "Increase spawn exclusion probability."),
     keyboard_help_key("N", 1.0, true, "Reset spawn exclusion probability."),
     keyboard_help_key("M", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
-    keyboard_help_key(",", 1.0, true, "Decrease single-spawn source repeat count."),
-    keyboard_help_key(".", 1.0, true, "Increase single-spawn source repeat count."),
+    keyboard_help_key(",", 1.0, true, "Decrease single-spawn source repeat count; hold to repeat."),
+    keyboard_help_key(".", 1.0, true, "Increase single-spawn source repeat count; hold to repeat."),
     keyboard_help_key("/", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("Shift", 2.3, false, KEYBOARD_HELP_UNUSED_TEXT),
 ];
@@ -273,7 +273,6 @@ pub(crate) struct ParameterChangeNotificationValue;
 
 #[derive(Default)]
 pub(crate) struct ParameterChangeNotificationUiState {
-    initialized: bool,
     last_seen_revision: u64,
     visible_revision: Option<u64>,
 }

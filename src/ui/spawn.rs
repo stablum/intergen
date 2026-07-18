@@ -1129,12 +1129,10 @@ fn spawn_parameter_change_notification(
                             px(ui_config.hint_padding_x),
                             px(ui_config.hint_padding_y),
                         ),
-                        border: UiRect::all(px(1.0)),
                         border_radius: effect_tuner_corner_radius(),
                         ..default()
                     },
-                    BackgroundColor(srgba(ui_config.panel_background)),
-                    BorderColor::all(Color::srgba(1.0, 1.0, 1.0, 0.28)),
+                    BackgroundColor(Color::NONE),
                 ))
                 .with_children(|panel| {
                     panel.spawn((

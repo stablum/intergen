@@ -7,7 +7,7 @@ use crate::effect_tuner::{
     EffectTunerEditContext, EffectTunerParameter, EffectTunerSceneParameter, EffectTunerState,
     EffectTunerViewContext,
 };
-use crate::parameters::GenerationParameter;
+use crate::parameters::{GenerationParameter, HoldRepeatState};
 use crate::recent_changes::RecentChangesState;
 use crate::runtime_scene::GenerationSceneAccess;
 use crate::scene::{
@@ -29,6 +29,10 @@ const VERTEX_EXCLUSION_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyV];
 const VERTEX_EXCLUSION_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyB];
 const SINGLE_ATTACHMENT_REPEAT_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::Comma];
 const SINGLE_ATTACHMENT_REPEAT_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::Period];
+const SCALE_DECREASE_KEYS: [KeyCode; 2] = [KeyCode::Minus, KeyCode::NumpadSubtract];
+const SCALE_INCREASE_KEYS: [KeyCode; 2] = [KeyCode::Equal, KeyCode::NumpadAdd];
+const OPACITY_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyO];
+const OPACITY_INCREASE_KEYS: [KeyCode; 1] = [KeyCode::KeyP];
 
 const SHAPE_SELECTION_KEYS: [(KeyCode, ShapeKind); 4] = [
     (KeyCode::Digit1, ShapeKind::Cube),
@@ -37,11 +41,20 @@ const SHAPE_SELECTION_KEYS: [(KeyCode, ShapeKind); 4] = [
     (KeyCode::Digit4, ShapeKind::Dodecahedron),
 ];
 
+#[derive(Resource, Default)]
+pub(crate) struct NeutralParameterInputState {
+    repeat_count_decrease_hold: HoldRepeatState,
+    repeat_count_increase_hold: HoldRepeatState,
+    opacity_decrease_hold: HoldRepeatState,
+    opacity_increase_hold: HoldRepeatState,
+}
+
 pub(crate) fn generation_input_system(
     keys: Res<ButtonInput<KeyCode>>,
     time: Res<Time>,
     control_page_input_mask: Res<ControlPageInputMask>,
     mut effect_tuner: ResMut<EffectTunerState>,
+    mut neutral_parameter_input: ResMut<NeutralParameterInputState>,
     mut recent_changes: ResMut<RecentChangesState>,
     mut scene: GenerationSceneAccess,
 ) {
@@ -64,6 +77,7 @@ pub(crate) fn generation_input_system(
     );
     handle_scale_input(
         &keys,
+        time.delta_secs(),
         input_mask,
         &scene.app_config.generation,
         &mut scene.generation_state,
@@ -72,15 +86,20 @@ pub(crate) fn generation_input_system(
     );
     handle_single_attachment_repeat_input(
         &keys,
+        time.delta_secs(),
         input_mask,
+        &scene.app_config.generation,
         &mut scene.generation_state,
+        &mut neutral_parameter_input,
         &mut recent_changes,
         now_secs,
     );
     handle_opacity_input(
         &keys,
+        time.delta_secs(),
         input_mask,
         &mut effect_tuner,
+        &mut neutral_parameter_input,
         &mut recent_changes,
         &mut scene,
         now_secs,
@@ -204,6 +223,7 @@ fn control_pressed(keys: &ButtonInput<KeyCode>) -> bool {
 
 fn handle_scale_input(
     keys: &ButtonInput<KeyCode>,
+    delta_secs: f32,
     input_mask: ControlPageInputMask,
     generation_config: &crate::config::GenerationConfig,
     generation_state: &mut crate::scene::GenerationState,
@@ -211,9 +231,17 @@ fn handle_scale_input(
     now_secs: f32,
 ) {
     let scale_spec = generation_config.parameter_spec(GenerationParameter::ChildScaleRatio);
-    if just_pressed_unmasked(keys, input_mask, KeyCode::Minus)
-        || just_pressed_unmasked(keys, input_mask, KeyCode::NumpadSubtract)
-    {
+    let decrease_requested = generation_state
+        .parameter_mut(GenerationParameter::ChildScaleRatio)
+        .input_mut()
+        .request_decrease(
+            key_group_just_pressed(keys, input_mask, &SCALE_DECREASE_KEYS),
+            key_group_pressed(keys, input_mask, &SCALE_DECREASE_KEYS),
+            key_group_just_released(keys, input_mask, &SCALE_DECREASE_KEYS),
+            delta_secs,
+            scale_spec,
+        );
+    if decrease_requested {
         let scale_ratio = generation_state
             .parameter_mut(GenerationParameter::ChildScaleRatio)
             .adjust_clamped_base_value(-scale_spec.step(), scale_spec);
@@ -221,9 +249,17 @@ fn handle_scale_input(
         recent_changes.record_status_message(message.clone(), now_secs);
         println!("{message}");
     }
-    if just_pressed_unmasked(keys, input_mask, KeyCode::Equal)
-        || just_pressed_unmasked(keys, input_mask, KeyCode::NumpadAdd)
-    {
+    let increase_requested = generation_state
+        .parameter_mut(GenerationParameter::ChildScaleRatio)
+        .input_mut()
+        .request_increase(
+            key_group_just_pressed(keys, input_mask, &SCALE_INCREASE_KEYS),
+            key_group_pressed(keys, input_mask, &SCALE_INCREASE_KEYS),
+            key_group_just_released(keys, input_mask, &SCALE_INCREASE_KEYS),
+            delta_secs,
+            scale_spec,
+        );
+    if increase_requested {
         let scale_ratio = generation_state
             .parameter_mut(GenerationParameter::ChildScaleRatio)
             .adjust_clamped_base_value(scale_spec.step(), scale_spec);
@@ -235,20 +271,37 @@ fn handle_scale_input(
 
 fn handle_single_attachment_repeat_input(
     keys: &ButtonInput<KeyCode>,
+    delta_secs: f32,
     input_mask: ControlPageInputMask,
+    generation_config: &crate::config::GenerationConfig,
     generation_state: &mut crate::scene::GenerationState,
+    input_state: &mut NeutralParameterInputState,
     recent_changes: &mut RecentChangesState,
     now_secs: f32,
 ) {
     let mut next_value = None;
-    if key_group_just_pressed(keys, input_mask, &SINGLE_ATTACHMENT_REPEAT_DECREASE_KEYS) {
+    if input_state.repeat_count_decrease_hold.update(
+        key_group_just_pressed(keys, input_mask, &SINGLE_ATTACHMENT_REPEAT_DECREASE_KEYS),
+        key_group_pressed(keys, input_mask, &SINGLE_ATTACHMENT_REPEAT_DECREASE_KEYS),
+        key_group_just_released(keys, input_mask, &SINGLE_ATTACHMENT_REPEAT_DECREASE_KEYS),
+        delta_secs,
+        generation_config.twist_hold_delay_secs,
+        generation_config.twist_repeat_interval_secs,
+    ) {
         next_value = Some(
             generation_state
                 .single_attachment_repeat_count
                 .saturating_sub(1),
         );
     }
-    if key_group_just_pressed(keys, input_mask, &SINGLE_ATTACHMENT_REPEAT_INCREASE_KEYS) {
+    if input_state.repeat_count_increase_hold.update(
+        key_group_just_pressed(keys, input_mask, &SINGLE_ATTACHMENT_REPEAT_INCREASE_KEYS),
+        key_group_pressed(keys, input_mask, &SINGLE_ATTACHMENT_REPEAT_INCREASE_KEYS),
+        key_group_just_released(keys, input_mask, &SINGLE_ATTACHMENT_REPEAT_INCREASE_KEYS),
+        delta_secs,
+        generation_config.twist_hold_delay_secs,
+        generation_config.twist_repeat_interval_secs,
+    ) {
         next_value = Some(
             generation_state
                 .single_attachment_repeat_count
@@ -274,16 +327,27 @@ fn handle_single_attachment_repeat_input(
 
 fn handle_opacity_input(
     keys: &ButtonInput<KeyCode>,
+    delta_secs: f32,
     input_mask: ControlPageInputMask,
     effect_tuner: &mut EffectTunerState,
+    input_state: &mut NeutralParameterInputState,
     recent_changes: &mut RecentChangesState,
     scene: &mut GenerationSceneAccess<'_, '_>,
     now_secs: f32,
 ) {
     let (min_opacity, max_opacity) = scene.app_config.materials.opacity_bounds();
+    let hold_delay_secs = scene.app_config.generation.twist_hold_delay_secs;
+    let repeat_interval_secs = scene.app_config.generation.twist_repeat_interval_secs;
     let mut opacity_changed = false;
     let opacity_parameter = EffectTunerParameter::Scene(EffectTunerSceneParameter::GlobalOpacity);
-    if just_pressed_unmasked(keys, input_mask, KeyCode::KeyO) {
+    if input_state.opacity_decrease_hold.update(
+        key_group_just_pressed(keys, input_mask, &OPACITY_DECREASE_KEYS),
+        key_group_pressed(keys, input_mask, &OPACITY_DECREASE_KEYS),
+        key_group_just_released(keys, input_mask, &OPACITY_DECREASE_KEYS),
+        delta_secs,
+        hold_delay_secs,
+        repeat_interval_secs,
+    ) {
         {
             let mut context = effect_tuner_edit_context(scene);
             effect_tuner.restore_scene_parameter_base_if_needed(opacity_parameter, &mut context);
@@ -299,7 +363,14 @@ fn handle_opacity_input(
         recent_changes.record_status_message(message.clone(), now_secs);
         println!("{message}");
     }
-    if just_pressed_unmasked(keys, input_mask, KeyCode::KeyP) {
+    if input_state.opacity_increase_hold.update(
+        key_group_just_pressed(keys, input_mask, &OPACITY_INCREASE_KEYS),
+        key_group_pressed(keys, input_mask, &OPACITY_INCREASE_KEYS),
+        key_group_just_released(keys, input_mask, &OPACITY_INCREASE_KEYS),
+        delta_secs,
+        hold_delay_secs,
+        repeat_interval_secs,
+    ) {
         {
             let mut context = effect_tuner_edit_context(scene);
             effect_tuner.restore_scene_parameter_base_if_needed(opacity_parameter, &mut context);
@@ -812,7 +883,7 @@ pub(crate) fn vertex_exclusion_status_message(probability: f32) -> String {
 }
 
 pub(crate) fn spawn_add_mode_status_message(mode: SpawnAddMode) -> String {
-    format!("Object add mode: {}", mode.label())
+    format!("Ctrl+Space add mode: {}", mode.label())
 }
 
 pub(crate) fn single_attachment_repeat_count_status_message(repeat_count: usize) -> String {
@@ -855,12 +926,12 @@ fn spawn_summary_status_message(spawned: &[SpawnedShape], add_mode: SpawnAddMode
 #[cfg(test)]
 mod tests {
     use super::{
-        adjust_clamped_value, single_attachment_repeat_count_status_message,
-        spawn_add_mode_status_message, twist_status_message, vertex_exclusion_status_message,
-        vertex_offset_status_message,
+        NeutralParameterInputState, adjust_clamped_value,
+        single_attachment_repeat_count_status_message, spawn_add_mode_status_message,
+        twist_status_message, vertex_exclusion_status_message, vertex_offset_status_message,
     };
     use crate::config::GenerationConfig;
-    use crate::parameters::HoldRepeatState;
+    use crate::parameters::{GenerationParameter, HoldRepeatState};
     use crate::shapes::SpawnAddMode;
 
     #[test]
@@ -973,7 +1044,51 @@ mod tests {
     fn spawn_add_mode_status_message_mentions_fill_level() {
         let status = spawn_add_mode_status_message(SpawnAddMode::FillLevel);
 
+        assert!(status.starts_with("Ctrl+Space add mode:"));
         assert!(status.contains("fill current level"));
+    }
+
+    #[test]
+    fn scale_ratio_uses_the_continuous_parameter_hold_timing() {
+        let config = GenerationConfig::default();
+        let scale_spec = config.parameter_spec(GenerationParameter::ChildScaleRatio);
+
+        assert_eq!(scale_spec.hold_delay_secs(), config.twist_hold_delay_secs);
+        assert_eq!(
+            scale_spec.repeat_interval_secs(),
+            config.twist_repeat_interval_secs
+        );
+    }
+
+    #[test]
+    fn neutral_opacity_input_repeats_after_the_hold_delay() {
+        let config = GenerationConfig::default();
+        let mut input = NeutralParameterInputState::default();
+
+        assert!(input.opacity_decrease_hold.update(
+            true,
+            true,
+            false,
+            0.0,
+            config.twist_hold_delay_secs,
+            config.twist_repeat_interval_secs,
+        ));
+        assert!(!input.opacity_decrease_hold.update(
+            false,
+            true,
+            false,
+            config.twist_hold_delay_secs * 0.5,
+            config.twist_hold_delay_secs,
+            config.twist_repeat_interval_secs,
+        ));
+        assert!(input.opacity_decrease_hold.update(
+            false,
+            true,
+            false,
+            config.twist_hold_delay_secs * 0.5,
+            config.twist_hold_delay_secs,
+            config.twist_repeat_interval_secs,
+        ));
     }
 
     #[test]

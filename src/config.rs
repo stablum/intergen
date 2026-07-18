@@ -327,8 +327,8 @@ impl GenerationConfig {
                 self.min_scale_ratio,
                 self.max_scale_ratio,
                 self.scale_adjust_step,
-                0.0,
-                0.0,
+                self.twist_hold_delay_secs,
+                self.twist_repeat_interval_secs,
             ),
             GenerationParameter::ChildAxisScaleX => {
                 self.child_axis_scale_spec(self.default_child_axis_scale[0])
@@ -759,7 +759,7 @@ impl Default for MaterialConfig {
             perceptual_roughness: 0.86,
             reflectance: 0.24,
             default_opacity: 1.0,
-            opacity_adjust_step: 0.1,
+            opacity_adjust_step: 0.01,
             min_opacity: 0.1,
             max_opacity: 1.0,
             cube_hue_bias: 35.0,
@@ -886,7 +886,7 @@ fn ordered_pair(left: f32, right: f32) -> (f32, f32) {
 mod tests {
     use bevy::prelude::Vec3;
 
-    use super::{AppConfig, PresentModeSetting, parse_config};
+    use super::{AppConfig, MaterialConfig, PresentModeSetting, parse_config};
 
     #[test]
     fn partial_config_uses_defaults_for_unspecified_sections() {
@@ -1063,6 +1063,11 @@ mod tests {
         .expect("material config should parse");
 
         assert_eq!(config.materials.default_opacity_clamped(), 0.8);
+    }
+
+    #[test]
+    fn material_opacity_default_adjustment_is_one_percent() {
+        assert_eq!(MaterialConfig::default().opacity_adjust_step, 0.01);
     }
 
     #[test]

@@ -784,11 +784,6 @@ pub(crate) fn update_parameter_change_notification_system(
     };
 
     let latest_revision = recent_changes.latest_revision();
-    if !ui_state.initialized {
-        ui_state.initialized = true;
-        ui_state.last_seen_revision = latest_revision;
-    }
-
     let neutral_mode = control_page.active_page().is_none() && !help_overlay.is_visible();
     if !neutral_mode {
         ui_state.last_seen_revision = latest_revision;

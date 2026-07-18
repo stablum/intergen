@@ -220,16 +220,16 @@ const SCENE_HELP: [HelpEntry; 24] = [
         explanation: "Save a screenshot.",
     },
     HelpEntry {
-        startup: "-/+ adjust child scale ratio",
-        overlay: "- / +: Adjust child scale ratio",
+        startup: "hold -/+ to adjust child scale ratio",
+        overlay: "- / +: Adjust child scale ratio (hold to repeat)",
         binding: "- / +",
-        explanation: "Adjust child scale ratio.",
+        explanation: "Adjust child scale ratio, and hold to repeat.",
     },
     HelpEntry {
-        startup: "O/P adjust opacity",
-        overlay: "O / P: Adjust global opacity",
+        startup: "hold O/P to adjust opacity",
+        overlay: "O / P: Adjust global opacity (hold to repeat)",
         binding: "O / P",
-        explanation: "Adjust global opacity.",
+        explanation: "Adjust global opacity in 1% steps, and hold to repeat.",
     },
     HelpEntry {
         startup: "I reset opacity",
@@ -256,10 +256,10 @@ const SCENE_HELP: [HelpEntry; 24] = [
         explanation: "Adjust spawn exclusion probability, and hold to repeat.",
     },
     HelpEntry {
-        startup: ",/. adjust single-spawn source repeat count",
-        overlay: ", / .: Adjust single-spawn source repeat count",
+        startup: "hold ,/. to adjust single-spawn source repeat count",
+        overlay: ", / .: Adjust single-spawn source repeat count (hold to repeat)",
         binding: ", / .",
-        explanation: "Adjust how many successful single-mode spawns stay on the current source attachment before advancing.",
+        explanation: "Adjust how many successful single-mode spawns stay on the current source attachment before advancing, and hold to repeat.",
     },
     HelpEntry {
         startup: "C resets child outward offset",

@@ -19,7 +19,7 @@ use crate::effect_tuner::{
     capture_config_toml_reset_baseline_system, effect_tuner_input_system,
 };
 use crate::effects::EffectsPlugin;
-use crate::generation::generation_input_system;
+use crate::generation::{NeutralParameterInputState, generation_input_system};
 use crate::presets::{
     AutomatedScenePresetLoad, PresetBrowserState, automated_scene_preset_load_system,
     preset_input_system,
@@ -67,6 +67,7 @@ pub fn run() {
         .insert_resource(EffectTunerState::from_config(&app_config.effects))
         .insert_resource(EffectTunerResetBaselines::default())
         .insert_resource(RecentChangesState::default())
+        .insert_resource(NeutralParameterInputState::default())
         .insert_resource(PresetBrowserState::load_from_disk())
         .insert_resource(ScreenshotCounter::default())
         .add_plugins(DefaultPlugins.set(WindowPlugin {

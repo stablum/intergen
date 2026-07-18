@@ -176,7 +176,7 @@ The in-app F2 control page starts from the values loaded from `config.toml` at l
 
 Live opacity controls use these `materials` settings:
 - `default_opacity`: startup default for all object materials
-- `opacity_adjust_step`: per-keypress opacity change
+- `opacity_adjust_step`: opacity change per repeated adjustment (1% by default)
 - `min_opacity` / `max_opacity`: live clamp range
 
 
@@ -323,16 +323,16 @@ test or runnable build will follow.
 - `R`: reset the scene with the currently selected shape as the new root
 - `Space`: spawn child shapes with the current placement mode, or hold to keep spawning
 - `Ctrl + Space`: cycle the add mode between single spawn and fill-current-level spawning
-- `,`: decrease the single-spawn source repeat count
-- `.`: increase the single-spawn source repeat count
+- `,`: decrease the single-spawn source repeat count, or hold to keep decreasing
+- `.`: increase the single-spawn source repeat count, or hold to keep increasing
 - Fill-current-level spawning advances spawn-time generation LFO sampling by `generation.fill_mode_lfo_virtual_time_step_secs` per successful child
 - `G`: cycle the spawn placement mode between vertices, edges, and faces
 - `1`: select cube
 - `2`: select tetrahedron
 - `3`: select octahedron
 - `4`: select dodecahedron
-- `-`: decrease child scale ratio
-- `+`: increase child scale ratio
+- `-`: decrease child scale ratio, or hold to keep decreasing
+- `+`: increase child scale ratio, or hold to keep increasing
 - `[`: decrease child twist angle, or hold to keep decreasing
 - `]`: increase child twist angle, or hold to keep increasing
 - `Z`: decrease the child outward offset, or hold to keep decreasing
@@ -342,8 +342,8 @@ test or runnable build will follow.
 - `B`: increase the global spawn-exclusion probability, or hold to keep increasing
 - `N`: reset the global spawn-exclusion probability to the configured default
 - In single-spawn mode, `generation.default_single_attachment_repeat_count = 0` keeps reusing the current source attachment, `1` preserves the original one-spawn-per-source behavior, and larger values stay on one source attachment for that many successful spawns before advancing
-- `O`: decrease global object opacity
-- `P`: increase global object opacity
+- `O`: decrease global object opacity by 1%, or hold to keep decreasing
+- `P`: increase global object opacity by 1%, or hold to keep increasing
 - `I`: reset global object opacity to the configured default
 - `T`: reset the child twist angle to the configured default
 
