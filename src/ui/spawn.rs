@@ -1138,14 +1138,14 @@ fn spawn_parameter_change_notification(
                     panel.spawn((
                         Text::new(""),
                         ui_theme.text_font(label_font_size),
-                        TextColor(srgb(ui_config.title_text)),
+                        TextColor(Color::srgba(1.0, 1.0, 1.0, 1.0)),
                         effect_tuner_text_layout(Justify::Right),
                         ParameterChangeNotificationLabel,
                     ));
                     panel.spawn((
                         Text::new(""),
                         ui_theme.text_font(value_font_size),
-                        TextColor(srgb(ui_config.body_text)),
+                        TextColor(Color::srgba(1.0, 1.0, 1.0, 1.0)),
                         effect_tuner_text_layout(Justify::Right),
                         ParameterChangeNotificationValue,
                     ));
