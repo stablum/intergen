@@ -1107,6 +1107,7 @@ fn spawn_parameter_change_notification(
             Node {
                 display: Display::None,
                 position_type: PositionType::Absolute,
+                left: px(ui_config.hint_left),
                 right: px(ui_config.hint_left),
                 top: px(ui_config.hint_top),
                 justify_content: JustifyContent::FlexEnd,
@@ -1119,21 +1120,19 @@ fn spawn_parameter_change_notification(
         ))
         .with_children(|parent| {
             parent
-                .spawn((
-                    Node {
-                        max_width: px(460.0),
-                        flex_direction: FlexDirection::Column,
-                        align_items: AlignItems::FlexEnd,
-                        row_gap: px(4.0),
-                        padding: UiRect::axes(
-                            px(ui_config.hint_padding_x),
-                            px(ui_config.hint_padding_y),
-                        ),
-                        border_radius: effect_tuner_corner_radius(),
-                        ..default()
-                    },
-                    BackgroundColor(Color::NONE),
-                ))
+                .spawn(Node {
+                    min_width: px(320.0),
+                    max_width: px(460.0),
+                    flex_direction: FlexDirection::Column,
+                    align_items: AlignItems::FlexEnd,
+                    row_gap: px(4.0),
+                    padding: UiRect::axes(
+                        px(ui_config.hint_padding_x),
+                        px(ui_config.hint_padding_y),
+                    ),
+                    border_radius: effect_tuner_corner_radius(),
+                    ..default()
+                })
                 .with_children(|panel| {
                     panel.spawn((
                         Text::new(""),
