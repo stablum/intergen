@@ -1113,7 +1113,7 @@ fn spawn_parameter_change_notification(
                 justify_content: JustifyContent::FlexEnd,
                 ..default()
             },
-            GlobalZIndex(25),
+            GlobalZIndex(40),
             Visibility::Hidden,
             ParameterChangeNotification,
             UiTargetCamera(scene_camera),

@@ -271,12 +271,6 @@ pub(crate) struct ParameterChangeNotificationLabel;
 #[derive(Component)]
 pub(crate) struct ParameterChangeNotificationValue;
 
-#[derive(Default)]
-pub(crate) struct ParameterChangeNotificationUiState {
-    last_seen_revision: u64,
-    visible_revision: Option<u64>,
-}
-
 #[derive(Component)]
 pub(crate) struct RecentChangesWindowText;
 

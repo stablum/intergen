@@ -756,10 +756,7 @@ pub(crate) fn update_recent_changes_overlay_system(
 
 pub(crate) fn update_parameter_change_notification_system(
     time: Res<Time>,
-    control_page: Res<ControlPageState>,
-    help_overlay: Res<HelpOverlayState>,
     recent_changes: Res<RecentChangesState>,
-    mut ui_state: Local<ParameterChangeNotificationUiState>,
     mut notification_query: Query<
         (&mut Visibility, &mut Node),
         With<ParameterChangeNotification>,
@@ -783,20 +780,7 @@ pub(crate) fn update_parameter_change_notification_system(
         return;
     };
 
-    let latest_revision = recent_changes.latest_revision();
-    let neutral_mode = control_page.active_page().is_none() && !help_overlay.is_visible();
-    if !neutral_mode {
-        ui_state.last_seen_revision = latest_revision;
-        ui_state.visible_revision = None;
-    } else if latest_revision > ui_state.last_seen_revision {
-        ui_state.last_seen_revision = latest_revision;
-        ui_state.visible_revision = Some(latest_revision);
-    }
-
-    let latest = recent_changes.latest_recent_change(time.elapsed_secs());
-    let displayed_change = latest.filter(|(revision, _)| {
-        neutral_mode && ui_state.visible_revision == Some(*revision)
-    });
+    let displayed_change = recent_changes.latest_recent_change(time.elapsed_secs());
     let visible = displayed_change.is_some();
     *visibility = if visible {
         Visibility::Visible
@@ -809,7 +793,7 @@ pub(crate) fn update_parameter_change_notification_system(
         Display::None
     };
 
-    let Some((_, change)) = displayed_change else {
+    let Some(change) = displayed_change else {
         return;
     };
     if let Ok(mut text) = label_query.single_mut() {
