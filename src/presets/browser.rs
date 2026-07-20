@@ -229,12 +229,16 @@ impl PresetBrowserState {
         Some(lines.join("\n"))
     }
 
-    pub(crate) fn open_page(&mut self) -> Result<(), String> {
+    pub(crate) fn open_page(&mut self) -> Option<String> {
         self.command = PresetCommand::Load(PresetLoadMode::All);
         self.first_digit = None;
         self.chooser = None;
         self.status_message.clear();
-        self.refresh()
+        let Err(error) = self.refresh() else {
+            return None;
+        };
+        self.status_message = format!("refresh failed; showing cached presets: {error}");
+        Some(error)
     }
 
     pub(crate) fn close_page(&mut self) {

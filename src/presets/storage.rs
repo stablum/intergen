@@ -70,13 +70,14 @@ pub(super) fn load_preset_records() -> Result<Vec<PresetRecord>, String> {
 }
 
 pub(super) fn sync_preset_records(records: &mut Vec<PresetRecord>) -> Result<(), String> {
+    let paths = preset_paths()?;
     let mut cached_records = records
         .drain(..)
         .map(|record| (record.path.clone(), record))
         .collect::<HashMap<_, _>>();
     let mut synced_records = Vec::new();
 
-    for path in preset_paths()? {
+    for path in paths {
         let stamp = match read_preset_file_stamp(&path) {
             Ok(stamp) => stamp,
             Err(error) => {

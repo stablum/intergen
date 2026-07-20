@@ -375,16 +375,17 @@ pub(crate) fn control_page_input_system(
             return;
         }
 
-        match preset_browser.open_page() {
-            Ok(()) => {
-                if let Some(previous_page) = control_page.open_page(ControlPage::ScenePresets) {
-                    close_page(previous_page, &mut effect_tuner, &mut preset_browser);
-                }
-                println!(
-                    "Scene preset mode open. Use O/E/P plus two digits for partial loads, or prefix that sequence with S for partial saves."
-                );
-            }
-            Err(error) => eprintln!("{error}"),
+        if let Some(previous_page) = control_page.open_page(ControlPage::ScenePresets) {
+            close_page(previous_page, &mut effect_tuner, &mut preset_browser);
+        }
+        let refresh_error = preset_browser.open_page();
+        println!(
+            "Scene preset mode open. Use O/E/P plus two digits for partial loads, or prefix that sequence with S for partial saves."
+        );
+        if let Some(error) = refresh_error {
+            eprintln!(
+                "Scene preset mode open with cached entries. Could not refresh presets: {error}"
+            );
         }
         return;
     }
