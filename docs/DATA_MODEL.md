@@ -70,6 +70,9 @@ These are scene-wide, not per object.
 | `selected_shape_kind` | `ShapeKind` | One of `Cube`, `Tetrahedron`, `Octahedron`, `Dodecahedron`. This is the shape kind for future spawns, not a property of all existing nodes. |
 | `spawn_placement_mode` | `SpawnPlacementMode` | One of `Vertex`, `Edge`, `Face`. Controls where future children attach. |
 | `spawn_add_mode` | `SpawnAddMode` | One of `Single`, `FillLevel`. Controls how many objects one spawn action adds. |
+| `single_attachment_repeat_count` | `usize` | Single-mode total child capacity per attachment. `0` means unlimited. Increasing it can reactivate previously saturated attachments. The historical field name is retained for configuration and preset compatibility. |
+| `single_spawn_source_cursor` | optional parent/attachment cursor | Current position in the ordered single-spawn frontier. `H` clears it to rewind root-first. |
+| `single_spawn_frontier` | derived active-parent index and child counts | Runtime-only cache rebuilt from node origins after reset, mode/capacity changes, fill spawns, or preset loading. It is not serialized as authoritative scene state. |
 | `parameters` | `GenerationParameters` | Shared scalar generation state. See the next table. |
 | `spawn_hold` | `HoldRepeatState` | Internal input state. `elapsed_secs` is expected to stay `>= 0.0`; `repeating` is boolean. |
 
@@ -289,7 +292,10 @@ Current runtime behavior:
 
 Important distinction:
 
-- Occupancy is stored.
+- Occupancy booleans are stored for fill-mode and backward-compatible snapshot
+  semantics. Single-mode capacity is evaluated from child counts reconstructed
+  from each child's `NodeOrigin`, so increasing capacity can reactivate an
+  attachment even if its historical occupancy boolean is true.
 - Spawn exclusion is not stored.
 
 The spawn-exclusion probability is a shared generation parameter. When the app checks whether a candidate attachment is excluded, it derives that result deterministically from:
@@ -411,6 +417,8 @@ The main serialized snapshot contains:
 | `selected_shape_kind` | `ShapeKind` | Future-spawn selected child kind. |
 | `spawn_placement_mode` | `SpawnPlacementMode` | Future-spawn placement mode. |
 | `spawn_add_mode` | `SpawnAddMode` | Future-spawn add mode. |
+| `single_attachment_repeat_count` | `usize` | Serialized single-attachment capacity; `0` is unlimited. |
+| `single_spawn_source_cursor` | optional `SingleSpawnSourceCursorSnapshot` | Serialized frontier position. Child counts and active parents are reconstructed from node origins on load. |
 | `scale_ratio` | finite `f32` | Serialized base scale ratio. In runtime evaluation it is clamped by `GenerationConfig`. |
 | `child_axis_scale` | `[f32; 3]` of finite values | Serialized base shared child/root axis scale. Missing serialized values default to `[1.0, 1.0, 1.0]` for backward compatibility. Runtime evaluation clamps each component to the positive axis-scale bounds. |
 | `twist_per_vertex_radians` | finite `f32` | Serialized base twist. In runtime evaluation it is clamped by `GenerationConfig`. |

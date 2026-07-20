@@ -262,6 +262,7 @@ pub(crate) fn spawn_batch(
     })
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn next_spawn_on_attachment(
     nodes: &mut Vec<ShapeNode>,
     shapes: &ShapeCatalog,
@@ -280,8 +281,31 @@ pub(crate) fn next_spawn_on_attachment(
         tuning,
         parent_index,
         attachment,
+        false,
     )
     .map(|pending| apply_spawn(nodes, pending, mark_parent_attachment_occupied))
+}
+
+pub(crate) fn next_spawn_on_reusable_attachment(
+    nodes: &mut Vec<ShapeNode>,
+    shapes: &ShapeCatalog,
+    child_kind: ShapeKind,
+    scale_ratio: f32,
+    tuning: SpawnTuning,
+    parent_index: usize,
+    attachment: SpawnAttachment,
+) -> Option<SpawnedShape> {
+    find_spawn_at_attachment(
+        nodes,
+        shapes,
+        child_kind,
+        scale_ratio,
+        tuning,
+        parent_index,
+        attachment,
+        true,
+    )
+    .map(|pending| apply_spawn(nodes, pending, false))
 }
 
 pub(crate) fn spawn_batch_with_inputs(
@@ -377,6 +401,7 @@ fn find_next_spawn(
                     tuning,
                     parent_index,
                     attachment,
+                    false,
                 ) {
                     return Some(pending);
                 }
@@ -395,6 +420,7 @@ fn find_spawn_at_attachment(
     tuning: SpawnTuning,
     parent_index: usize,
     attachment: SpawnAttachment,
+    allow_occupied_attachment: bool,
 ) -> Option<PendingSpawn> {
     if attachment.mode != tuning.spawn_placement_mode {
         return None;
@@ -406,7 +432,7 @@ fn find_spawn_at_attachment(
     if attachment.index >= parent_geometry.attachment_count(attachment.mode) {
         return None;
     }
-    if parent.occupied_attachments.is_occupied(attachment) {
+    if !allow_occupied_attachment && parent.occupied_attachments.is_occupied(attachment) {
         return None;
     }
     if attachment_is_excluded(
@@ -886,7 +912,7 @@ mod tests {
     }
 
     #[test]
-    fn targeted_spawn_can_reuse_the_same_attachment_when_left_unoccupied() {
+    fn reusable_targeted_spawn_can_reactivate_an_occupied_attachment() {
         let shapes = ShapeCatalog::new();
         let mut nodes = vec![root_node(ShapeKind::Cube, 1.4, &shapes)];
         let attachment = SpawnAttachment {
@@ -902,13 +928,13 @@ mod tests {
             test_tuning(),
             0,
             attachment,
-            false,
+            true,
         )
         .expect("first targeted spawn should succeed");
 
         let mut offset_tuning = test_tuning();
         offset_tuning.child_position_offset = Vec3::new(0.4, 0.0, 0.0);
-        let second = next_spawn_on_attachment(
+        let second = next_spawn_on_reusable_attachment(
             &mut nodes,
             &shapes,
             ShapeKind::Cube,
@@ -916,7 +942,6 @@ mod tests {
             offset_tuning,
             0,
             attachment,
-            true,
         )
         .expect("second targeted spawn should succeed");
 

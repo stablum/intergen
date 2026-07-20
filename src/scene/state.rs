@@ -235,6 +235,7 @@ pub(crate) struct GenerationState {
     pub(crate) spawn_add_mode: SpawnAddMode,
     pub(crate) single_attachment_repeat_count: usize,
     pub(crate) single_spawn_source_cursor: Option<SingleSpawnSourceCursor>,
+    pub(crate) single_spawn_frontier: SingleSpawnFrontier,
     pub(crate) parameters: GenerationParameters,
     pub(crate) spawn_hold: HoldRepeatState,
 }
@@ -244,6 +245,240 @@ pub(crate) struct SingleSpawnSourceCursor {
     pub(crate) parent_index: usize,
     pub(crate) attachment: SpawnAttachment,
     pub(crate) successful_spawns: usize,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord)]
+struct FrontierParent {
+    level: usize,
+    index: usize,
+}
+
+#[derive(Clone, Debug, Default)]
+struct AttachmentChildCounts {
+    vertices: Vec<usize>,
+    edges: Vec<usize>,
+    faces: Vec<usize>,
+}
+
+impl AttachmentChildCounts {
+    fn for_node(node: &ShapeNode) -> Self {
+        Self {
+            vertices: vec![0; node.occupied_attachments.vertices.len()],
+            edges: vec![0; node.occupied_attachments.edges.len()],
+            faces: vec![0; node.occupied_attachments.faces.len()],
+        }
+    }
+
+    fn counts(&self, mode: SpawnPlacementMode) -> &[usize] {
+        match mode {
+            SpawnPlacementMode::Vertex => &self.vertices,
+            SpawnPlacementMode::Edge => &self.edges,
+            SpawnPlacementMode::Face => &self.faces,
+        }
+    }
+
+    fn counts_mut(&mut self, mode: SpawnPlacementMode) -> &mut [usize] {
+        match mode {
+            SpawnPlacementMode::Vertex => &mut self.vertices,
+            SpawnPlacementMode::Edge => &mut self.edges,
+            SpawnPlacementMode::Face => &mut self.faces,
+        }
+    }
+
+    fn record_child(&mut self, attachment: SpawnAttachment) -> Option<usize> {
+        let count = self.counts_mut(attachment.mode).get_mut(attachment.index)?;
+        *count = count.saturating_add(1);
+        Some(*count)
+    }
+
+    fn has_capacity(&self, mode: SpawnPlacementMode, capacity: usize) -> bool {
+        self.counts(mode)
+            .iter()
+            .any(|count| attachment_has_capacity(*count, capacity))
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct SingleSpawnFrontierConfiguration {
+    mode: SpawnPlacementMode,
+    capacity: usize,
+}
+
+#[derive(Clone, Debug, Default)]
+pub(crate) struct SingleSpawnFrontier {
+    configuration: Option<SingleSpawnFrontierConfiguration>,
+    parent_levels: Vec<usize>,
+    child_counts: Vec<AttachmentChildCounts>,
+    active_parents: std::collections::BTreeSet<FrontierParent>,
+}
+
+impl SingleSpawnFrontier {
+    pub(crate) fn ensure(
+        &mut self,
+        nodes: &[ShapeNode],
+        mode: SpawnPlacementMode,
+        capacity: usize,
+    ) {
+        let configuration = SingleSpawnFrontierConfiguration { mode, capacity };
+        if self.configuration == Some(configuration) && self.child_counts.len() == nodes.len() {
+            return;
+        }
+
+        self.configuration = Some(configuration);
+        self.parent_levels = nodes.iter().map(|node| node.level).collect();
+        self.child_counts = nodes
+            .iter()
+            .map(AttachmentChildCounts::for_node)
+            .collect();
+
+        for node in nodes.iter().skip(1) {
+            let NodeOrigin::Child {
+                parent_index,
+                attachment,
+            } = node.origin
+            else {
+                continue;
+            };
+            let Some(parent_counts) = self.child_counts.get_mut(parent_index) else {
+                continue;
+            };
+            let _ = parent_counts.record_child(attachment);
+        }
+
+        self.rebuild_active_parents();
+    }
+
+    pub(crate) fn invalidate(&mut self) {
+        self.configuration = None;
+        self.parent_levels.clear();
+        self.child_counts.clear();
+        self.active_parents.clear();
+    }
+
+    pub(crate) fn source_at_or_after(
+        &self,
+        cursor: Option<SingleSpawnSourceCursor>,
+    ) -> Option<SingleSpawnSourceCursor> {
+        self.source_from(cursor, false)
+    }
+
+    pub(crate) fn source_after(
+        &self,
+        cursor: SingleSpawnSourceCursor,
+    ) -> Option<SingleSpawnSourceCursor> {
+        self.source_from(Some(cursor), true)
+    }
+
+    pub(crate) fn record_spawn(
+        &mut self,
+        source: SingleSpawnSourceCursor,
+        child_index: usize,
+        child: &ShapeNode,
+    ) -> Option<usize> {
+        let configuration = self.configuration?;
+        if source.attachment.mode != configuration.mode {
+            return None;
+        }
+
+        let parent_level = *self.parent_levels.get(source.parent_index)?;
+        let parent_counts = self.child_counts.get_mut(source.parent_index)?;
+        let child_count = parent_counts.record_child(source.attachment)?;
+        if !parent_counts.has_capacity(configuration.mode, configuration.capacity) {
+            self.active_parents.remove(&FrontierParent {
+                level: parent_level,
+                index: source.parent_index,
+            });
+        }
+
+        if child_index != self.child_counts.len() {
+            self.invalidate();
+            return Some(child_count);
+        }
+
+        let child_counts = AttachmentChildCounts::for_node(child);
+        let child_has_capacity =
+            child_counts.has_capacity(configuration.mode, configuration.capacity);
+        self.parent_levels.push(child.level);
+        self.child_counts.push(child_counts);
+        if child_has_capacity {
+            self.active_parents.insert(FrontierParent {
+                level: child.level,
+                index: child_index,
+            });
+        }
+
+        Some(child_count)
+    }
+
+    fn rebuild_active_parents(&mut self) {
+        self.active_parents.clear();
+        let Some(configuration) = self.configuration else {
+            return;
+        };
+
+        for (index, counts) in self.child_counts.iter().enumerate() {
+            if !counts.has_capacity(configuration.mode, configuration.capacity) {
+                continue;
+            }
+            self.active_parents.insert(FrontierParent {
+                level: self.parent_levels[index],
+                index,
+            });
+        }
+    }
+
+    fn source_from(
+        &self,
+        cursor: Option<SingleSpawnSourceCursor>,
+        exclusive: bool,
+    ) -> Option<SingleSpawnSourceCursor> {
+        let configuration = self.configuration?;
+        let cursor = cursor.filter(|cursor| cursor.attachment.mode == configuration.mode);
+        let start_parent = cursor.and_then(|cursor| {
+            self.parent_levels
+                .get(cursor.parent_index)
+                .map(|level| FrontierParent {
+                    level: *level,
+                    index: cursor.parent_index,
+                })
+        });
+
+        for parent in self
+            .active_parents
+            .range(start_parent.unwrap_or_default()..)
+        {
+            let counts = self.child_counts[parent.index].counts(configuration.mode);
+            let start_attachment = cursor
+                .filter(|cursor| cursor.parent_index == parent.index)
+                .map_or(0, |cursor| {
+                    cursor
+                        .attachment
+                        .index
+                        .saturating_add(usize::from(exclusive))
+                });
+            for (attachment_index, child_count) in
+                counts.iter().copied().enumerate().skip(start_attachment)
+            {
+                if !attachment_has_capacity(child_count, configuration.capacity) {
+                    continue;
+                }
+                return Some(SingleSpawnSourceCursor {
+                    parent_index: parent.index,
+                    attachment: SpawnAttachment {
+                        mode: configuration.mode,
+                        index: attachment_index,
+                    },
+                    successful_spawns: child_count,
+                });
+            }
+        }
+
+        None
+    }
+}
+
+fn attachment_has_capacity(child_count: usize, capacity: usize) -> bool {
+    capacity == 0 || child_count < capacity
 }
 
 #[cfg_attr(not(test), allow(dead_code))]
@@ -259,6 +494,7 @@ impl GenerationState {
             spawn_add_mode: SpawnAddMode::default(),
             single_attachment_repeat_count: generation_config.default_single_attachment_repeat_count,
             single_spawn_source_cursor: None,
+            single_spawn_frontier: SingleSpawnFrontier::default(),
             parameters: GenerationParameters::from_config(generation_config),
             spawn_hold: HoldRepeatState::default(),
         }
@@ -349,6 +585,9 @@ impl GenerationState {
         let Some(cursor) = self.single_spawn_source_cursor.take() else {
             return;
         };
+        if cursor.successful_spawns == 0 {
+            return;
+        }
         let Some(parent) = self.nodes.get_mut(cursor.parent_index) else {
             return;
         };
@@ -364,22 +603,6 @@ impl GenerationState {
 
     pub(crate) fn reset_single_spawn_source_cursor(&mut self) {
         self.single_spawn_source_cursor = None;
-    }
-
-    pub(crate) fn single_spawn_source_cursor_is_valid(&self) -> bool {
-        let Some(cursor) = self.single_spawn_source_cursor else {
-            return false;
-        };
-        let Some(parent) = self.nodes.get(cursor.parent_index) else {
-            return false;
-        };
-        let occupied = match cursor.attachment.mode {
-            SpawnPlacementMode::Vertex => &parent.occupied_attachments.vertices,
-            SpawnPlacementMode::Edge => &parent.occupied_attachments.edges,
-            SpawnPlacementMode::Face => &parent.occupied_attachments.faces,
-        };
-
-        cursor.attachment.mode == self.spawn_placement_mode && cursor.attachment.index < occupied.len()
     }
 }
 
@@ -718,6 +941,7 @@ pub(crate) fn reset_generation_state(
     generation_state.nodes = vec![root.clone()];
     generation_state.spawn_hold.reset();
     generation_state.reset_single_spawn_source_cursor();
+    generation_state.single_spawn_frontier.invalidate();
     generation_state.parameters.clear_runtime_state();
     root
 }

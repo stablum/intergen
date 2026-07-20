@@ -54,6 +54,7 @@ fn overlay_text_lists_help_and_spawn_controls() {
     assert!(text.contains("Space: Add shapes using the current add mode (hold to repeat)"));
     assert!(text.contains("Ctrl + Space: Cycle add mode (single / fill current level)"));
     assert!(text.contains("G: Cycle spawn placement mode (vertex / edge / face)"));
+    assert!(text.contains("H: Rewind the single-spawn frontier to the root"));
     assert!(text.contains("Backspace: Stop camera rotation momentum"));
     assert!(text.contains("R: Reset to the selected shape as root"));
     assert!(text.contains("F12: Save a screenshot"));
@@ -63,7 +64,7 @@ fn overlay_text_lists_help_and_spawn_controls() {
     assert!(text.contains("[ / ]: Adjust child twist angle (hold to repeat)"));
     assert!(text.contains("Z / X: Adjust child outward offset (hold to repeat)"));
     assert!(text.contains("V / B: Adjust spawn exclusion probability (hold to repeat)"));
-    assert!(text.contains(", / .: Adjust single-spawn source repeat count"));
+    assert!(text.contains(", / .: Adjust single-spawn attachment capacity"));
     assert!(text.contains("C: Reset child outward offset"));
     assert!(text.contains("N: Reset spawn exclusion probability"));
     assert!(text.contains("T: Reset child twist angle"));
@@ -124,7 +125,7 @@ fn keyboard_help_rows_include_active_and_inactive_keys() {
     assert!(specs.iter().any(|spec| spec.label == "F1" && spec.used));
     assert!(specs.iter().any(|spec| spec.label == "F5" && spec.used));
     assert!(specs.iter().any(|spec| spec.label == "A" && !spec.used));
-    assert!(specs.iter().any(|spec| spec.label == "H" && !spec.used));
+    assert!(specs.iter().any(|spec| spec.label == "H" && spec.used));
     assert!(specs.iter().any(|spec| spec.label == "," && spec.used));
     assert!(specs.iter().any(|spec| spec.label == "." && spec.used));
     assert!(specs.iter().any(|spec| spec.label == "F11" && !spec.used));

@@ -611,6 +611,7 @@ fn respawn_shape_entities(runtime: &mut SceneMutationAccess<'_, '_>) {
 fn replace_object_structure(current: &mut GenerationState, preset: GenerationState) {
     current.nodes = preset.nodes;
     current.single_spawn_source_cursor = preset.single_spawn_source_cursor;
+    current.single_spawn_frontier = preset.single_spawn_frontier;
 }
 
 fn replace_generation_parameters(current: &mut GenerationState, preset: GenerationState) {

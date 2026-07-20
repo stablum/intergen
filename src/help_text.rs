@@ -134,7 +134,7 @@ const PRESET_HELP: [HelpEntry; 1] = [HelpEntry {
     explanation: "In the preset page, load or save full scenes or only object structure, post effects, or non-effect parameters; Del frees a slot.",
 }];
 
-const SCENE_HELP: [HelpEntry; 24] = [
+const SCENE_HELP: [HelpEntry; 25] = [
     HelpEntry {
         startup: "Arrow Up/Down pitch camera",
         overlay: "Arrow Up / Down: Pitch camera",
@@ -182,6 +182,12 @@ const SCENE_HELP: [HelpEntry; 24] = [
         overlay: "G: Cycle spawn placement mode (vertex / edge / face)",
         binding: "G",
         explanation: "Cycle spawn placement mode between vertex, edge, and face.",
+    },
+    HelpEntry {
+        startup: "H rewinds the single-spawn frontier to the root",
+        overlay: "H: Rewind the single-spawn frontier to the root",
+        binding: "H",
+        explanation: "Rewind the single-spawn frontier so reactivated root attachments are considered first.",
     },
     HelpEntry {
         startup: "R reset scene",
@@ -256,10 +262,10 @@ const SCENE_HELP: [HelpEntry; 24] = [
         explanation: "Adjust spawn exclusion probability, and hold to repeat.",
     },
     HelpEntry {
-        startup: "hold ,/. to adjust single-spawn source repeat count",
-        overlay: ", / .: Adjust single-spawn source repeat count (hold to repeat)",
+        startup: "hold ,/. to adjust single-spawn attachment capacity",
+        overlay: ", / .: Adjust single-spawn attachment capacity (hold to repeat)",
         binding: ", / .",
-        explanation: "Adjust how many successful single-mode spawns stay on the current source attachment before advancing, and hold to repeat.",
+        explanation: "Adjust the total number of single-mode children allowed on each attachment, and hold to repeat.",
     },
     HelpEntry {
         startup: "C resets child outward offset",

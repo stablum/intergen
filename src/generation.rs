@@ -15,9 +15,8 @@ use crate::scene::{
     opacity_status_message, reset_generation_state, spawn_shape_entity, sync_shape_transforms,
 };
 use crate::shapes::{
-    NodeOrigin, ShapeKind, SpawnAddMode, SpawnPlacementMode, SpawnedShape,
-    next_spawn_on_attachment, next_spawn_with_attachment_marking, recompute_spawn_tree,
-    spawn_batch_with_inputs,
+    ShapeKind, SpawnAddMode, SpawnPlacementMode, SpawnedShape, next_spawn_on_reusable_attachment,
+    recompute_spawn_tree, spawn_batch_with_inputs,
 };
 
 const RADIANS_TO_DEGREES: f32 = 180.0 / std::f32::consts::PI;
@@ -91,6 +90,13 @@ pub(crate) fn generation_input_system(
         &scene.app_config.generation,
         &mut scene.generation_state,
         &mut neutral_parameter_input,
+        &mut recent_changes,
+        now_secs,
+    );
+    handle_spawn_frontier_rewind(
+        &keys,
+        input_mask,
+        &mut scene.generation_state,
         &mut recent_changes,
         now_secs,
     );
@@ -199,6 +205,7 @@ fn handle_mode_shortcuts(
 ) -> bool {
     if just_pressed_unmasked(keys, input_mask, KeyCode::KeyG) {
         generation_state.finalize_single_spawn_source_cursor();
+        generation_state.single_spawn_frontier.invalidate();
         generation_state.spawn_placement_mode = generation_state.spawn_placement_mode.next();
         let message = spawn_placement_mode_status_message(generation_state.spawn_placement_mode);
         recent_changes.record_status_message(message.clone(), now_secs);
@@ -208,6 +215,7 @@ fn handle_mode_shortcuts(
     let ctrl_pressed = control_pressed(keys);
     if ctrl_pressed && just_pressed_unmasked(keys, input_mask, KeyCode::Space) {
         generation_state.finalize_single_spawn_source_cursor();
+        generation_state.single_spawn_frontier.invalidate();
         generation_state.spawn_add_mode = generation_state.spawn_add_mode.next();
         let message = spawn_add_mode_status_message(generation_state.spawn_add_mode);
         recent_changes.record_status_message(message.clone(), now_secs);
@@ -316,12 +324,28 @@ fn handle_single_attachment_repeat_input(
         return;
     }
 
-    generation_state.finalize_single_spawn_source_cursor();
     generation_state.single_attachment_repeat_count = next_value;
     let message = single_attachment_repeat_count_status_message(
         generation_state.single_attachment_repeat_count,
     );
     recent_changes.record_status_message(message.clone(), now_secs);
+    println!("{message}");
+}
+
+fn handle_spawn_frontier_rewind(
+    keys: &ButtonInput<KeyCode>,
+    input_mask: ControlPageInputMask,
+    generation_state: &mut crate::scene::GenerationState,
+    recent_changes: &mut RecentChangesState,
+    now_secs: f32,
+) {
+    if !just_pressed_unmasked(keys, input_mask, KeyCode::KeyH) {
+        return;
+    }
+
+    generation_state.reset_single_spawn_source_cursor();
+    let message = spawn_frontier_rewind_status_message();
+    recent_changes.record_status_message(message.to_string(), now_secs);
     println!("{message}");
 }
 
@@ -625,7 +649,7 @@ fn handle_spawn_input(
             .vertex_offset_ratio(generation_config);
         let spawn_placement_mode = scene.generation_state.spawn_placement_mode;
 
-        spawn_batch_with_inputs(
+        let spawned = spawn_batch_with_inputs(
             &mut scene.generation_state.nodes,
             &scene.shape_assets.catalog,
             selected_shape_kind,
@@ -687,7 +711,9 @@ fn handle_spawn_input(
 
                 (scale_ratio, spawn_tuning)
             },
-        )
+        );
+        scene.generation_state.single_spawn_frontier.invalidate();
+        spawned
     } else {
         let generation_config = scene.app_config.generation.clone();
         spawn_single_shape(selected_shape_kind, generation_config, scene)
@@ -720,75 +746,76 @@ fn spawn_single_shape(
     generation_config: crate::config::GenerationConfig,
     scene: &mut GenerationSceneAccess<'_, '_>,
 ) -> Vec<SpawnedShape> {
-    let repeat_count = scene.generation_state.single_attachment_repeat_count;
+    let attachment_capacity = scene.generation_state.single_attachment_repeat_count;
     let scale_ratio = scene.generation_state.scale_ratio(&generation_config);
     let spawn_tuning = scene.generation_state.spawn_tuning(&generation_config);
 
-    if scene.generation_state.single_spawn_source_cursor.is_some()
-        && !scene.generation_state.single_spawn_source_cursor_is_valid()
-    {
-        scene.generation_state.reset_single_spawn_source_cursor();
-    }
+    let spawn_placement_mode = scene.generation_state.spawn_placement_mode;
+    let generation_state = &mut *scene.generation_state;
+    generation_state.single_spawn_frontier.ensure(
+        &generation_state.nodes,
+        spawn_placement_mode,
+        attachment_capacity,
+    );
 
-    if let Some(cursor) = scene.generation_state.single_spawn_source_cursor {
-        let should_advance_after_spawn =
-            repeat_count > 0 && cursor.successful_spawns.saturating_add(1) >= repeat_count;
-        let spawn = next_spawn_on_attachment(
+    let original_cursor = scene.generation_state.single_spawn_source_cursor;
+    let mut search_cursor = original_cursor;
+    let mut include_cursor = true;
+    loop {
+        let source = if include_cursor {
+            scene
+                .generation_state
+                .single_spawn_frontier
+                .source_at_or_after(search_cursor)
+        } else {
+            scene
+                .generation_state
+                .single_spawn_frontier
+                .source_after(search_cursor.expect("exclusive frontier search needs a cursor"))
+        };
+        let Some(source) = source else {
+            return Vec::new();
+        };
+
+        let spawn = next_spawn_on_reusable_attachment(
             &mut scene.generation_state.nodes,
             &scene.shape_assets.catalog,
             selected_shape_kind,
             scale_ratio,
             spawn_tuning,
-            cursor.parent_index,
-            cursor.attachment,
-            should_advance_after_spawn,
+            source.parent_index,
+            source.attachment,
         );
-        return match spawn {
-            Some(spawn) => {
-                if should_advance_after_spawn {
-                    scene.generation_state.reset_single_spawn_source_cursor();
-                } else {
-                    scene.generation_state.single_spawn_source_cursor =
-                        Some(SingleSpawnSourceCursor {
-                            parent_index: cursor.parent_index,
-                            attachment: cursor.attachment,
-                            successful_spawns: cursor.successful_spawns.saturating_add(1),
-                        });
-                }
-                vec![spawn]
+        let Some(spawn) = spawn else {
+            search_cursor = Some(source);
+            include_cursor = false;
+            continue;
+        };
+
+        let child_index = scene.generation_state.nodes.len() - 1;
+        let child_count = scene
+            .generation_state
+            .single_spawn_frontier
+            .record_spawn(source, child_index, &spawn.node)
+            .unwrap_or_else(|| source.successful_spawns.saturating_add(1));
+        let source_is_saturated = attachment_capacity > 0 && child_count >= attachment_capacity;
+        if source_is_saturated {
+            if let Some(parent) = scene.generation_state.nodes.get_mut(source.parent_index) {
+                parent.occupied_attachments.mark_occupied(source.attachment);
             }
-            None => Vec::new(),
-        };
-    }
+            scene.generation_state.single_spawn_source_cursor = scene
+                .generation_state
+                .single_spawn_frontier
+                .source_after(source);
+        } else {
+            scene.generation_state.single_spawn_source_cursor = Some(SingleSpawnSourceCursor {
+                successful_spawns: child_count,
+                ..source
+            });
+        }
 
-    let mark_parent_attachment_occupied = repeat_count == 1;
-    let spawn = next_spawn_with_attachment_marking(
-        &mut scene.generation_state.nodes,
-        &scene.shape_assets.catalog,
-        selected_shape_kind,
-        scale_ratio,
-        spawn_tuning,
-        mark_parent_attachment_occupied,
-    );
-    let Some(spawn) = spawn else {
-        return Vec::new();
-    };
-    if !mark_parent_attachment_occupied {
-        let NodeOrigin::Child {
-            parent_index,
-            attachment,
-        } = spawn.node.origin
-        else {
-            return vec![spawn];
-        };
-        scene.generation_state.single_spawn_source_cursor = Some(SingleSpawnSourceCursor {
-            parent_index,
-            attachment,
-            successful_spawns: 1,
-        });
+        return vec![spawn];
     }
-
-    vec![spawn]
 }
 
 fn key_group_just_pressed(
@@ -888,12 +915,18 @@ pub(crate) fn spawn_add_mode_status_message(mode: SpawnAddMode) -> String {
 
 pub(crate) fn single_attachment_repeat_count_status_message(repeat_count: usize) -> String {
     match repeat_count {
-        0 => "Single-spawn source repeat count: 0 (never advance automatically)".to_string(),
-        1 => "Single-spawn source repeat count: 1 (advance every spawn)".to_string(),
+        0 => {
+            "Single-spawn attachment capacity: unlimited (never advance automatically)".to_string()
+        }
+        1 => "Single-spawn attachment capacity: 1 child".to_string(),
         count => {
-            format!("Single-spawn source repeat count: {count} (advance after {count} spawns)")
+            format!("Single-spawn attachment capacity: {count} children")
         }
     }
+}
+
+pub(crate) fn spawn_frontier_rewind_status_message() -> &'static str {
+    "Single-spawn frontier rewound to the root"
 }
 
 pub(crate) fn spawn_placement_mode_status_message(mode: SpawnPlacementMode) -> String {
@@ -928,7 +961,8 @@ mod tests {
     use super::{
         NeutralParameterInputState, adjust_clamped_value,
         single_attachment_repeat_count_status_message, spawn_add_mode_status_message,
-        twist_status_message, vertex_exclusion_status_message, vertex_offset_status_message,
+        spawn_frontier_rewind_status_message, twist_status_message,
+        vertex_exclusion_status_message, vertex_offset_status_message,
     };
     use crate::config::GenerationConfig;
     use crate::parameters::{GenerationParameter, HoldRepeatState};
@@ -1096,5 +1130,10 @@ mod tests {
         let status = single_attachment_repeat_count_status_message(0);
 
         assert!(status.contains("never advance automatically"));
+    }
+
+    #[test]
+    fn spawn_frontier_rewind_status_message_mentions_root() {
+        assert!(spawn_frontier_rewind_status_message().contains("root"));
     }
 }

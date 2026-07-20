@@ -27,6 +27,7 @@ pub(crate) fn setup_scene(
                 .generation
                 .default_single_attachment_repeat_count,
             single_spawn_source_cursor: None,
+            single_spawn_frontier: SingleSpawnFrontier::default(),
             parameters: GenerationParameters::from_config(&app_config.generation),
             spawn_hold: HoldRepeatState::default(),
         },
@@ -95,6 +96,7 @@ pub(crate) fn setup_scene(
         spawn_add_mode: SpawnAddMode::default(),
         single_attachment_repeat_count: app_config.generation.default_single_attachment_repeat_count,
         single_spawn_source_cursor: None,
+        single_spawn_frontier: SingleSpawnFrontier::default(),
         parameters: initial_parameters,
         spawn_hold: HoldRepeatState::default(),
     });

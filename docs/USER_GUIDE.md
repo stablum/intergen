@@ -172,9 +172,11 @@ The main groups of live generation settings are:
   `child_position_offset_adjust_step`; components are clamped to `[-1, 1]`
 - exclusion: `default_vertex_spawn_exclusion_probability`, its
   adjustment/hold/repeat values, and bounds within `[0, 1]`
-- single-source reuse: `default_single_attachment_repeat_count`; `0` reuses the
-  current attachment indefinitely, `1` advances after every successful spawn,
-  and larger values advance after that many successful spawns
+- single-attachment capacity: `default_single_attachment_repeat_count`; `0`
+  keeps the current attachment indefinitely, `1` allows one child per
+  attachment, and larger values allow that many total children per attachment.
+  Raising the capacity reactivates earlier attachments; press `H` to rewind the
+  single-spawn frontier so root attachments are considered first
 
 For all configuration fields and their relationship to runtime and preset
 state, see the [data-model reference](DATA_MODEL.md). For geometry-specific

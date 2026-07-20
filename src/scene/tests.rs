@@ -8,8 +8,8 @@ use crate::shapes::{
 };
 
 use super::{
-    GenerationParameters, GenerationState, SingleSpawnSourceCursor, alpha_mode_for_opacity,
-    reset_generation_state,
+    GenerationParameters, GenerationState, SingleSpawnFrontier, SingleSpawnSourceCursor,
+    alpha_mode_for_opacity, reset_generation_state,
     root_generation_node,
 };
 
@@ -53,6 +53,7 @@ fn reset_generation_state_restores_root_only() {
             },
             successful_spawns: 2,
         }),
+        single_spawn_frontier: SingleSpawnFrontier::default(),
         parameters: GenerationParameters::from_base_values_with_axis_scale(
             0.42,
             Vec3::new(1.25, 0.75, 1.5),
@@ -210,6 +211,119 @@ fn reset_generation_state_restores_root_only() {
     assert!(!exclusion_input.decrease_hold().repeating);
     assert_eq!(exclusion_input.increase_hold().elapsed_secs, 0.0);
     assert!(!exclusion_input.increase_hold().repeating);
+}
+
+#[test]
+fn increased_single_spawn_capacity_reactivates_root_attachments_for_rewind() {
+    let shape_catalog = ShapeCatalog::new();
+    let generation_config = GenerationConfig::default();
+    let mut root = root_generation_node(&shape_catalog, &generation_config);
+    root.occupied_attachments.vertices[0] = true;
+    let child = ShapeNode {
+        kind: ShapeKind::Tetrahedron,
+        level: 1,
+        center: Vec3::ZERO,
+        rotation: Quat::IDENTITY,
+        scale: 0.4,
+        axis_scale: Vec3::ONE,
+        local_position_offset: Vec3::ZERO,
+        radius: 0.7,
+        occupied_attachments: AttachmentOccupancy::new(
+            shape_catalog.geometry(ShapeKind::Tetrahedron),
+        ),
+        origin: NodeOrigin::Child {
+            parent_index: 0,
+            attachment: SpawnAttachment {
+                mode: SpawnPlacementMode::Vertex,
+                index: 0,
+            },
+        },
+    };
+    let nodes = vec![root, child];
+    let deeper_cursor = SingleSpawnSourceCursor {
+        parent_index: 1,
+        attachment: SpawnAttachment {
+            mode: SpawnPlacementMode::Vertex,
+            index: 0,
+        },
+        successful_spawns: 0,
+    };
+    let mut frontier = SingleSpawnFrontier::default();
+
+    frontier.ensure(&nodes, SpawnPlacementMode::Vertex, 1);
+    assert_eq!(
+        frontier
+            .source_at_or_after(Some(deeper_cursor))
+            .expect("level-one parent should be active")
+            .parent_index,
+        1
+    );
+
+    frontier.ensure(&nodes, SpawnPlacementMode::Vertex, 2);
+    assert_eq!(
+        frontier
+            .source_at_or_after(Some(deeper_cursor))
+            .expect("increased capacity should preserve the current frontier")
+            .parent_index,
+        1
+    );
+    let rewound = frontier
+        .source_at_or_after(None)
+        .expect("rewind should expose the reactivated root attachment");
+    assert_eq!(rewound.parent_index, 0);
+    assert_eq!(rewound.attachment.index, 0);
+    assert_eq!(rewound.successful_spawns, 1);
+}
+
+#[test]
+fn single_spawn_frontier_tracks_total_children_per_attachment() {
+    let shape_catalog = ShapeCatalog::new();
+    let generation_config = GenerationConfig::default();
+    let root = root_generation_node(&shape_catalog, &generation_config);
+    let child = ShapeNode {
+        kind: ShapeKind::Tetrahedron,
+        level: 1,
+        center: Vec3::ZERO,
+        rotation: Quat::IDENTITY,
+        scale: 0.4,
+        axis_scale: Vec3::ONE,
+        local_position_offset: Vec3::ZERO,
+        radius: 0.7,
+        occupied_attachments: AttachmentOccupancy::new(
+            shape_catalog.geometry(ShapeKind::Tetrahedron),
+        ),
+        origin: NodeOrigin::Child {
+            parent_index: 0,
+            attachment: SpawnAttachment {
+                mode: SpawnPlacementMode::Vertex,
+                index: 0,
+            },
+        },
+    };
+    let mut frontier = SingleSpawnFrontier::default();
+    frontier.ensure(std::slice::from_ref(&root), SpawnPlacementMode::Vertex, 2);
+    let source = frontier
+        .source_at_or_after(None)
+        .expect("root should have an active attachment");
+
+    assert_eq!(frontier.record_spawn(source, 1, &child), Some(1));
+    assert_eq!(
+        frontier
+            .source_at_or_after(Some(source))
+            .expect("source should remain active below capacity")
+            .attachment
+            .index,
+        0
+    );
+    assert_eq!(frontier.record_spawn(source, 2, &child), Some(2));
+    assert_eq!(
+        frontier
+            .source_at_or_after(Some(source))
+            .expect("frontier should advance after reaching capacity")
+            .attachment
+            .index,
+        1
+    );
 }
 
 #[test]

@@ -26,7 +26,7 @@ are limited to the geometry workflow and are explained in that context.
 - [Shape kind: 1, 2, 3, 4](#shape-kind-1-2-3-4)
 - [Placement mode: G](#placement-mode-g)
 - [Add mode and spawning: Ctrl+Space and Space](#add-mode-and-spawning-ctrlspace-and-space)
-- [Single-source repeat count: comma and period](#single-source-repeat-count-comma-and-period)
+- [Single-attachment capacity and rewind: comma, period, and H](#single-attachment-capacity-and-rewind-comma-period-and-h)
 - [Uniform child scale ratio: minus and plus](#uniform-child-scale-ratio-minus-and-plus)
 - [Per-axis child scale: F2 only](#per-axis-child-scale-f2-only)
 - [Twist: brackets and T](#twist-brackets-and-t)
@@ -87,8 +87,9 @@ mask may claim the same keys for page navigation or editing.
 | `G` | Cycle attachment placement | vertex → edge → face → vertex | No |
 | `Ctrl` + `Space` | Cycle add mode | single → fill current level → single | No |
 | `Space` | Spawn using the current settings | tap once; hold to repeat | Adds shapes |
-| `,` | Decrease single-source repeat count | minimum `0`; hold repeats | No |
-| `.` | Increase single-source repeat count | unbounded integer; hold repeats | No |
+| `,` | Decrease single-attachment child capacity | minimum `0`; hold repeats | No |
+| `.` | Increase single-attachment child capacity | unbounded integer; hold repeats | No |
+| `H` | Rewind the single-spawn frontier | root-first | No |
 | `-` | Decrease child uniform scale ratio | configured bounds; hold repeats | No |
 | `+` | Increase child uniform scale ratio | configured bounds; hold repeats | No |
 | `[` | Decrease twist | configured bounds; hold repeats | **Yes—reflows** |
@@ -187,8 +188,8 @@ on every potential parent:
 - **Face:** the anchor is the face center; outward follows the face normal.
 
 The child center starts at the selected anchor. Position offset and outward
-offset may then move it. Changing placement mode resets the single-source cursor
-so the next single spawn searches afresh.
+offset may then move it. Changing placement mode rebuilds and rewinds the
+single-spawn frontier for the newly selected attachment type.
 
 Placement is a future-spawn setting: existing children remember the attachment
 mode and index from which they were created.
@@ -211,27 +212,30 @@ action. A later press can begin the next level. It also samples generation LFOs
 at a small virtual time increment per successful child, allowing visible
 variation inside one batch.
 
-## Single-source repeat count: comma and period
+## Single-attachment capacity and rewind: comma, period, and H
 
-![How single-source repeat count reuses one attachment](spawn-geometry/07-repeat-count.svg)
+![How single-source capacity reuses one attachment](spawn-geometry/07-repeat-count.svg)
 
-This control applies only in **single object** add mode:
+These controls apply only in **single object** add mode:
 
 - `,` decreases the count, stopping at `0`, and holding repeats;
 - `.` increases it, and holding repeats;
-- `0` means keep using one source attachment indefinitely;
-- `1` means advance after every successful spawn—the traditional one-child-per-
-  attachment behavior;
-- `N > 1` means spawn `N` successful children from that attachment, then mark it
-  occupied and advance.
+- `0` means the selected source has unlimited capacity and remains selected;
+- `1` means each attachment can own one child;
+- `N > 1` means each attachment can own up to `N` children in total;
+- `H` rewinds the frontier so the earliest eligible root attachment is
+  considered first.
 
-The count tracks successful spawns, not keypresses. If a candidate is excluded
-or rejected, it does not consume a repetition. Changing the count, placement
-mode, or add mode finalizes the current cursor so the next spawn searches for a
-new source.
+Capacity is derived from successful children already stored in the tree, not
+keypresses. If a candidate is excluded or rejected, it does not consume
+capacity. Increasing the value can reactivate previously saturated attachments;
+it preserves the current frontier position until `H` is pressed. Decreasing it
+does not delete excess children. Changing placement or add mode rebuilds and
+rewinds the frontier.
 
 Repeated children share the source attachment but may still differ because of
-LFO values or their child mesh transform.
+LFO values or their child mesh transform. Identical overlapping candidates can
+still be rejected by containment validation even when capacity remains.
 
 ## Uniform child scale ratio: minus and plus
 
@@ -381,22 +385,26 @@ This means:
 - local position offset = zero.
 
 Generation settings such as selected shape, placement mode, add mode, scale
-ratio, twist, offsets, exclusion, and repeat count remain available after the
-reset. The attachment cursor and held-spawn state are cleared.
+ratio, twist, offsets, exclusion, and attachment capacity remain available after
+the reset. The single-spawn frontier and held-spawn state are reset.
 
 ## Traversal, occupied attachments, and rejected spawns
 
 ![Breadth-first traversal, attachment occupancy, and containment rejection](spawn-geometry/15-search-and-rejection.svg)
 
-For an ordinary single spawn without an active repeat cursor, Intergen searches:
+Single spawning maintains an active-parent frontier instead of rescanning the
+entire tree. The frontier is ordered by:
 
 1. parent level from shallowest to deepest;
 2. parents in node creation order;
 3. attachments in geometry index order.
 
-A candidate is skipped if:
+Parents with no attachment below the current capacity are removed. Increasing
+capacity can reactivate them, and `H` returns the cursor to the earliest active
+parent. A candidate is skipped if:
 
-- the attachment is already occupied;
+- fill mode has already occupied the attachment, or single mode has no remaining
+  capacity for it;
 - spawn exclusion filters it;
 - the candidate is fully contained by an existing shape;
 - the candidate fully contains an existing shape.
@@ -405,9 +413,8 @@ Containment uses each shape's conservative scaled bounding radius and
 `containment_epsilon`. It prevents obviously hidden or engulfing spawns; it is
 not a general collision detector, so partial intersections are allowed.
 
-An attachment is normally marked occupied after a successful spawn. The
-single-source repeat feature deliberately delays that mark until its requested
-number of successful spawns has been reached.
+Fill-level mode retains one child per attachment. Single mode derives
+availability from each attachment's total child count and the current capacity.
 
 ## What changes existing shapes?
 
@@ -424,7 +431,7 @@ number of successful spawns has been reached.
 | outward offset | **recomputes centers** | used at spawn |
 | position offset X/Y/Z | stored value unchanged | evaluated vector copied into node |
 | exclusion probability | unchanged | filters candidate attachments |
-| single-source repeat count | unchanged | changes cursor advance behavior |
+| single-attachment capacity | unchanged | controls total children allowed per attachment |
 | `R` | **deletes the whole tree** | creates one new root |
 
 The key distinction is **shared live layout values** versus **copied spawn-time
@@ -504,7 +511,7 @@ active; the values apply to all placement modes.
 
 | Field | Effective value in this repository | Meaning |
 | --- | --- | --- |
-| `default_single_attachment_repeat_count` | `1` | Startup single-source reuse count |
+| `default_single_attachment_repeat_count` | `1` | Startup single-attachment child capacity; `0` is unlimited |
 | `spawn_hold_delay_secs` | `0.24` | Delay before held `Space` begins repeating |
 | `spawn_repeat_interval_secs` | `0.00005` | Interval between held spawn actions |
 | `fill_mode_lfo_virtual_time_step_secs` | `0.25` | LFO sample-time advance per successful fill child; clamped nonnegative |
@@ -588,8 +595,8 @@ max_vertex_spawn_exclusion_probability = 1.0
 ### A fan from one attachment
 
 1. Use single-object mode.
-2. Increase the repeat count with `.` to `5`, or set it to `0` for unlimited
-   reuse.
+2. Increase attachment capacity with `.` to `5`, or set it to `0` for unlimited
+   reuse. Press `H` first when earlier/root attachments should be revisited.
 3. Enable an LFO on twist, position Y, or scale.
 4. Hold `Space` briefly.
 
@@ -612,8 +619,8 @@ Check these in order:
    different mode or grow from a deeper level.
 3. The candidate may be fully contained by—or fully contain—another shape; lower
    scale, change placement, or add outward offset.
-4. A repeat cursor may point at a source that became invalid under changed
-   settings; changing placement/add mode or repeat count starts a fresh search.
+4. The frontier may point past newly reactivated earlier attachments; press `H`
+   to rewind it. Changing placement or add mode also rebuilds and rewinds it.
 
 ### “Changing scale did not resize shapes already on screen”
 

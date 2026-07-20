@@ -274,6 +274,7 @@ impl GenerationSnapshot {
                 .single_spawn_source_cursor
                 .as_ref()
                 .map(SingleSpawnSourceCursorSnapshot::to_runtime),
+            single_spawn_frontier: crate::scene::SingleSpawnFrontier::default(),
             parameters: GenerationParameters::from_base_values_with_axis_scale(
                 self.scale_ratio,
                 vec3_from_array(self.child_axis_scale),
