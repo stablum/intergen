@@ -44,8 +44,11 @@ const EFFECT_TUNER_NUMERIC_BINDINGS: [KeyBindingPattern; 27] = [
     KeyBindingPattern::no_ctrl_or_alt(KeyCode::NumpadSubtract),
     KeyBindingPattern::no_ctrl_or_alt(KeyCode::NumpadAdd),
 ];
-const PRESET_PAGE_BINDINGS: [KeyBindingPattern; 22] = [
+const PRESET_PAGE_BINDINGS: [KeyBindingPattern; 25] = [
     KeyBindingPattern::any_modifiers(KeyCode::KeyS),
+    KeyBindingPattern::any_modifiers(KeyCode::KeyO),
+    KeyBindingPattern::any_modifiers(KeyCode::KeyE),
+    KeyBindingPattern::any_modifiers(KeyCode::KeyP),
     KeyBindingPattern::any_modifiers(KeyCode::Delete),
     KeyBindingPattern::any_modifiers(KeyCode::Digit0),
     KeyBindingPattern::any_modifiers(KeyCode::Digit1),
@@ -377,7 +380,9 @@ pub(crate) fn control_page_input_system(
                 if let Some(previous_page) = control_page.open_page(ControlPage::ScenePresets) {
                     close_page(previous_page, &mut effect_tuner, &mut preset_browser);
                 }
-                println!("Scene preset mode open. Type two digits to recall a slot.");
+                println!(
+                    "Scene preset mode open. Type two digits for a full load, or O/E/P then two digits for objects/effects/parameters."
+                );
             }
             Err(error) => eprintln!("{error}"),
         }
@@ -499,6 +504,9 @@ mod tests {
         };
 
         assert!(preset_page_mask.captures_binding(binding(KeyCode::KeyS)));
+        assert!(preset_page_mask.captures_binding(binding(KeyCode::KeyO)));
+        assert!(preset_page_mask.captures_binding(binding(KeyCode::KeyE)));
+        assert!(preset_page_mask.captures_binding(binding(KeyCode::KeyP)));
         assert!(preset_page_mask.captures_binding(binding(KeyCode::Digit4)));
         assert!(!preset_page_mask.captures_binding(binding(KeyCode::ArrowUp)));
         assert!(!preset_page_mask.captures_binding(binding(KeyCode::KeyW)));

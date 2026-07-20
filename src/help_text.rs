@@ -128,10 +128,10 @@ const FX_HELP: [HelpEntry; 13] = [
 ];
 
 const PRESET_HELP: [HelpEntry; 1] = [HelpEntry {
-    startup: "scene preset page supports save/free/load/collision resolution",
-    overlay: "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions",
-    binding: "S / Del / 00-99 / Up / Down + Enter",
-    explanation: "In the preset page, save, free slots, load presets, and resolve collisions.",
+    startup: "scene preset page supports full and partial loads, save/free, and collision resolution",
+    overlay: "In preset page: 00-99 full load; O/E/P + 00-99 load objects/effects/parameters; S save; Del free",
+    binding: "00-99 / O,E,P + 00-99 / S / Del",
+    explanation: "In the preset page, load a full preset or only its object structure, post effects, or non-effect parameters; save scenes; and free slots.",
 }];
 
 const SCENE_HELP: [HelpEntry; 24] = [

@@ -72,13 +72,16 @@ The preset page has 10 banks with 10 slots each.
 | Key | Action |
 | --- | --- |
 | `00`–`99` | Load the preset assigned to the bank and slot. |
+| `O`, then `00`–`99` | Load only the complete 3D object structure; keep all current parameters and post effects. |
+| `E`, then `00`–`99` | Load only the 2D post-scene effect values and effect LFO settings. |
+| `P`, then `00`–`99` | Load scene parameters and scene-parameter LFO settings; keep the current object structure and 2D post effects. |
 | `S`, then `00`–`99` | Save the current scene and assign it to that slot. |
 | `Delete`, then `00`–`99` | Free that slot in every preset file that claims it. |
 | `Up` / `Down` | In a slot-collision chooser, select which file keeps the slot. |
 | `Enter` | Confirm the selected collision resolution. |
 | `F3` or `Esc` | Close the preset page. |
 
-The preset page captures digits, `S`, and `Delete`; when the collision chooser
+The preset page captures digits, `O`, `E`, `P`, `S`, and `Delete`; when the collision chooser
 is visible it also captures `Up`, `Down`, and `Enter`. Other neutral controls
 remain available.
 

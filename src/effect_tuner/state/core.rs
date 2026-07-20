@@ -541,6 +541,36 @@ impl EffectTunerState {
         self.sync_selected_group_to_parameter();
     }
 
+    pub(crate) fn apply_effect_snapshot(&mut self, snapshot: &EffectRuntimeSnapshot) {
+        self.current = snapshot.current.clone();
+        let effect_count = EffectNumericParameter::all().len();
+        for (target, source) in self.lfos[..effect_count]
+            .iter_mut()
+            .zip(snapshot.lfos.iter().copied())
+        {
+            *target = source;
+        }
+        self.clear_numeric_entry();
+        self.reset_hold_states();
+    }
+
+    pub(crate) fn apply_scene_snapshot(&mut self, snapshot: &EffectRuntimeSnapshot) {
+        let effect_count = EffectNumericParameter::all().len();
+        let defaults = default_lfos();
+        self.lfos[effect_count..].copy_from_slice(&defaults[effect_count..]);
+        for (target, source) in self.lfos[effect_count..]
+            .iter_mut()
+            .zip(snapshot.lfos.iter().copied().skip(effect_count))
+        {
+            *target = source;
+        }
+        self.scene_lfo_values = default_scene_lfo_values();
+        self.generation_lfo_applied = false;
+        self.generation_recompute_lfo_applied = true;
+        self.clear_numeric_entry();
+        self.reset_hold_states();
+    }
+
     pub(crate) fn apply_reset_snapshot(&mut self, snapshot: &EffectRuntimeSnapshot) {
         self.apply_snapshot_values(snapshot);
     }

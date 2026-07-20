@@ -14,7 +14,7 @@ captured as images, or exported to Blender for further work.
 - inertial three-axis camera movement and keyboard zoom
 - live parameter editing and LFO modulation through the `F2` control pages
 - procedural material families, stage controls, and a camera-output shader stack
-- 100 scene-preset slots with save, load, free, and collision-resolution flows
+- 100 scene-preset slots with full or component-only loads, save, free, and collision resolution
 - Blender `.blend` export with scene data and effect metadata
 
 ## Gallery

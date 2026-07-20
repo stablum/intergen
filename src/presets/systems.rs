@@ -1,7 +1,9 @@
 use bevy::app::AppExit;
 use bevy::prelude::*;
 
-use super::browser::{AutomatedScenePresetLoad, PresetBrowserState, PresetCommand, PresetIndex};
+use super::browser::{
+    AutomatedScenePresetLoad, PresetBrowserState, PresetCommand, PresetIndex, PresetLoadMode,
+};
 use super::storage::{
     ScenePresetFile, preset_record_from_file, read_preset_file, unique_preset_path,
     write_preset_file,
@@ -31,7 +33,7 @@ pub(crate) fn automated_scene_preset_load_system(
     let result = read_preset_file(&preset_load.path)
         .and_then(|file| {
             let summary = file.summary.clone();
-            apply_scene_preset(&file.scene, &mut scene)?;
+            apply_scene_preset(&file.scene, &mut scene, PresetLoadMode::All)?;
             remember_loaded_preset(&mut reset_baselines, &summary, &scene);
             Ok(summary)
         })
@@ -101,6 +103,18 @@ pub(crate) fn preset_input_system(
         return;
     }
 
+    let load_mode = [
+        (KeyCode::KeyO, PresetLoadMode::Structure),
+        (KeyCode::KeyE, PresetLoadMode::Effects),
+        (KeyCode::KeyP, PresetLoadMode::Parameters),
+    ]
+    .into_iter()
+    .find_map(|(key, mode)| keys.just_pressed(key).then_some(mode));
+    if let Some(load_mode) = load_mode {
+        preset_browser.arm_load(load_mode);
+        return;
+    }
+
     let Some(digit) = just_pressed_digit(&keys) else {
         return;
     };
@@ -109,9 +123,10 @@ pub(crate) fn preset_input_system(
     };
 
     let result = match preset_browser.command {
-        PresetCommand::Load => load_assigned_preset(
+        PresetCommand::Load(mode) => load_assigned_preset(
             &mut preset_browser,
             index,
+            mode,
             &mut recent_changes,
             &mut reset_baselines,
             &mut scene,
@@ -142,6 +157,7 @@ pub(crate) fn preset_input_system(
 fn load_assigned_preset(
     preset_browser: &mut PresetBrowserState,
     index: PresetIndex,
+    mode: PresetLoadMode,
     recent_changes: &mut RecentChangesState,
     reset_baselines: &mut EffectTunerResetBaselines,
     scene: &mut SceneMutationAccess<'_, '_>,
@@ -155,7 +171,7 @@ fn load_assigned_preset(
 
     if records.len() > 1 {
         reset_command_state(preset_browser);
-        preset_browser.start_collision_resolution(index, true);
+        preset_browser.start_collision_resolution(index, Some(mode));
         return Ok(Some(format!(
             "Slot {} has multiple assigned presets. Resolve the chooser.",
             index.code()
@@ -163,14 +179,15 @@ fn load_assigned_preset(
     }
 
     let record = &records[0];
-    apply_scene_preset(&record.file.scene, scene)?;
+    apply_scene_preset(&record.file.scene, scene, mode)?;
     remember_loaded_preset(reset_baselines, &record.file.summary, scene);
     preset_browser.highlight_index(index);
-    record_scene_preset_load(recent_changes, index, now_secs);
+    record_scene_preset_load(recent_changes, index, mode, now_secs);
     Ok(finish_with_status(
         preset_browser,
         format!(
-            "Loaded scene preset {}: {}",
+            "Loaded {} from preset {}: {}",
+            load_mode_description(mode),
             index.code(),
             record.file.summary
         ),
@@ -206,7 +223,7 @@ fn save_scene_preset(
 
     if preset_browser.records_for_index(index).len() > 1 {
         reset_command_state(preset_browser);
-        preset_browser.start_collision_resolution(index, false);
+        preset_browser.start_collision_resolution(index, None);
         return Ok(Some(format!(
             "Stored a new scene preset in slot {}. Resolve which preset stays assigned.",
             index.code()
@@ -278,11 +295,11 @@ fn resolve_collision(
         preset_browser.upsert_record(record);
     }
 
-    if chooser.load_after_resolution {
-        apply_scene_preset(&chosen.file.scene, scene)?;
+    if let Some(mode) = chooser.load_mode {
+        apply_scene_preset(&chosen.file.scene, scene, mode)?;
         remember_loaded_preset(reset_baselines, &chosen.file.summary, scene);
         preset_browser.highlight_index(chooser.index);
-        record_scene_preset_load(recent_changes, chooser.index, now_secs);
+        record_scene_preset_load(recent_changes, chooser.index, mode, now_secs);
     }
 
     Ok(finish_with_status(
@@ -318,12 +335,33 @@ fn remember_loaded_preset(
 fn record_scene_preset_load(
     recent_changes: &mut RecentChangesState,
     index: PresetIndex,
+    mode: PresetLoadMode,
     now_secs: f32,
 ) {
-    recent_changes.record("Scene preset", format!("loaded {}", index.code()), now_secs);
+    recent_changes.record(
+        "Scene preset",
+        format!("loaded {} {}", load_mode_description(mode), index.code()),
+        now_secs,
+    );
 }
 
 fn apply_scene_preset(
+    scene: &SceneStateSnapshot,
+    runtime: &mut SceneMutationAccess<'_, '_>,
+    mode: PresetLoadMode,
+) -> Result<(), String> {
+    match mode {
+        PresetLoadMode::All => apply_complete_scene_preset(scene, runtime),
+        PresetLoadMode::Structure => apply_structure_preset(scene, runtime),
+        PresetLoadMode::Effects => {
+            runtime.effect_tuner.apply_effect_snapshot(&scene.effects);
+            Ok(())
+        }
+        PresetLoadMode::Parameters => apply_parameter_preset(scene, runtime),
+    }
+}
+
+fn apply_complete_scene_preset(
     scene: &SceneStateSnapshot,
     runtime: &mut SceneMutationAccess<'_, '_>,
 ) -> Result<(), String> {
@@ -401,8 +439,121 @@ fn apply_scene_preset(
     Ok(())
 }
 
+fn apply_structure_preset(
+    scene: &SceneStateSnapshot,
+    runtime: &mut SceneMutationAccess<'_, '_>,
+) -> Result<(), String> {
+    let prepared_generation = scene.generation.to_runtime()?;
+    replace_object_structure(&mut runtime.generation_state, prepared_generation);
+
+    respawn_shape_entities(runtime);
+    Ok(())
+}
+
+fn apply_parameter_preset(
+    scene: &SceneStateSnapshot,
+    runtime: &mut SceneMutationAccess<'_, '_>,
+) -> Result<(), String> {
+    let prepared = scene.prepare_runtime()?;
+
+    runtime.app_config.rendering = prepared.rendering;
+    runtime.app_config.lighting = prepared.lighting;
+    runtime.app_config.materials = prepared.materials;
+
+    *runtime.camera_rig = prepared.camera_rig;
+    runtime.effect_tuner.apply_scene_snapshot(&prepared.effects);
+    replace_generation_parameters(&mut runtime.generation_state, prepared.generation);
+    *runtime.rendering_state = RenderingState::from_config(&runtime.app_config.rendering);
+    *runtime.lighting_state = LightingState::from_config(&runtime.app_config.lighting);
+    *runtime.material_state = MaterialState::from_config(&runtime.app_config.materials);
+    runtime.material_state.opacity = prepared.material_opacity;
+    *runtime.stage_state = StageState::from_config(&runtime.app_config.rendering.stage);
+    runtime
+        .effect_tuner
+        .sync_scene_lfo_bases(&crate::effect_tuner::EffectTunerViewContext {
+            camera_config: &runtime.app_config.camera,
+            camera_rig: &runtime.camera_rig,
+            generation_config: &runtime.app_config.generation,
+            generation_state: &runtime.generation_state,
+            rendering_config: &runtime.app_config.rendering,
+            rendering_state: &runtime.rendering_state,
+            lighting_config: &runtime.app_config.lighting,
+            lighting_state: &runtime.lighting_state,
+            material_config: &runtime.app_config.materials,
+            material_state: &runtime.material_state,
+            stage_state: &runtime.stage_state,
+        });
+
+    for entity in runtime.light_entities.iter() {
+        runtime.commands.entity(entity).despawn();
+    }
+    for entity in runtime.stage_entities.iter() {
+        runtime.commands.entity(entity).despawn();
+    }
+
+    apply_live_rendering_state(
+        &runtime.app_config.rendering,
+        &mut runtime.clear_color,
+        &mut runtime.ambient_light,
+    );
+    sync_scene_camera_transform(&runtime.camera_rig, &mut runtime.camera_transforms);
+    spawn_scene_lights(&mut runtime.commands, &runtime.app_config.lighting);
+    spawn_stage_entities(
+        &mut runtime.commands,
+        &mut runtime.meshes,
+        &mut runtime.materials,
+        &runtime.app_config.rendering,
+    );
+    respawn_shape_entities(runtime);
+
+    Ok(())
+}
+
+fn respawn_shape_entities(runtime: &mut SceneMutationAccess<'_, '_>) {
+    for entity in runtime.shape_entities.iter() {
+        runtime.commands.entity(entity).despawn();
+    }
+
+    let material_config = runtime
+        .material_state
+        .runtime_material_config(&runtime.app_config.materials);
+    for (node_index, node) in runtime.generation_state.nodes.iter().enumerate() {
+        spawn_shape_entity(
+            &mut runtime.commands,
+            &mut runtime.materials,
+            runtime.shape_assets.mesh(node.kind),
+            node,
+            &material_config,
+            runtime.material_state.opacity,
+            node_index,
+        );
+    }
+}
+
+fn replace_object_structure(current: &mut GenerationState, preset: GenerationState) {
+    current.nodes = preset.nodes;
+    current.single_spawn_source_cursor = preset.single_spawn_source_cursor;
+}
+
+fn replace_generation_parameters(current: &mut GenerationState, preset: GenerationState) {
+    current.selected_shape_kind = preset.selected_shape_kind;
+    current.spawn_placement_mode = preset.spawn_placement_mode;
+    current.spawn_add_mode = preset.spawn_add_mode;
+    current.single_attachment_repeat_count = preset.single_attachment_repeat_count;
+    current.parameters = preset.parameters;
+}
+
+fn load_mode_description(mode: PresetLoadMode) -> &'static str {
+    match mode {
+        PresetLoadMode::All => "scene",
+        PresetLoadMode::Structure => "object structure",
+        PresetLoadMode::Effects => "post effects",
+        PresetLoadMode::Parameters => "parameters",
+    }
+}
+
 fn reset_command_state(preset_browser: &mut PresetBrowserState) {
-    preset_browser.command = PresetCommand::Load;
+    preset_browser.command = PresetCommand::Load(PresetLoadMode::All);
     preset_browser.first_digit = None;
 }
 
@@ -449,4 +600,41 @@ fn just_pressed_digit(keys: &ButtonInput<KeyCode>) -> Option<u8> {
         .into_iter()
         .chain(NUMPAD_KEYS)
         .find_map(|(key_code, digit)| keys.just_pressed(key_code).then_some(digit))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{replace_generation_parameters, replace_object_structure};
+    use crate::config::GenerationConfig;
+    use crate::scene::GenerationState;
+    use crate::shapes::ShapeKind;
+
+    #[test]
+    fn object_structure_replacement_preserves_generation_parameters() {
+        let mut current = GenerationState::from_config(&GenerationConfig::default());
+        current.selected_shape_kind = ShapeKind::Cube;
+        let mut preset = GenerationState::from_config(&GenerationConfig::default());
+        preset.nodes[0].kind = ShapeKind::Octahedron;
+        preset.selected_shape_kind = ShapeKind::Dodecahedron;
+
+        replace_object_structure(&mut current, preset);
+
+        assert_eq!(current.nodes[0].kind, ShapeKind::Octahedron);
+        assert_eq!(current.selected_shape_kind, ShapeKind::Cube);
+    }
+
+    #[test]
+    fn generation_parameter_replacement_preserves_object_structure() {
+        let mut current = GenerationState::from_config(&GenerationConfig::default());
+        current.nodes[0].kind = ShapeKind::Cube;
+        current.selected_shape_kind = ShapeKind::Cube;
+        let mut preset = GenerationState::from_config(&GenerationConfig::default());
+        preset.nodes[0].kind = ShapeKind::Octahedron;
+        preset.selected_shape_kind = ShapeKind::Dodecahedron;
+
+        replace_generation_parameters(&mut current, preset);
+
+        assert_eq!(current.nodes[0].kind, ShapeKind::Cube);
+        assert_eq!(current.selected_shape_kind, ShapeKind::Dodecahedron);
+    }
 }

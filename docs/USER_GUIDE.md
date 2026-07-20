@@ -79,6 +79,12 @@ are unique and independent of bank and slot, so saving does not overwrite an
 older file by filename. The slot assignment lives in the preset metadata. If
 multiple files claim one slot, Intergen asks which file should keep it.
 
+Typing a slot directly loads the whole preset. Prefix the two-digit slot with
+`O` to load only its 3D object tree, `E` to load only its 2D post-scene effects,
+or `P` to load its non-effect scene parameters while keeping both the current
+object tree and post effects. The active operation and typed slot are highlighted
+in red in the F3 panel.
+
 A preset contains:
 
 - render background, ambient light, directional light, and point light

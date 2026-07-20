@@ -19,7 +19,7 @@ impl PresetIndex {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum PresetCommand {
-    Load,
+    Load(PresetLoadMode),
     Save,
     Free,
 }
@@ -27,9 +27,28 @@ pub(super) enum PresetCommand {
 impl PresetCommand {
     pub(super) fn label(self) -> &'static str {
         match self {
-            Self::Load => "load",
+            Self::Load(mode) => mode.label(),
             Self::Save => "save",
             Self::Free => "free",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum PresetLoadMode {
+    All,
+    Structure,
+    Effects,
+    Parameters,
+}
+
+impl PresetLoadMode {
+    pub(super) fn label(self) -> &'static str {
+        match self {
+            Self::All => "load",
+            Self::Structure => "objects",
+            Self::Effects => "effects",
+            Self::Parameters => "parameters",
         }
     }
 }
@@ -58,7 +77,7 @@ pub(super) struct CollisionResolutionState {
     pub(super) index: PresetIndex,
     pub(super) selected: usize,
     pub(super) candidates: Vec<PresetRecord>,
-    pub(super) load_after_resolution: bool,
+    pub(super) load_mode: Option<PresetLoadMode>,
 }
 
 #[derive(Resource)]
@@ -85,7 +104,7 @@ impl AutomatedScenePresetLoad {
 impl Default for PresetBrowserState {
     fn default() -> Self {
         Self {
-            command: PresetCommand::Load,
+            command: PresetCommand::Load(PresetLoadMode::All),
             first_digit: None,
             status_message: String::new(),
             records: Vec::new(),
@@ -127,7 +146,11 @@ impl PresetBrowserState {
             target,
             banks,
             status,
-            emphasize_command: self.command == PresetCommand::Save,
+            emphasize_command: matches!(self.command, PresetCommand::Save)
+                || matches!(
+                    self.command,
+                    PresetCommand::Load(mode) if mode != PresetLoadMode::All
+                ),
             emphasize_target: self.first_digit.is_some(),
         }
     }
@@ -186,7 +209,7 @@ impl PresetBrowserState {
     }
 
     pub(crate) fn open_page(&mut self) -> Result<(), String> {
-        self.command = PresetCommand::Load;
+        self.command = PresetCommand::Load(PresetLoadMode::All);
         self.first_digit = None;
         self.chooser = None;
         self.status_message.clear();
@@ -194,7 +217,7 @@ impl PresetBrowserState {
     }
 
     pub(crate) fn close_page(&mut self) {
-        self.command = PresetCommand::Load;
+        self.command = PresetCommand::Load(PresetLoadMode::All);
         self.first_digit = None;
         self.chooser = None;
         self.status_message.clear();
@@ -232,6 +255,13 @@ impl PresetBrowserState {
         self.status_message = "type bank+slot".to_string();
     }
 
+    pub(super) fn arm_load(&mut self, mode: PresetLoadMode) {
+        self.command = PresetCommand::Load(mode);
+        self.first_digit = None;
+        self.chooser = None;
+        self.status_message = "type bank+slot".to_string();
+    }
+
     pub(super) fn push_digit(&mut self, digit: u8) -> Option<PresetIndex> {
         if let Some(bank) = self.first_digit.take() {
             Some(PresetIndex { bank, slot: digit })
@@ -256,14 +286,14 @@ impl PresetBrowserState {
     pub(super) fn start_collision_resolution(
         &mut self,
         index: PresetIndex,
-        load_after_resolution: bool,
+        load_mode: Option<PresetLoadMode>,
     ) {
         let candidates = self.records_for_index(index);
         self.chooser = Some(CollisionResolutionState {
             index,
             selected: 0,
             candidates,
-            load_after_resolution,
+            load_mode,
         });
         self.status_message = format!("resolve {}", index.code());
     }
@@ -293,7 +323,7 @@ impl PresetBrowserState {
 
 #[cfg(test)]
 mod tests {
-    use super::{PresetBrowserState, PresetIndex};
+    use super::{PresetBrowserState, PresetIndex, PresetLoadMode};
     use crate::config::{EffectsConfig, LightingConfig, MaterialConfig, RenderingConfig};
     use crate::presets::storage::{PresetFileStamp, ScenePresetFile};
     use crate::scene_snapshot::{
@@ -375,6 +405,23 @@ mod tests {
         assert_eq!(segments.target, " 4_");
         assert!(segments.emphasize_command);
         assert!(segments.emphasize_target);
+    }
+
+    #[test]
+    fn strip_segments_highlight_each_partial_load_operation() {
+        let mut state = PresetBrowserState::default();
+
+        for (mode, label) in [
+            (PresetLoadMode::Structure, "objects"),
+            (PresetLoadMode::Effects, "effects"),
+            (PresetLoadMode::Parameters, "parameters"),
+        ] {
+            state.arm_load(mode);
+            let segments = state.strip_segments();
+
+            assert_eq!(segments.command, label);
+            assert!(segments.emphasize_command);
+        }
     }
 
     #[test]

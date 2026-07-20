@@ -564,6 +564,55 @@ fn runtime_snapshot_round_trips_lfo_state() {
 }
 
 #[test]
+fn effect_snapshot_preserves_scene_lfos() {
+    let effect_index = lfo_index_for_parameter(EffectTunerParameter::Effect(
+        EffectNumericParameter::LensStrength,
+    ))
+    .expect("effect parameter should have an LFO slot");
+    let scene_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
+        EffectTunerSceneParameter::GlobalOpacity,
+    ))
+    .expect("scene parameter should have an LFO slot");
+    let mut source = EffectTunerState::from_config(&EffectsConfig::default());
+    source.current.lens_distortion.strength = 0.73;
+    source.lfos[effect_index].amplitude = 0.37;
+    source.lfos[scene_index].amplitude = 0.91;
+
+    let mut target = EffectTunerState::from_config(&EffectsConfig::default());
+    target.lfos[scene_index].amplitude = 0.24;
+    target.apply_effect_snapshot(&source.runtime_snapshot());
+
+    assert_eq!(target.current.lens_distortion.strength, 0.73);
+    assert_eq!(target.lfos[effect_index].amplitude, 0.37);
+    assert_eq!(target.lfos[scene_index].amplitude, 0.24);
+}
+
+#[test]
+fn scene_snapshot_preserves_post_effect_values_and_lfos() {
+    let effect_index = lfo_index_for_parameter(EffectTunerParameter::Effect(
+        EffectNumericParameter::LensStrength,
+    ))
+    .expect("effect parameter should have an LFO slot");
+    let scene_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
+        EffectTunerSceneParameter::GlobalOpacity,
+    ))
+    .expect("scene parameter should have an LFO slot");
+    let mut source = EffectTunerState::from_config(&EffectsConfig::default());
+    source.current.lens_distortion.strength = 0.73;
+    source.lfos[effect_index].amplitude = 0.37;
+    source.lfos[scene_index].amplitude = 0.91;
+
+    let mut target = EffectTunerState::from_config(&EffectsConfig::default());
+    target.current.lens_distortion.strength = 0.12;
+    target.lfos[effect_index].amplitude = 0.24;
+    target.apply_scene_snapshot(&source.runtime_snapshot());
+
+    assert_eq!(target.current.lens_distortion.strength, 0.12);
+    assert_eq!(target.lfos[effect_index].amplitude, 0.24);
+    assert_eq!(target.lfos[scene_index].amplitude, 0.91);
+}
+
+#[test]
 fn reset_confirmation_defaults_to_cancel_and_clamps_selection() {
     let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
 

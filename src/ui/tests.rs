@@ -49,7 +49,7 @@ fn overlay_text_lists_help_and_spawn_controls() {
         "Shift + Enter: Choose reset source (cancel / config.toml / last loaded preset)"
     ));
     assert!(text.contains(
-        "In preset page: S save, Del free slot, 00-99 load, Up/Down + Enter resolve collisions"
+        "In preset page: 00-99 full load; O/E/P + 00-99 load objects/effects/parameters; S save; Del free"
     ));
     assert!(text.contains("Space: Add shapes using the current add mode (hold to repeat)"));
     assert!(text.contains("Ctrl + Space: Cycle add mode (single / fill current level)"));
@@ -159,7 +159,7 @@ fn help_overlay_table_rows_cover_primary_bindings() {
     assert!(
         entries
             .iter()
-            .any(|entry| entry.binding == "S / Del / 00-99 / Up / Down + Enter")
+            .any(|entry| entry.binding == "00-99 / O,E,P + 00-99 / S / Del")
     );
     assert!(
         entries
