@@ -6,6 +6,10 @@ shortcuts, the generation controls on the `F2` page, the related
 `[generation]` configuration values, and the rules Intergen applies behind the
 scenes.
 
+For a consolidated list of every application and F-mode binding, use the
+[canonical keybinding reference](KEYBINDINGS.md). The bindings repeated here
+are limited to the geometry workflow and are explained in that context.
+
 > [!TIP]
 > If you only remember one workflow: choose a shape with `1`–`4`, choose an
 > attachment type with `G`, tune size with `-` / `+`, then tap `Space`. Use
