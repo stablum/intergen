@@ -2,10 +2,11 @@ use bevy::app::AppExit;
 use bevy::prelude::*;
 
 use super::browser::{
-    AutomatedScenePresetLoad, PresetBrowserState, PresetCommand, PresetIndex, PresetLoadMode,
+    AutomatedScenePresetLoad, CollisionAction, PresetBrowserState, PresetCommand, PresetIndex,
+    PresetLoadMode,
 };
 use super::storage::{
-    ScenePresetFile, preset_record_from_file, read_preset_file, unique_preset_path,
+    PresetRecord, ScenePresetFile, preset_record_from_file, read_preset_file, unique_preset_path,
     write_preset_file,
 };
 use crate::camera::{CameraRig, sync_scene_camera_transform};
@@ -103,15 +104,15 @@ pub(crate) fn preset_input_system(
         return;
     }
 
-    let load_mode = [
+    let component = [
         (KeyCode::KeyO, PresetLoadMode::Structure),
         (KeyCode::KeyE, PresetLoadMode::Effects),
         (KeyCode::KeyP, PresetLoadMode::Parameters),
     ]
     .into_iter()
     .find_map(|(key, mode)| keys.just_pressed(key).then_some(mode));
-    if let Some(load_mode) = load_mode {
-        preset_browser.arm_load(load_mode);
+    if let Some(component) = component {
+        preset_browser.arm_component(component);
         return;
     }
 
@@ -132,9 +133,10 @@ pub(crate) fn preset_input_system(
             &mut scene,
             now_secs,
         ),
-        PresetCommand::Save => save_scene_preset(
+        PresetCommand::Save(mode) => save_scene_preset(
             &mut preset_browser,
             index,
+            mode,
             &scene.app_config,
             &scene.camera_rig,
             &scene.generation_state,
@@ -171,7 +173,7 @@ fn load_assigned_preset(
 
     if records.len() > 1 {
         reset_command_state(preset_browser);
-        preset_browser.start_collision_resolution(index, Some(mode));
+        preset_browser.start_collision_resolution(index, CollisionAction::Load(mode));
         return Ok(Some(format!(
             "Slot {} has multiple assigned presets. Resolve the chooser.",
             index.code()
@@ -197,6 +199,7 @@ fn load_assigned_preset(
 fn save_scene_preset(
     preset_browser: &mut PresetBrowserState,
     index: PresetIndex,
+    mode: PresetLoadMode,
     app_config: &AppConfig,
     camera_rig: &CameraRig,
     generation_state: &GenerationState,
@@ -216,6 +219,19 @@ fn save_scene_preset(
         stage_state,
         effect_tuner,
     );
+
+    if mode != PresetLoadMode::All {
+        return save_scene_preset_component(preset_browser, index, mode, scene);
+    }
+
+    save_complete_scene_preset(preset_browser, index, scene)
+}
+
+fn save_complete_scene_preset(
+    preset_browser: &mut PresetBrowserState,
+    index: PresetIndex,
+    scene: SceneStateSnapshot,
+) -> Result<Option<String>, String> {
     let path = unique_preset_path(scene.file_slug().as_str())?;
     let file = ScenePresetFile::new(index, scene);
     write_preset_file(&path, &file)?;
@@ -223,7 +239,7 @@ fn save_scene_preset(
 
     if preset_browser.records_for_index(index).len() > 1 {
         reset_command_state(preset_browser);
-        preset_browser.start_collision_resolution(index, None);
+        preset_browser.start_collision_resolution(index, CollisionAction::ResolveOnly);
         return Ok(Some(format!(
             "Stored a new scene preset in slot {}. Resolve which preset stays assigned.",
             index.code()
@@ -233,6 +249,54 @@ fn save_scene_preset(
     Ok(finish_with_status(
         preset_browser,
         format!("Stored scene preset {}: {}", index.code(), file.summary),
+    ))
+}
+
+fn save_scene_preset_component(
+    preset_browser: &mut PresetBrowserState,
+    index: PresetIndex,
+    mode: PresetLoadMode,
+    scene: SceneStateSnapshot,
+) -> Result<Option<String>, String> {
+    let mut records = preset_browser.records_for_index(index);
+    if records.is_empty() {
+        return save_complete_scene_preset(preset_browser, index, scene);
+    }
+
+    if records.len() > 1 {
+        reset_command_state(preset_browser);
+        preset_browser.start_collision_resolution(index, CollisionAction::Save { mode, scene });
+        return Ok(Some(format!(
+            "Slot {} has multiple assigned presets. Choose which preset to update.",
+            index.code()
+        )));
+    }
+
+    update_preset_component(preset_browser, index, records.remove(0), mode, &scene)
+}
+
+fn update_preset_component(
+    preset_browser: &mut PresetBrowserState,
+    index: PresetIndex,
+    mut record: PresetRecord,
+    mode: PresetLoadMode,
+    scene: &SceneStateSnapshot,
+) -> Result<Option<String>, String> {
+    merge_scene_component(&mut record.file.scene, scene, mode);
+    record.file.refresh_summary_and_timestamp();
+    write_preset_file(&record.path, &record.file)?;
+    let summary = record.file.summary.clone();
+    preset_browser.upsert_record(preset_record_from_file(record.path, record.file)?);
+    preset_browser.highlight_index(index);
+
+    Ok(finish_with_status(
+        preset_browser,
+        format!(
+            "Stored {} in preset {}: {}",
+            load_mode_description(mode),
+            index.code(),
+            summary
+        ),
     ))
 }
 
@@ -295,21 +359,35 @@ fn resolve_collision(
         preset_browser.upsert_record(record);
     }
 
-    if let Some(mode) = chooser.load_mode {
-        apply_scene_preset(&chosen.file.scene, scene, mode)?;
-        remember_loaded_preset(reset_baselines, &chosen.file.summary, scene);
-        preset_browser.highlight_index(chooser.index);
-        record_scene_preset_load(recent_changes, chooser.index, mode, now_secs);
+    match chooser.action {
+        CollisionAction::ResolveOnly => Ok(finish_with_status(
+            preset_browser,
+            format!(
+                "Slot {} now points to {}.",
+                chooser.index.code(),
+                chosen.file.summary
+            ),
+        )),
+        CollisionAction::Load(mode) => {
+            apply_scene_preset(&chosen.file.scene, scene, mode)?;
+            remember_loaded_preset(reset_baselines, &chosen.file.summary, scene);
+            preset_browser.highlight_index(chooser.index);
+            record_scene_preset_load(recent_changes, chooser.index, mode, now_secs);
+            Ok(finish_with_status(
+                preset_browser,
+                format!(
+                    "Loaded {} from preset {}: {}",
+                    load_mode_description(mode),
+                    chooser.index.code(),
+                    chosen.file.summary
+                ),
+            ))
+        }
+        CollisionAction::Save {
+            mode,
+            scene: saved_scene,
+        } => update_preset_component(preset_browser, chooser.index, chosen, mode, &saved_scene),
     }
-
-    Ok(finish_with_status(
-        preset_browser,
-        format!(
-            "Slot {} now points to {}.",
-            chooser.index.code(),
-            chosen.file.summary
-        ),
-    ))
 }
 
 fn remember_loaded_preset(
@@ -543,6 +621,37 @@ fn replace_generation_parameters(current: &mut GenerationState, preset: Generati
     current.parameters = preset.parameters;
 }
 
+fn merge_scene_component(
+    target: &mut SceneStateSnapshot,
+    source: &SceneStateSnapshot,
+    mode: PresetLoadMode,
+) {
+    match mode {
+        PresetLoadMode::All => *target = source.clone(),
+        PresetLoadMode::Structure => {
+            target.generation.nodes = source.generation.nodes.clone();
+            target.generation.single_spawn_source_cursor =
+                source.generation.single_spawn_source_cursor.clone();
+        }
+        PresetLoadMode::Effects => {
+            target.effects.replace_post_effects_from(&source.effects);
+        }
+        PresetLoadMode::Parameters => {
+            let nodes = target.generation.nodes.clone();
+            let single_spawn_source_cursor = target.generation.single_spawn_source_cursor.clone();
+            target.rendering = source.rendering.clone();
+            target.lighting = source.lighting.clone();
+            target.materials = source.materials.clone();
+            target.camera = source.camera.clone();
+            target.generation = source.generation.clone();
+            target.generation.nodes = nodes;
+            target.generation.single_spawn_source_cursor = single_spawn_source_cursor;
+            target.material_state = source.material_state.clone();
+            target.effects.replace_scene_lfos_from(&source.effects);
+        }
+    }
+}
+
 fn load_mode_description(mode: PresetLoadMode) -> &'static str {
     match mode {
         PresetLoadMode::All => "scene",
@@ -604,9 +713,15 @@ fn just_pressed_digit(keys: &ButtonInput<KeyCode>) -> Option<u8> {
 
 #[cfg(test)]
 mod tests {
-    use super::{replace_generation_parameters, replace_object_structure};
-    use crate::config::GenerationConfig;
-    use crate::scene::GenerationState;
+    use super::{
+        PresetLoadMode, merge_scene_component, replace_generation_parameters,
+        replace_object_structure,
+    };
+    use crate::camera::CameraRig;
+    use crate::config::{AppConfig, GenerationConfig};
+    use crate::effect_tuner::EffectTunerState;
+    use crate::scene::{GenerationState, LightingState, MaterialState, RenderingState, StageState};
+    use crate::scene_snapshot::SceneStateSnapshot;
     use crate::shapes::ShapeKind;
 
     #[test]
@@ -636,5 +751,84 @@ mod tests {
 
         assert_eq!(current.nodes[0].kind, ShapeKind::Cube);
         assert_eq!(current.selected_shape_kind, ShapeKind::Dodecahedron);
+    }
+
+    #[test]
+    fn structure_save_merge_preserves_parameters_and_effects() {
+        let mut target = snapshot(ShapeKind::Cube, ShapeKind::Tetrahedron, 2.0, 0.12);
+        let source = snapshot(ShapeKind::Octahedron, ShapeKind::Dodecahedron, 7.0, 0.73);
+
+        merge_scene_component(&mut target, &source, PresetLoadMode::Structure);
+
+        assert_eq!(target.generation.nodes[0].shape_kind, ShapeKind::Octahedron);
+        assert_eq!(
+            target.generation.selected_shape_kind,
+            ShapeKind::Tetrahedron
+        );
+        assert_eq!(target.camera.distance, 2.0);
+        assert_eq!(target.effects.current.lens_distortion.strength, 0.12);
+    }
+
+    #[test]
+    fn effect_save_merge_preserves_structure_and_parameters() {
+        let mut target = snapshot(ShapeKind::Cube, ShapeKind::Tetrahedron, 2.0, 0.12);
+        let source = snapshot(ShapeKind::Octahedron, ShapeKind::Dodecahedron, 7.0, 0.73);
+
+        merge_scene_component(&mut target, &source, PresetLoadMode::Effects);
+
+        assert_eq!(target.generation.nodes[0].shape_kind, ShapeKind::Cube);
+        assert_eq!(
+            target.generation.selected_shape_kind,
+            ShapeKind::Tetrahedron
+        );
+        assert_eq!(target.camera.distance, 2.0);
+        assert_eq!(target.effects.current.lens_distortion.strength, 0.73);
+    }
+
+    #[test]
+    fn parameter_save_merge_preserves_structure_and_effects() {
+        let mut target = snapshot(ShapeKind::Cube, ShapeKind::Tetrahedron, 2.0, 0.12);
+        let source = snapshot(ShapeKind::Octahedron, ShapeKind::Dodecahedron, 7.0, 0.73);
+
+        merge_scene_component(&mut target, &source, PresetLoadMode::Parameters);
+
+        assert_eq!(target.generation.nodes[0].shape_kind, ShapeKind::Cube);
+        assert_eq!(
+            target.generation.selected_shape_kind,
+            ShapeKind::Dodecahedron
+        );
+        assert_eq!(target.camera.distance, 7.0);
+        assert_eq!(target.effects.current.lens_distortion.strength, 0.12);
+    }
+
+    fn snapshot(
+        root_kind: ShapeKind,
+        selected_shape_kind: ShapeKind,
+        camera_distance: f32,
+        lens_strength: f32,
+    ) -> SceneStateSnapshot {
+        let mut app_config = AppConfig::default();
+        app_config.effects.lens_distortion.strength = lens_strength;
+        let mut camera_rig = CameraRig::from_config(&app_config.camera);
+        camera_rig.distance = camera_distance;
+        let mut generation_state = GenerationState::from_config(&app_config.generation);
+        generation_state.nodes[0].kind = root_kind;
+        generation_state.selected_shape_kind = selected_shape_kind;
+        let rendering_state = RenderingState::from_config(&app_config.rendering);
+        let lighting_state = LightingState::from_config(&app_config.lighting);
+        let material_state = MaterialState::from_config(&app_config.materials);
+        let stage_state = StageState::from_config(&app_config.rendering.stage);
+        let effect_tuner = EffectTunerState::from_config(&app_config.effects);
+
+        SceneStateSnapshot::capture(
+            &app_config,
+            &camera_rig,
+            &generation_state,
+            &rendering_state,
+            &lighting_state,
+            &material_state,
+            &stage_state,
+            &effect_tuner,
+        )
     }
 }

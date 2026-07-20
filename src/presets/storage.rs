@@ -48,6 +48,11 @@ impl ScenePresetFile {
             scene,
         }
     }
+
+    pub(super) fn refresh_summary_and_timestamp(&mut self) {
+        self.saved_at_unix_ms = current_unix_ms();
+        self.summary = self.scene.summary();
+    }
 }
 
 pub(super) fn load_preset_records() -> Result<Vec<PresetRecord>, String> {

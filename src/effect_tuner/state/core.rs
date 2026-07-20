@@ -219,6 +219,27 @@ impl StoredParameterLfo {
 }
 
 impl EffectRuntimeSnapshot {
+    pub(crate) fn replace_post_effects_from(&mut self, source: &Self) {
+        self.current = source.current.clone();
+        let effect_count = EffectNumericParameter::all().len();
+        for (target, source) in self.lfos[..effect_count]
+            .iter_mut()
+            .zip(source.lfos.iter().copied())
+        {
+            *target = source;
+        }
+    }
+
+    pub(crate) fn replace_scene_lfos_from(&mut self, source: &Self) {
+        let effect_count = EffectNumericParameter::all().len();
+        for (target, source) in self.lfos[effect_count..]
+            .iter_mut()
+            .zip(source.lfos.iter().copied().skip(effect_count))
+        {
+            *target = source;
+        }
+    }
+
     fn stored_snapshot(&self) -> StoredEffectRuntimeSnapshot {
         StoredEffectRuntimeSnapshot {
             current: self.current.clone(),

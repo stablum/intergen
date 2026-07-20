@@ -4,6 +4,7 @@ use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
 use super::storage::{PresetRecord, load_preset_records, sort_preset_records, sync_preset_records};
+use crate::scene_snapshot::SceneStateSnapshot;
 
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, Eq, PartialEq, Hash)]
 pub(crate) struct PresetIndex {
@@ -20,7 +21,7 @@ impl PresetIndex {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum PresetCommand {
     Load(PresetLoadMode),
-    Save,
+    Save(PresetLoadMode),
     Free,
 }
 
@@ -28,7 +29,8 @@ impl PresetCommand {
     pub(super) fn label(self) -> &'static str {
         match self {
             Self::Load(mode) => mode.label(),
-            Self::Save => "save",
+            Self::Save(PresetLoadMode::All) => "save",
+            Self::Save(mode) => mode.save_label(),
             Self::Free => "free",
         }
     }
@@ -51,6 +53,25 @@ impl PresetLoadMode {
             Self::Parameters => "parameters",
         }
     }
+
+    fn save_label(self) -> &'static str {
+        match self {
+            Self::All => "save",
+            Self::Structure => "save objects",
+            Self::Effects => "save effects",
+            Self::Parameters => "save parameters",
+        }
+    }
+}
+
+#[derive(Clone)]
+pub(super) enum CollisionAction {
+    ResolveOnly,
+    Load(PresetLoadMode),
+    Save {
+        mode: PresetLoadMode,
+        scene: SceneStateSnapshot,
+    },
 }
 
 pub(crate) struct PresetStripSegments {
@@ -77,7 +98,7 @@ pub(super) struct CollisionResolutionState {
     pub(super) index: PresetIndex,
     pub(super) selected: usize,
     pub(super) candidates: Vec<PresetRecord>,
-    pub(super) load_mode: Option<PresetLoadMode>,
+    pub(super) action: CollisionAction,
 }
 
 #[derive(Resource)]
@@ -146,7 +167,7 @@ impl PresetBrowserState {
             target,
             banks,
             status,
-            emphasize_command: matches!(self.command, PresetCommand::Save)
+            emphasize_command: matches!(self.command, PresetCommand::Save(_))
                 || matches!(
                     self.command,
                     PresetCommand::Load(mode) if mode != PresetLoadMode::All
@@ -242,7 +263,7 @@ impl PresetBrowserState {
     }
 
     pub(super) fn arm_save(&mut self) {
-        self.command = PresetCommand::Save;
+        self.command = PresetCommand::Save(PresetLoadMode::All);
         self.first_digit = None;
         self.chooser = None;
         self.status_message = "type bank+slot".to_string();
@@ -255,8 +276,11 @@ impl PresetBrowserState {
         self.status_message = "type bank+slot".to_string();
     }
 
-    pub(super) fn arm_load(&mut self, mode: PresetLoadMode) {
-        self.command = PresetCommand::Load(mode);
+    pub(super) fn arm_component(&mut self, mode: PresetLoadMode) {
+        self.command = match self.command {
+            PresetCommand::Save(_) => PresetCommand::Save(mode),
+            _ => PresetCommand::Load(mode),
+        };
         self.first_digit = None;
         self.chooser = None;
         self.status_message = "type bank+slot".to_string();
@@ -286,14 +310,14 @@ impl PresetBrowserState {
     pub(super) fn start_collision_resolution(
         &mut self,
         index: PresetIndex,
-        load_mode: Option<PresetLoadMode>,
+        action: CollisionAction,
     ) {
         let candidates = self.records_for_index(index);
         self.chooser = Some(CollisionResolutionState {
             index,
             selected: 0,
             candidates,
-            load_mode,
+            action,
         });
         self.status_message = format!("resolve {}", index.code());
     }
@@ -416,7 +440,25 @@ mod tests {
             (PresetLoadMode::Effects, "effects"),
             (PresetLoadMode::Parameters, "parameters"),
         ] {
-            state.arm_load(mode);
+            state.arm_component(mode);
+            let segments = state.strip_segments();
+
+            assert_eq!(segments.command, label);
+            assert!(segments.emphasize_command);
+        }
+    }
+
+    #[test]
+    fn strip_segments_highlight_each_partial_save_operation() {
+        let mut state = PresetBrowserState::default();
+
+        for (mode, label) in [
+            (PresetLoadMode::Structure, "save objects"),
+            (PresetLoadMode::Effects, "save effects"),
+            (PresetLoadMode::Parameters, "save parameters"),
+        ] {
+            state.arm_save();
+            state.arm_component(mode);
             let segments = state.strip_segments();
 
             assert_eq!(segments.command, label);

@@ -613,6 +613,41 @@ fn scene_snapshot_preserves_post_effect_values_and_lfos() {
 }
 
 #[test]
+fn saved_snapshot_component_merges_keep_the_opposite_lfo_family() {
+    let effect_index = lfo_index_for_parameter(EffectTunerParameter::Effect(
+        EffectNumericParameter::LensStrength,
+    ))
+    .expect("effect parameter should have an LFO slot");
+    let scene_index = lfo_index_for_parameter(EffectTunerParameter::Scene(
+        EffectTunerSceneParameter::GlobalOpacity,
+    ))
+    .expect("scene parameter should have an LFO slot");
+    let mut source = EffectTunerState::from_config(&EffectsConfig::default());
+    source.current.lens_distortion.strength = 0.73;
+    source.lfos[effect_index].amplitude = 0.37;
+    source.lfos[scene_index].amplitude = 0.91;
+    let source = source.runtime_snapshot();
+
+    let mut target = EffectTunerState::from_config(&EffectsConfig::default());
+    target.current.lens_distortion.strength = 0.12;
+    target.lfos[effect_index].amplitude = 0.24;
+    target.lfos[scene_index].amplitude = 0.42;
+    let target = target.runtime_snapshot();
+
+    let mut effects_only = target.clone();
+    effects_only.replace_post_effects_from(&source);
+    assert_eq!(effects_only.current.lens_distortion.strength, 0.73);
+    assert_eq!(effects_only.lfos[effect_index].amplitude, 0.37);
+    assert_eq!(effects_only.lfos[scene_index].amplitude, 0.42);
+
+    let mut parameters_only = target;
+    parameters_only.replace_scene_lfos_from(&source);
+    assert_eq!(parameters_only.current.lens_distortion.strength, 0.12);
+    assert_eq!(parameters_only.lfos[effect_index].amplitude, 0.24);
+    assert_eq!(parameters_only.lfos[scene_index].amplitude, 0.91);
+}
+
+#[test]
 fn reset_confirmation_defaults_to_cancel_and_clamps_selection() {
     let mut effect_tuner = EffectTunerState::from_config(&EffectsConfig::default());
 

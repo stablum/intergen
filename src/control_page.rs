@@ -381,7 +381,7 @@ pub(crate) fn control_page_input_system(
                     close_page(previous_page, &mut effect_tuner, &mut preset_browser);
                 }
                 println!(
-                    "Scene preset mode open. Type two digits for a full load, or O/E/P then two digits for objects/effects/parameters."
+                    "Scene preset mode open. Use O/E/P plus two digits for partial loads, or prefix that sequence with S for partial saves."
                 );
             }
             Err(error) => eprintln!("{error}"),

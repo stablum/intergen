@@ -76,6 +76,9 @@ The preset page has 10 banks with 10 slots each.
 | `E`, then `00`–`99` | Load only the 2D post-scene effect values and effect LFO settings. |
 | `P`, then `00`–`99` | Load scene parameters and scene-parameter LFO settings; keep the current object structure and 2D post effects. |
 | `S`, then `00`–`99` | Save the current scene and assign it to that slot. |
+| `S`, then `O`, then `00`–`99` | Save only the current 3D object structure into that preset; preserve its parameters and post effects. |
+| `S`, then `E`, then `00`–`99` | Save only the current 2D post-scene effect values and effect LFO settings into that preset. |
+| `S`, then `P`, then `00`–`99` | Save only current scene parameters and scene-parameter LFO settings; preserve that preset's object structure and 2D post effects. |
 | `Delete`, then `00`–`99` | Free that slot in every preset file that claims it. |
 | `Up` / `Down` | In a slot-collision chooser, select which file keeps the slot. |
 | `Enter` | Confirm the selected collision resolution. |
@@ -84,6 +87,10 @@ The preset page has 10 banks with 10 slots each.
 The preset page captures digits, `O`, `E`, `P`, `S`, and `Delete`; when the collision chooser
 is visible it also captures `Up`, `Down`, and `Enter`. Other neutral controls
 remain available.
+
+A component-only save updates the preset already assigned to the slot. When the
+slot is empty, it creates a complete backing preset from the current scene so
+that every later full or component-only load remains valid.
 
 ## F4: Blender export
 

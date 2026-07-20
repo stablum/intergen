@@ -85,6 +85,12 @@ or `P` to load its non-effect scene parameters while keeping both the current
 object tree and post effects. The active operation and typed slot are highlighted
 in red in the F3 panel.
 
+Partial saves use the same prefixes after `S`: type `S O`, `S E`, or `S P`, then
+the two-digit slot. This replaces only that component in the assigned preset and
+preserves the others, including the opposite LFO family. A partial save to an
+empty slot creates a complete backing preset from the current scene. If several
+files claim the slot, choose the file to update in the collision chooser.
+
 A preset contains:
 
 - render background, ambient light, directional light, and point light
