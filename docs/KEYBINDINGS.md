@@ -136,6 +136,7 @@ F-page assigns them another meaning, as described above.
 | `Space` | Spawn using the current add mode; hold to repeat. |
 | `Ctrl + Space` | Cycle between single-object and fill-current-level add modes. |
 | `G` | Cycle placement through vertex, edge, and face attachments. |
+| `D` | Toggle the unoccluded red wireframe over the current spawn parent and latest spawned child. |
 | `H` | Rewind the single-spawn frontier so eligible root attachments are considered first. |
 | `R` | Reset the scene with the selected shape as the new root. |
 | `1` / `2` / `3` / `4` | Select cube, tetrahedron, octahedron, or dodecahedron. |
@@ -147,6 +148,11 @@ F-page assigns them another meaning, as described above.
 | `V` / `B` | Decrease or increase spawn-exclusion probability; hold to repeat. |
 | `N` | Reset spawn-exclusion probability to its configured default. |
 | `,` / `.` | Decrease or increase the total single-spawn child capacity of each attachment; hold to repeat. |
+
+The `D` overlay starts hidden. While enabled, a successful spawn highlights
+its parent and newest child. A sibling replaces the previous child highlight;
+moving to another parent replaces both highlights. Rewinding with `H` focuses
+the overlay on the root-first frontier and clears the previous child highlight.
 
 ### Materials
 

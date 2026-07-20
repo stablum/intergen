@@ -59,6 +59,7 @@ The current scene is spread across shared resources:
 - `LightingState`
 - `CameraRig`
 - `EffectTunerState`
+- `SpawnDebugOverlayState`
 
 These are scene-wide, not per object.
 
@@ -75,6 +76,14 @@ These are scene-wide, not per object.
 | `single_spawn_frontier` | derived active-parent index and child counts | Runtime-only cache rebuilt from node origins after reset, mode/capacity changes, fill spawns, or preset loading. It is not serialized as authoritative scene state. |
 | `parameters` | `GenerationParameters` | Shared scalar generation state. See the next table. |
 | `spawn_hold` | `HoldRepeatState` | Internal input state. `elapsed_secs` is expected to stay `>= 0.0`; `repeating` is boolean. |
+
+### `SpawnDebugOverlayState`
+
+This runtime-only resource stores whether the `D` debug overlay is enabled and
+the optional node indices for its current parent and latest-child wireframes.
+Successful spawns update the pair, while frontier changes such as `H`, placement
+or add-mode changes, and scene reset refocus the parent and clear the child.
+This diagnostic state is not part of scene presets or Blender snapshot data.
 
 ### `GenerationParameters`
 

@@ -1,10 +1,10 @@
 # Shape spawning: geometry and placement guide
 
 This guide explains every control that changes **what gets spawned, where it is
-placed, how it is oriented, and how large it is**. It covers the direct keyboard
-shortcuts, the generation controls on the `F2` page, the related
-`[generation]` configuration values, and the rules Intergen applies behind the
-scenes.
+placed, how it is oriented, and how large it is**, plus the debug overlay for
+inspecting the active spawning focus. It covers the direct keyboard shortcuts,
+the generation controls on the `F2` page, the related `[generation]`
+configuration values, and the rules Intergen applies behind the scenes.
 
 For a consolidated list of every application and F-mode binding, use the
 [canonical keybinding reference](KEYBINDINGS.md). The bindings repeated here
@@ -27,6 +27,7 @@ are limited to the geometry workflow and are explained in that context.
 - [Placement mode: G](#placement-mode-g)
 - [Add mode and spawning: Ctrl+Space and Space](#add-mode-and-spawning-ctrlspace-and-space)
 - [Single-attachment capacity and rewind: comma, period, and H](#single-attachment-capacity-and-rewind-comma-period-and-h)
+- [Spawn-state debug overlay: D](#spawn-state-debug-overlay-d)
 - [Uniform child scale ratio: minus and plus](#uniform-child-scale-ratio-minus-and-plus)
 - [Per-axis child scale: F2 only](#per-axis-child-scale-f2-only)
 - [Twist: brackets and T](#twist-brackets-and-t)
@@ -90,6 +91,7 @@ mask may claim the same keys for page navigation or editing.
 | `,` | Decrease single-attachment child capacity | minimum `0`; hold repeats | No |
 | `.` | Increase single-attachment child capacity | unbounded integer; hold repeats | No |
 | `H` | Rewind the single-spawn frontier | root-first | No |
+| `D` | Toggle spawn-state debug wireframes | current parent and latest child | No |
 | `-` | Decrease child uniform scale ratio | configured bounds; hold repeats | No |
 | `+` | Increase child uniform scale ratio | configured bounds; hold repeats | No |
 | `[` | Decrease twist | configured bounds; hold repeats | **Yes—reflows** |
@@ -236,6 +238,26 @@ rewinds the frontier.
 Repeated children share the source attachment but may still differ because of
 LFO values or their child mesh transform. Identical overlapping candidates can
 still be rejected by containment validation even when capacity remains.
+
+## Spawn-state debug overlay: D
+
+Press `D` to show or hide an unoccluded red wireframe over the spawning focus.
+The overlay is diagnostic only: it does not alter geometry, frontier order, or
+spawn eligibility.
+
+- Before the first spawn, the parent wireframe identifies the current frontier
+  parent (the root in a new or rewound scene).
+- After a successful spawn, one wireframe identifies its parent and another
+  identifies the new child.
+- Spawning a sibling replaces only the previous child wireframe.
+- Moving to a different spawning parent replaces the old parent and child
+  wireframes with the new pair.
+- Pressing `H`, changing placement or add mode, or resetting the scene refocuses
+  the parent wireframe and clears the child wireframe.
+- Pressing `D` again removes all debug wireframes.
+
+The overlay renders through scene geometry, so its highlighted shapes remain
+visible even when another object would normally occlude them.
 
 ## Uniform child scale ratio: minus and plus
 

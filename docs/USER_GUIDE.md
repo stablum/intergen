@@ -38,7 +38,9 @@ the application uses equivalent built-in defaults.
 3. Select a child shape with `1`–`4`, then press or hold `Space` to grow the
    structure.
 4. Press `G` to try vertex, edge, and face placement. Use `Ctrl + Space` to
-   switch between adding one object and filling the current level.
+   switch between adding one object and filling the current level. Press `D`
+   to show or hide the current spawn parent and latest child as unoccluded red
+   wireframes.
 5. Press `F2` to browse and tune scene, geometry, stage, material, lighting,
    camera, and shader parameters.
 6. Press `F3` to save or recall a scene, `F4` to export it to Blender, and `F12`
@@ -177,6 +179,11 @@ The main groups of live generation settings are:
   attachment, and larger values allow that many total children per attachment.
   Raising the capacity reactivates earlier attachments; press `H` to rewind the
   single-spawn frontier so root attachments are considered first
+
+The runtime-only `D` debug overlay shows the current spawning focus without
+changing the generated tree. It highlights the active parent and latest child;
+the child highlight follows each new sibling, and both highlights move when the
+spawning parent changes.
 
 For all configuration fields and their relationship to runtime and preset
 state, see the [data-model reference](DATA_MODEL.md). For geometry-specific

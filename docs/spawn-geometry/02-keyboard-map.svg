@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="960" height="430" viewBox="0 0 960 430" role="img" aria-labelledby="title desc">
-  <title id="title">Keyboard map for spawn geometry</title><desc id="desc">Color grouped keyboard keys for shape, placement, size, twist, offsets, filtering, reset, and spawning.</desc>
+  <title id="title">Keyboard map for spawning controls</title><desc id="desc">Color grouped keyboard keys for shape, placement, size, twist, offsets, filtering, frontier rewind, debug highlighting, reset, and spawning.</desc>
   <defs><linearGradient id="bg" x2="1" y2="1"><stop stop-color="#0b1020"/><stop offset="1" stop-color="#17122b"/></linearGradient><filter id="s"><feDropShadow dx="0" dy="5" stdDeviation="4" flood-opacity=".35"/></filter></defs>
   <rect width="960" height="430" rx="22" fill="url(#bg)"/>
-  <text x="36" y="44" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">Direct geometry controls</text>
+  <text x="36" y="44" fill="#f7f5ff" font-family="system-ui,sans-serif" font-size="24" font-weight="700">Direct spawning controls</text>
   <text x="36" y="70" fill="#aab5d6" font-family="system-ui,sans-serif" font-size="14">Normal scene view · holdable controls carry a ↻ symbol</text>
   <g font-family="system-ui,sans-serif" text-anchor="middle" filter="url(#s)">
     <g fill="#203f62" stroke="#63e6ff" stroke-width="2"><rect x="58" y="105" width="72" height="58" rx="10"/><rect x="140" y="105" width="72" height="58" rx="10"/><rect x="222" y="105" width="72" height="58" rx="10"/><rect x="304" y="105" width="72" height="58" rx="10"/></g>
@@ -23,7 +23,9 @@
     <g fill="#4b3c22" stroke="#ffe08a" stroke-width="2"><rect x="58" y="338" width="72" height="58" rx="10"/><rect x="140" y="338" width="72" height="58" rx="10"/><rect x="222" y="338" width="72" height="58" rx="10"/></g>
     <text x="94" y="374" fill="#fff1bc" font-size="18" font-weight="700">V ↻</text><text x="176" y="374" fill="#fff1bc" font-size="18" font-weight="700">B ↻</text><text x="258" y="374" fill="#fff1bc" font-size="21" font-weight="700">N</text>
     <text x="176" y="418" fill="#ffe08a" font-size="14">EXCLUSION</text>
-    <rect x="364" y="338" width="82" height="58" rx="10" fill="#432954" stroke="#ff72d0" stroke-width="2"/><text x="405" y="374" fill="#ffe1f5" font-size="21" font-weight="700">R</text><text x="405" y="418" fill="#ff8bd8" font-size="14">RESET TREE</text>
-    <rect x="530" y="338" width="372" height="58" rx="10" fill="#111a31" stroke="#37466d"/><text x="716" y="363" fill="#f7f5ff" font-size="14">F2 adds exact entry, axis scale, local position</text><text x="716" y="384" fill="#aab5d6" font-size="13">and LFO modulation for every numeric control</text>
+    <g fill="#432954" stroke="#ff72d0" stroke-width="2"><rect x="334" y="338" width="62" height="58" rx="10"/><rect x="406" y="338" width="62" height="58" rx="10"/></g>
+    <text x="365" y="374" fill="#ffe1f5" font-size="21" font-weight="700">D</text><text x="437" y="374" fill="#ffe1f5" font-size="21" font-weight="700">H</text><text x="401" y="418" fill="#ff8bd8" font-size="13">DEBUG / REWIND</text>
+    <rect x="504" y="338" width="72" height="58" rx="10" fill="#432954" stroke="#ff72d0" stroke-width="2"/><text x="540" y="374" fill="#ffe1f5" font-size="21" font-weight="700">R</text><text x="540" y="418" fill="#ff8bd8" font-size="13">RESET TREE</text>
+    <rect x="612" y="338" width="290" height="58" rx="10" fill="#111a31" stroke="#37466d"/><text x="757" y="362" fill="#f7f5ff" font-size="13">F2 adds exact entry, axis scale, local</text><text x="757" y="382" fill="#aab5d6" font-size="12">position, and numeric LFO modulation</text>
   </g>
 </svg>
