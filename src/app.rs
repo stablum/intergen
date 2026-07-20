@@ -26,6 +26,7 @@ use crate::presets::{
 };
 use crate::recent_changes::RecentChangesState;
 use crate::scene::setup_scene;
+use crate::spawn_debug::{SpawnDebugOverlayPlugin, sync_spawn_debug_overlay_system};
 use crate::ui::{
     HelpOverlayState, toggle_help_overlay_system, update_effect_tuner_group_overlay_system,
     update_effect_tuner_list_overlay_system, update_effect_tuner_overlay_system,
@@ -80,6 +81,7 @@ pub fn run() {
             ..default()
         }))
         .add_plugins(EffectsPlugin)
+        .add_plugins(SpawnDebugOverlayPlugin)
         .add_systems(
             Startup,
             (
@@ -101,6 +103,7 @@ pub fn run() {
                 camera_input_system,
                 camera_motion_system,
                 generation_input_system,
+                sync_spawn_debug_overlay_system,
                 apply_effect_tuner_system,
                 update_effect_tuner_overlay_system,
                 update_effect_tuner_group_overlay_system,

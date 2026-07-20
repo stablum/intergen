@@ -28,18 +28,48 @@ impl ShapeAssets {
             ShapeKind::Dodecahedron => &self.dodecahedron.mesh,
         }
     }
+
+    pub(crate) fn debug_wireframe_mesh(&self, kind: ShapeKind) -> &Handle<Mesh> {
+        match kind {
+            ShapeKind::Cube => &self.cube.debug_wireframe_mesh,
+            ShapeKind::Tetrahedron => &self.tetrahedron.debug_wireframe_mesh,
+            ShapeKind::Octahedron => &self.octahedron.debug_wireframe_mesh,
+            ShapeKind::Dodecahedron => &self.dodecahedron.debug_wireframe_mesh,
+        }
+    }
 }
 
 struct ShapeRuntime {
     mesh: Handle<Mesh>,
+    debug_wireframe_mesh: Handle<Mesh>,
 }
 
 impl ShapeRuntime {
     fn new(geometry: &ShapeGeometry, meshes: &mut Assets<Mesh>) -> Self {
         Self {
             mesh: meshes.add(build_mesh(geometry)),
+            debug_wireframe_mesh: meshes.add(build_debug_wireframe_mesh(geometry)),
         }
     }
+}
+
+fn build_debug_wireframe_mesh(geometry: &ShapeGeometry) -> Mesh {
+    let vertices = geometry
+        .edges
+        .iter()
+        .flat_map(|[left, right]| [geometry.vertices[*left], geometry.vertices[*right]])
+        .collect::<Vec<_>>();
+    let normals = vertices
+        .iter()
+        .map(|vertex| vertex.normalize_or_zero())
+        .collect::<Vec<_>>();
+
+    Mesh::new(
+        PrimitiveTopology::LineList,
+        RenderAssetUsages::RENDER_WORLD,
+    )
+    .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
+    .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
 }
 
 #[derive(Clone, Debug)]
@@ -603,6 +633,16 @@ impl GenerationState {
 
     pub(crate) fn reset_single_spawn_source_cursor(&mut self) {
         self.single_spawn_source_cursor = None;
+    }
+
+    pub(crate) fn current_single_spawn_parent_index(&mut self) -> Option<usize> {
+        let mode = self.spawn_placement_mode;
+        let capacity = self.single_attachment_repeat_count;
+        self.single_spawn_frontier
+            .ensure(&self.nodes, mode, capacity);
+        self.single_spawn_frontier
+            .source_at_or_after(self.single_spawn_source_cursor)
+            .map(|source| source.parent_index)
     }
 }
 

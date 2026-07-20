@@ -513,6 +513,7 @@ fn apply_complete_scene_preset(
             node_index,
         );
     }
+    reset_spawn_debug_focus(runtime);
 
     Ok(())
 }
@@ -525,6 +526,7 @@ fn apply_structure_preset(
     replace_object_structure(&mut runtime.generation_state, prepared_generation);
 
     respawn_shape_entities(runtime);
+    reset_spawn_debug_focus(runtime);
     Ok(())
 }
 
@@ -606,6 +608,11 @@ fn respawn_shape_entities(runtime: &mut SceneMutationAccess<'_, '_>) {
             node_index,
         );
     }
+}
+
+fn reset_spawn_debug_focus(runtime: &mut SceneMutationAccess<'_, '_>) {
+    let parent_node_index = runtime.generation_state.current_single_spawn_parent_index();
+    runtime.spawn_debug_overlay.focus_parent(parent_node_index);
 }
 
 fn replace_object_structure(current: &mut GenerationState, preset: GenerationState) {

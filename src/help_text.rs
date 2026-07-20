@@ -134,7 +134,7 @@ const PRESET_HELP: [HelpEntry; 1] = [HelpEntry {
     explanation: "In the preset page, load or save full scenes or only object structure, post effects, or non-effect parameters; Del frees a slot.",
 }];
 
-const SCENE_HELP: [HelpEntry; 25] = [
+const SCENE_HELP: [HelpEntry; 26] = [
     HelpEntry {
         startup: "Arrow Up/Down pitch camera",
         overlay: "Arrow Up / Down: Pitch camera",
@@ -182,6 +182,12 @@ const SCENE_HELP: [HelpEntry; 25] = [
         overlay: "G: Cycle spawn placement mode (vertex / edge / face)",
         binding: "G",
         explanation: "Cycle spawn placement mode between vertex, edge, and face.",
+    },
+    HelpEntry {
+        startup: "D toggles the spawn debug wireframe",
+        overlay: "D: Toggle the spawn parent / latest child debug wireframe",
+        binding: "D",
+        explanation: "Toggle an unoccluded red wireframe over the current spawn parent and latest child.",
     },
     HelpEntry {
         startup: "H rewinds the single-spawn frontier to the root",

@@ -16,6 +16,7 @@ mod scene;
 mod scene_snapshot;
 #[path = "polyhedra/mod.rs"]
 mod shapes;
+mod spawn_debug;
 mod timestamp;
 mod ui;
 

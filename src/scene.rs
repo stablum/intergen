@@ -1,5 +1,8 @@
+use bevy::asset::RenderAssetUsages;
+use bevy::camera::visibility::RenderLayers;
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::math::primitives::Cuboid;
+use bevy::mesh::PrimitiveTopology;
 use bevy::prelude::*;
 
 use crate::camera::{CameraRig, SceneCamera};
@@ -18,6 +21,7 @@ use crate::shapes::{
     NodeOrigin, ShapeCatalog, ShapeGeometry, ShapeKind, ShapeNode, SpawnAddMode, SpawnAttachment,
     SpawnPlacementMode, SpawnTuning, build_mesh, root_node_with_axis_scale,
 };
+use crate::spawn_debug::{SPAWN_DEBUG_RENDER_LAYER, SpawnDebugOverlayCamera};
 use crate::ui::{UiFontSource, load_ui_theme, spawn_help_ui};
 
 include!("scene/state.rs");

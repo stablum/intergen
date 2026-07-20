@@ -75,6 +75,20 @@ pub(crate) fn setup_scene(
             camera_effects_from_config(&app_config.effects),
         ))
         .id();
+    commands.spawn((
+        Camera3d::default(),
+        Camera {
+            order: 1,
+            clear_color: ClearColorConfig::None,
+            is_active: false,
+            ..default()
+        },
+        Tonemapping::AcesFitted,
+        Transform::from_translation(camera_translation)
+            .looking_at(Vec3::ZERO, camera_rig.orientation * Vec3::Y),
+        SpawnDebugOverlayCamera,
+        RenderLayers::layer(SPAWN_DEBUG_RENDER_LAYER),
+    ));
 
     spawn_help_ui(&mut commands, &ui_theme, scene_camera, &app_config.ui);
 

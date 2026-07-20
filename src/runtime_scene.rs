@@ -9,6 +9,7 @@ use crate::scene::{
     SceneDirectionalLight, SceneLightEntity, ScenePointLight, SceneStageEntity, ShapeAssets,
     ShapeEntity, StageState,
 };
+use crate::spawn_debug::SpawnDebugOverlayState;
 
 #[derive(SystemParam)]
 pub(crate) struct SceneSnapshotAccess<'w, 's> {
@@ -34,6 +35,7 @@ pub(crate) struct SceneMutationAccess<'w, 's> {
     pub(crate) effect_tuner: ResMut<'w, EffectTunerState>,
     pub(crate) shape_assets: Res<'w, ShapeAssets>,
     pub(crate) generation_state: ResMut<'w, GenerationState>,
+    pub(crate) spawn_debug_overlay: ResMut<'w, SpawnDebugOverlayState>,
     pub(crate) material_state: ResMut<'w, MaterialState>,
     pub(crate) stage_state: ResMut<'w, StageState>,
     pub(crate) rendering_state: ResMut<'w, RenderingState>,

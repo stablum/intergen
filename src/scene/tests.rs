@@ -1,4 +1,5 @@
 use bevy::prelude::{AlphaMode, Quat, Vec3};
+use bevy::mesh::PrimitiveTopology;
 
 use crate::config::GenerationConfig;
 use crate::parameters::{GenerationParameter, HoldRepeatState};
@@ -9,9 +10,19 @@ use crate::shapes::{
 
 use super::{
     GenerationParameters, GenerationState, SingleSpawnFrontier, SingleSpawnSourceCursor,
-    alpha_mode_for_opacity, reset_generation_state,
+    alpha_mode_for_opacity, build_debug_wireframe_mesh, reset_generation_state,
     root_generation_node,
 };
+
+#[test]
+fn debug_wireframe_mesh_contains_one_line_for_each_shape_edge() {
+    let shape_catalog = ShapeCatalog::new();
+    let geometry = shape_catalog.geometry(ShapeKind::Dodecahedron);
+    let mesh = build_debug_wireframe_mesh(geometry);
+
+    assert_eq!(mesh.primitive_topology(), PrimitiveTopology::LineList);
+    assert_eq!(mesh.count_vertices(), geometry.edges.len() * 2);
+}
 
 #[test]
 fn reset_generation_state_restores_root_only() {

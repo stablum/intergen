@@ -94,7 +94,12 @@ const KEYBOARD_HOME_ROW: [KeyboardHelpKeySpec; 13] = [
     keyboard_help_key("Caps", 1.8, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("A", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("S", 1.0, true, "Zoom out."),
-    keyboard_help_key("D", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
+    keyboard_help_key(
+        "D",
+        1.0,
+        true,
+        "Toggle the spawn parent and latest child debug wireframe.",
+    ),
     keyboard_help_key("F", 1.0, false, KEYBOARD_HELP_UNUSED_TEXT),
     keyboard_help_key("G", 1.0, true, "Cycle the spawn placement mode."),
     keyboard_help_key("H", 1.0, true, "Rewind the single-spawn frontier to the root."),

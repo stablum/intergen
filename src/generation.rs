@@ -15,9 +15,10 @@ use crate::scene::{
     opacity_status_message, reset_generation_state, spawn_shape_entity, sync_shape_transforms,
 };
 use crate::shapes::{
-    ShapeKind, SpawnAddMode, SpawnPlacementMode, SpawnedShape, next_spawn_on_reusable_attachment,
-    recompute_spawn_tree, spawn_batch_with_inputs,
+    NodeOrigin, ShapeKind, SpawnAddMode, SpawnPlacementMode, SpawnedShape,
+    next_spawn_on_reusable_attachment, recompute_spawn_tree, spawn_batch_with_inputs,
 };
+use crate::spawn_debug::{SpawnDebugOverlayState, spawn_debug_overlay_status_message};
 
 const RADIANS_TO_DEGREES: f32 = 180.0 / std::f32::consts::PI;
 const TWIST_DECREASE_KEYS: [KeyCode; 1] = [KeyCode::BracketLeft];
@@ -55,6 +56,7 @@ pub(crate) fn generation_input_system(
     mut effect_tuner: ResMut<EffectTunerState>,
     mut neutral_parameter_input: ResMut<NeutralParameterInputState>,
     mut recent_changes: ResMut<RecentChangesState>,
+    mut spawn_debug_overlay: ResMut<SpawnDebugOverlayState>,
     mut scene: GenerationSceneAccess,
 ) {
     let input_mask = *control_page_input_mask;
@@ -67,10 +69,18 @@ pub(crate) fn generation_input_system(
         &mut recent_changes,
         now_secs,
     );
+    handle_spawn_debug_overlay_toggle(
+        &keys,
+        input_mask,
+        &mut spawn_debug_overlay,
+        &mut recent_changes,
+        now_secs,
+    );
     let ctrl_pressed = handle_mode_shortcuts(
         &keys,
         input_mask,
         &mut scene.generation_state,
+        &mut spawn_debug_overlay,
         &mut recent_changes,
         now_secs,
     );
@@ -97,6 +107,7 @@ pub(crate) fn generation_input_system(
         &keys,
         input_mask,
         &mut scene.generation_state,
+        &mut spawn_debug_overlay,
         &mut recent_changes,
         now_secs,
     );
@@ -162,7 +173,14 @@ pub(crate) fn generation_input_system(
         recompute_generation_tree(&mut scene);
     }
 
-    if handle_scene_reset(&keys, input_mask, &mut scene, &mut recent_changes, now_secs) {
+    if handle_scene_reset(
+        &keys,
+        input_mask,
+        &mut scene,
+        &mut spawn_debug_overlay,
+        &mut recent_changes,
+        now_secs,
+    ) {
         return;
     }
 
@@ -173,6 +191,7 @@ pub(crate) fn generation_input_system(
         input_mask,
         ctrl_pressed,
         &effect_tuner,
+        &mut spawn_debug_overlay,
         &mut scene,
     );
 }
@@ -200,6 +219,7 @@ fn handle_mode_shortcuts(
     keys: &ButtonInput<KeyCode>,
     input_mask: ControlPageInputMask,
     generation_state: &mut crate::scene::GenerationState,
+    spawn_debug_overlay: &mut SpawnDebugOverlayState,
     recent_changes: &mut RecentChangesState,
     now_secs: f32,
 ) -> bool {
@@ -207,6 +227,7 @@ fn handle_mode_shortcuts(
         generation_state.finalize_single_spawn_source_cursor();
         generation_state.single_spawn_frontier.invalidate();
         generation_state.spawn_placement_mode = generation_state.spawn_placement_mode.next();
+        focus_debug_overlay_on_frontier(generation_state, spawn_debug_overlay);
         let message = spawn_placement_mode_status_message(generation_state.spawn_placement_mode);
         recent_changes.record_status_message(message.clone(), now_secs);
         println!("{message}");
@@ -217,12 +238,30 @@ fn handle_mode_shortcuts(
         generation_state.finalize_single_spawn_source_cursor();
         generation_state.single_spawn_frontier.invalidate();
         generation_state.spawn_add_mode = generation_state.spawn_add_mode.next();
+        focus_debug_overlay_on_frontier(generation_state, spawn_debug_overlay);
         let message = spawn_add_mode_status_message(generation_state.spawn_add_mode);
         recent_changes.record_status_message(message.clone(), now_secs);
         println!("{message}");
     }
 
     ctrl_pressed
+}
+
+fn handle_spawn_debug_overlay_toggle(
+    keys: &ButtonInput<KeyCode>,
+    input_mask: ControlPageInputMask,
+    spawn_debug_overlay: &mut SpawnDebugOverlayState,
+    recent_changes: &mut RecentChangesState,
+    now_secs: f32,
+) {
+    if !just_pressed_unmasked(keys, input_mask, KeyCode::KeyD) {
+        return;
+    }
+
+    let enabled = spawn_debug_overlay.toggle();
+    let message = spawn_debug_overlay_status_message(enabled);
+    recent_changes.record_status_message(message.to_string(), now_secs);
+    println!("{message}");
 }
 
 fn control_pressed(keys: &ButtonInput<KeyCode>) -> bool {
@@ -336,6 +375,7 @@ fn handle_spawn_frontier_rewind(
     keys: &ButtonInput<KeyCode>,
     input_mask: ControlPageInputMask,
     generation_state: &mut crate::scene::GenerationState,
+    spawn_debug_overlay: &mut SpawnDebugOverlayState,
     recent_changes: &mut RecentChangesState,
     now_secs: f32,
 ) {
@@ -344,9 +384,18 @@ fn handle_spawn_frontier_rewind(
     }
 
     generation_state.reset_single_spawn_source_cursor();
+    focus_debug_overlay_on_frontier(generation_state, spawn_debug_overlay);
     let message = spawn_frontier_rewind_status_message();
     recent_changes.record_status_message(message.to_string(), now_secs);
     println!("{message}");
+}
+
+fn focus_debug_overlay_on_frontier(
+    generation_state: &mut crate::scene::GenerationState,
+    spawn_debug_overlay: &mut SpawnDebugOverlayState,
+) {
+    let parent_node_index = generation_state.current_single_spawn_parent_index();
+    spawn_debug_overlay.focus_parent(parent_node_index);
 }
 
 fn handle_opacity_input(
@@ -571,6 +620,7 @@ fn handle_scene_reset(
     keys: &ButtonInput<KeyCode>,
     input_mask: ControlPageInputMask,
     scene: &mut GenerationSceneAccess<'_, '_>,
+    spawn_debug_overlay: &mut SpawnDebugOverlayState,
     recent_changes: &mut RecentChangesState,
     now_secs: f32,
 ) -> bool {
@@ -587,6 +637,7 @@ fn handle_scene_reset(
         &scene.shape_assets.catalog,
         &scene.app_config.generation,
     );
+    spawn_debug_overlay.focus_parent(Some(0));
     let material_config = scene
         .material_state
         .runtime_material_config(&scene.app_config.materials);
@@ -615,6 +666,7 @@ fn handle_spawn_input(
     input_mask: ControlPageInputMask,
     ctrl_pressed: bool,
     effect_tuner: &EffectTunerState,
+    spawn_debug_overlay: &mut SpawnDebugOverlayState,
     scene: &mut GenerationSceneAccess<'_, '_>,
 ) {
     let spawn_requested = scene.generation_state.spawn_hold.update(
@@ -737,6 +789,13 @@ fn handle_spawn_input(
             scene.material_state.opacity,
             first_new_index + offset,
         );
+    }
+    let last_spawn = spawned
+        .last()
+        .expect("a non-empty spawn batch must have a last shape");
+    if let NodeOrigin::Child { parent_index, .. } = last_spawn.node.origin {
+        let child_node_index = first_new_index + spawned.len() - 1;
+        spawn_debug_overlay.track_spawn(parent_index, child_node_index);
     }
     println!("{}", spawn_summary_status_message(&spawned, add_mode));
 }
