@@ -21,7 +21,9 @@ use crate::shapes::{
     NodeOrigin, ShapeCatalog, ShapeGeometry, ShapeKind, ShapeNode, SpawnAddMode, SpawnAttachment,
     SpawnPlacementMode, SpawnTuning, build_mesh, root_node_with_axis_scale,
 };
-use crate::spawn_debug::{SPAWN_DEBUG_RENDER_LAYER, SpawnDebugOverlayCamera};
+use crate::spawn_debug::{
+    SPAWN_DEBUG_CAMERA_ORDER, SPAWN_DEBUG_RENDER_LAYER, SpawnDebugOverlayCamera,
+};
 use crate::ui::{UiFontSource, load_ui_theme, spawn_help_ui};
 
 include!("scene/state.rs");

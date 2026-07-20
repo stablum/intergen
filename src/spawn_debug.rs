@@ -6,6 +6,7 @@ use crate::camera::SceneCamera;
 use crate::scene::{GenerationState, ShapeAssets};
 
 pub(crate) const SPAWN_DEBUG_RENDER_LAYER: usize = 1;
+pub(crate) const SPAWN_DEBUG_CAMERA_ORDER: isize = 1;
 
 pub(crate) struct SpawnDebugOverlayPlugin;
 
@@ -94,11 +95,15 @@ pub(crate) fn sync_spawn_debug_overlay_system(
     shape_assets: Res<ShapeAssets>,
     mut overlay_state: ResMut<SpawnDebugOverlayState>,
     mut overlay_materials: ResMut<Assets<StandardMaterial>>,
-    scene_camera: Query<&Transform, (With<SceneCamera>, Without<SpawnDebugOverlayCamera>)>,
+    scene_camera: Query<
+        (Entity, &Transform),
+        (With<SceneCamera>, Without<SpawnDebugOverlayCamera>),
+    >,
     mut overlay_camera: Query<
-        (&mut Camera, &mut Transform),
+        (Entity, &mut Camera, &mut Transform),
         (With<SpawnDebugOverlayCamera>, Without<SceneCamera>),
     >,
+    mut ui_target_cameras: Query<&mut UiTargetCamera>,
     mut overlays: Query<
         (
             Entity,
@@ -109,11 +114,25 @@ pub(crate) fn sync_spawn_debug_overlay_system(
         (Without<SceneCamera>, Without<SpawnDebugOverlayCamera>),
     >,
 ) {
-    if let (Ok(scene_transform), Ok((mut camera, mut camera_transform))) =
-        (scene_camera.single(), overlay_camera.single_mut())
+    if let (
+        Ok((scene_camera_entity, scene_transform)),
+        Ok((overlay_camera_entity, mut camera, mut camera_transform)),
+    ) = (scene_camera.single(), overlay_camera.single_mut())
     {
         camera.is_active = overlay_state.enabled;
         *camera_transform = *scene_transform;
+        let desired_ui_camera = ui_camera_for_debug_state(
+            overlay_state.enabled,
+            scene_camera_entity,
+            overlay_camera_entity,
+        );
+        for mut ui_target_camera in &mut ui_target_cameras {
+            if ui_target_camera.0 == scene_camera_entity
+                || ui_target_camera.0 == overlay_camera_entity
+            {
+                ui_target_camera.0 = desired_ui_camera;
+            }
+        }
     }
 
     let material = overlay_state
@@ -169,6 +188,18 @@ pub(crate) fn sync_spawn_debug_overlay_system(
     }
 }
 
+fn ui_camera_for_debug_state(
+    enabled: bool,
+    scene_camera: Entity,
+    overlay_camera: Entity,
+) -> Entity {
+    if enabled {
+        overlay_camera
+    } else {
+        scene_camera
+    }
+}
+
 fn overlay_transform(node: &crate::shapes::ShapeNode) -> Transform {
     Transform {
         translation: node.center,
@@ -187,7 +218,27 @@ pub(crate) fn spawn_debug_overlay_status_message(enabled: bool) -> &'static str 
 
 #[cfg(test)]
 mod tests {
-    use super::{SpawnDebugOverlayState, spawn_debug_overlay_status_message};
+    use bevy::prelude::Entity;
+
+    use super::{
+        SpawnDebugOverlayState, spawn_debug_overlay_status_message, ui_camera_for_debug_state,
+    };
+
+    #[test]
+    fn ui_tracks_the_camera_that_finishes_the_scene() {
+        let scene_camera = Entity::from_raw_u32(1).expect("scene camera entity should be valid");
+        let overlay_camera =
+            Entity::from_raw_u32(2).expect("overlay camera entity should be valid");
+
+        assert_eq!(
+            ui_camera_for_debug_state(false, scene_camera, overlay_camera),
+            scene_camera
+        );
+        assert_eq!(
+            ui_camera_for_debug_state(true, scene_camera, overlay_camera),
+            overlay_camera
+        );
+    }
 
     #[test]
     fn overlay_starts_hidden_and_focused_on_the_root() {

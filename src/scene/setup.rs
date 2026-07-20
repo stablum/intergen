@@ -78,7 +78,7 @@ pub(crate) fn setup_scene(
     commands.spawn((
         Camera3d::default(),
         Camera {
-            order: 1,
+            order: SPAWN_DEBUG_CAMERA_ORDER,
             clear_color: ClearColorConfig::None,
             is_active: false,
             ..default()
